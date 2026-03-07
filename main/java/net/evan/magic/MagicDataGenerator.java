@@ -1,0 +1,12 @@
+package net.evan.magic;
+
+import net.fabricmc.fabric.api.datagen.v1.DataGeneratorEntrypoint;
+import net.fabricmc.fabric.api.datagen.v1.FabricDataGenerator;
+
+public final class MagicDataGenerator implements DataGeneratorEntrypoint {
+	@Override
+	public void onInitializeDataGenerator(FabricDataGenerator fabricDataGenerator) {
+		fabricDataGenerator.createPack();
+		// TODO: Register data providers when blocks/items/recipes are added.
+	}
+}

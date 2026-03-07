@@ -1,0 +1,37 @@
+{
+	"schemaVersion": 1,
+	"id": "magic",
+	"version": "${version}",
+	"name": "Magic",
+	"description": "Starter workspace for a new Fabric mod.",
+	"authors": [
+		"Evan"
+	],
+	"contact": {
+		"homepage": "",
+		"sources": ""
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/magic/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.evan.magic.Magic"
+		],
+		"client": [
+			"net.evan.magic.client.MagicClient"
+		],
+		"fabric-datagen": [
+			"net.evan.magic.MagicDataGenerator"
+		]
+	},
+	"mixins": [
+		"magic.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

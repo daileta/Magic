@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "net.evan.magic.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"EnderPearlEntityMixin",
+		"PlayerEntityMixin",
+		"ServerPlayNetworkHandlerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
