@@ -212,6 +212,7 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, ManipulationState> MANIPULATION_STATES = new HashMap<>();
 	private static final Map<UUID, UUID> MANIPULATION_CASTER_BY_TARGET = new HashMap<>();
 	private static final Map<UUID, PlayerInput> MANIPULATION_INPUT_BY_CASTER = new HashMap<>();
+	private static final Map<UUID, ManipulationLookState> MANIPULATION_LOOK_BY_CASTER = new HashMap<>();
 	private static final Map<UUID, Integer> MANIPULATION_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, Integer> MANIPULATION_NEXT_REQUEST_TICK = new HashMap<>();
 	private static final Map<UUID, Integer> MANIPULATION_LAST_CLAMP_LOG_TICK = new HashMap<>();
@@ -2668,6 +2669,8 @@ public final class MagicAbilityManager {
 		);
 		MANIPULATION_STATES.put(casterId, state);
 		MANIPULATION_CASTER_BY_TARGET.put(target.getUuid(), casterId);
+		MANIPULATION_INPUT_BY_CASTER.putIfAbsent(casterId, PlayerInput.DEFAULT);
+		MANIPULATION_LOOK_BY_CASTER.put(casterId, new ManipulationLookState(caster.getYaw(), caster.getPitch()));
 		debugManipulation(
 			"{} manipulation maps updated: activeStates={}, controlledTargets={}",
 			debugName(caster),
@@ -2734,8 +2737,9 @@ public final class MagicAbilityManager {
 			sneaking,
 			sprinting
 		);
-		float yaw = caster.getYaw();
-		float pitch = caster.getPitch();
+		ManipulationLookState lookState = MANIPULATION_LOOK_BY_CASTER.get(caster.getUuid());
+		float yaw = lookState == null ? caster.getYaw() : lookState.yaw;
+		float pitch = lookState == null ? caster.getPitch() : lookState.pitch;
 
 		targetPlayer.move(MovementType.SELF, horizontalDelta);
 		targetPlayer.stopUsingItem();
@@ -2825,6 +2829,7 @@ public final class MagicAbilityManager {
 			MANIPULATION_LAST_CLAMP_LOG_TICK.remove(entry.getKey());
 			MANIPULATION_INTERACTION_PROXY.remove(entry.getKey());
 			MANIPULATION_INPUT_BY_CASTER.remove(entry.getKey());
+			MANIPULATION_LOOK_BY_CASTER.remove(entry.getKey());
 			debugManipulation(
 				"{} manipulation cleanup finalized: cooldownEndTick={}, remainingStates={}",
 				caster == null ? entry.getKey() : debugName(caster),
@@ -3774,6 +3779,21 @@ public final class MagicAbilityManager {
 		);
 	}
 
+	public static void onManipulationLookPacket(ServerPlayerEntity player, float yaw, float pitch) {
+		UUID playerId = player.getUuid();
+		MANIPULATION_LOOK_BY_CASTER.put(playerId, new ManipulationLookState(yaw, pitch));
+		if (!isManipulatingCaster(player) && !isManipulationControlledTarget(player)) {
+			return;
+		}
+
+		debugManipulation(
+			"{} look packet: yaw={}, pitch={}",
+			debugName(player),
+			round3(yaw),
+			round3(pitch)
+		);
+	}
+
 	private static boolean isLovePowerActiveThisSecond(ServerPlayerEntity player) {
 		return LOVE_POWER_ACTIVE_THIS_SECOND.getOrDefault(player.getUuid(), false);
 	}
@@ -3950,6 +3970,7 @@ public final class MagicAbilityManager {
 			MANIPULATION_LAST_CLAMP_LOG_TICK.remove(playerId);
 			MANIPULATION_INTERACTION_PROXY.remove(playerId);
 			MANIPULATION_INPUT_BY_CASTER.remove(playerId);
+			MANIPULATION_LOOK_BY_CASTER.remove(playerId);
 			return removed ? 1 : 0;
 		}
 
@@ -4009,6 +4030,7 @@ public final class MagicAbilityManager {
 		MANIPULATION_LAST_CLAMP_LOG_TICK.remove(playerId);
 		MANIPULATION_INTERACTION_PROXY.remove(playerId);
 		MANIPULATION_INPUT_BY_CASTER.remove(playerId);
+		MANIPULATION_LOOK_BY_CASTER.remove(playerId);
 		ABSOLUTE_ZERO_NEXT_DAMAGE_TICK.remove(playerId);
 		PLANCK_HEAT_STATES.remove(playerId);
 		PLANCK_HEAT_FROST_NEXT_DAMAGE_TICK.remove(playerId);
@@ -4066,6 +4088,7 @@ public final class MagicAbilityManager {
 			MANIPULATION_LAST_CLAMP_LOG_TICK.remove(manipulatorId);
 			MANIPULATION_INTERACTION_PROXY.remove(manipulatorId);
 			MANIPULATION_INPUT_BY_CASTER.remove(manipulatorId);
+			MANIPULATION_LOOK_BY_CASTER.remove(manipulatorId);
 			if (manipulator != null && activeAbility(manipulator) == MagicAbility.MANIPULATION) {
 				setActiveAbility(manipulator, MagicAbility.NONE);
 				manipulator.setCameraEntity(manipulator);
@@ -4146,6 +4169,7 @@ public final class MagicAbilityManager {
 		MANIPULATION_LAST_CLAMP_LOG_TICK.remove(casterId);
 		MANIPULATION_INTERACTION_PROXY.remove(casterId);
 		MANIPULATION_INPUT_BY_CASTER.remove(casterId);
+		MANIPULATION_LOOK_BY_CASTER.remove(casterId);
 		if (state == null) {
 			debugManipulation(
 				"{} manipulation deactivate skipped (no state). reason={}, startCooldown={}",
@@ -4540,6 +4564,16 @@ public final class MagicAbilityManager {
 
 		private ManipulationProxyState(Vec3d originalPos, float yaw, float pitch) {
 			this.originalPos = originalPos;
+			this.yaw = yaw;
+			this.pitch = pitch;
+		}
+	}
+
+	private static final class ManipulationLookState {
+		private final float yaw;
+		private final float pitch;
+
+		private ManipulationLookState(float yaw, float pitch) {
 			this.yaw = yaw;
 			this.pitch = pitch;
 		}

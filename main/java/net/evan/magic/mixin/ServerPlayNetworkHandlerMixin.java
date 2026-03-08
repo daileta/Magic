@@ -43,6 +43,7 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerMove", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerMoveHead(PlayerMoveC2SPacket packet, CallbackInfo ci) {
+		MagicAbilityManager.onManipulationLookPacket(player, packet.getYaw(player.getYaw()), packet.getPitch(player.getPitch()));
 		if (MagicAbilityManager.isManipulationControlledTarget(player)) {
 			magic$packetDebug("{} packet onPlayerMove canceled: player is manipulation-controlled target", magic$debugName());
 			ci.cancel();
