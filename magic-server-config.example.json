@@ -1,0 +1,104 @@
+{
+  "mana": {
+    "belowFreezingDrainPerSecond": 5,
+    "absoluteZeroDrainPerSecond": 20,
+    "loveAtFirstSightIdleDrainPerSecond": 2,
+    "loveAtFirstSightActiveDrainPerSecond": 5,
+    "tillDeathDoUsPartActivationCostPercent": 50,
+    "tillDeathDoUsPartMinimumTriggerPercent": 50,
+    "manipulationDrainPerSecond": 2,
+    "domainExpansionActivationCost": 0,
+    "passiveRegenPerSecond": 10,
+    "depletedRecoveryRegenPerSecond": 5,
+    "planckHeatActivationCost": 75
+  },
+  "timing": {
+    "effectRefreshTicks": 40,
+    "frostbiteDurationTicks": 120,
+    "frostVisualTicks": 180,
+    "absoluteZeroAuraDamageIntervalTicks": 50,
+    "absoluteZeroCooldownTicks": 1200,
+    "planckHeatCooldownTicks": 12000,
+    "planckHeatFrostPhaseTicks": 120,
+    "planckHeatFirePhaseTicks": 300,
+    "planckHeatFrostDamageIntervalTicks": 20,
+    "planckHeatEnhancedFireDamageIntervalTicks": 20,
+    "planckHeatAttackEnhancedFireDurationTicks": 160,
+    "planckHeatAuraEnhancedFireDurationTicks": 80,
+    "planckHeatAbsorptionDurationTicks": 2400,
+    "planckHeatStrengthDurationTicks": 2400,
+    "planckHeatFireResistanceDurationTicks": 9600,
+    "loveLockEffectTicks": 5,
+    "tillDeathDoUsPartWaitDurationTicks": 2400,
+    "tillDeathDoUsPartLinkDurationTicks": 600,
+    "tillDeathDoUsPartNoTriggerCooldownTicks": 1200,
+    "tillDeathDoUsPartTriggeredCooldownTicks": 3600,
+    "manipulationCooldownTicks": 6000,
+    "manipulationRequestDebounceTicks": 6,
+    "manipulationClampLogIntervalTicks": 20,
+    "domainExpansionDurationTicks": 1200,
+    "frostDomainCooldownTicks": 1200,
+    "loveDomainCooldownTicks": 36000
+  },
+  "damage": {
+    "frostbiteDamage": 2.0,
+    "absoluteZeroAuraDamage": 4.0,
+    "planckHeatFrostDamage": 14.0,
+    "planckHeatEnhancedFireDamage": 6.0
+  },
+  "radii": {
+    "belowFreezingAuraRadius": 1,
+    "absoluteZeroAuraRadius": 4,
+    "planckHeatAuraRadius": 8,
+    "loveGazeRange": 32,
+    "domainExpansionRadius": 25,
+    "domainExpansionHeight": 25,
+    "domainExpansionShellThickness": 1
+  },
+  "potionEffects": {
+    "frostbiteSlownessAmplifier": 3,
+    "belowFreezingAuraSlownessAmplifier": 3,
+    "belowFreezingResistanceAmplifier": 0,
+    "absoluteZeroResistanceAmplifier": 2,
+    "absoluteZeroAuraSlownessAmplifier": 2,
+    "planckHeatFrostSlownessAmplifier": 4,
+    "planckHeatAbsorptionAmplifier": 3,
+    "planckHeatStrengthAmplifier": 1,
+    "planckHeatFireResistanceAmplifier": 0,
+    "planckHeatFirePhaseHungerAmplifier": 1,
+    "planckHeatFirePhaseNauseaAmplifier": 1,
+    "loveLockSlownessAmplifier": 255,
+    "loveLockMiningFatigueAmplifier": 255
+  },
+  "manipulation": {
+    "maxInputDeltaPerTick": 0.45,
+    "verticalInputDeltaPerTick": 0.35,
+    "debugLogging": true
+  },
+  "powderedSnowEffect": {
+    "damageIntervalTicks": 20,
+    "dealDamageOnInitialApplication": true
+  },
+  "domainClash": {
+    "enabled": true,
+    "simultaneousCastWindowTicks": 1,
+    "minimumExteriorDistance": 20,
+    "readyDelayTicks": 60,
+    "promptCorrectProgressPercent": 2,
+    "promptWrongPenaltyPercent": 4,
+    "winProgressPercent": 100,
+    "loserManaDrainPercent": 50,
+    "loserCooldownMultiplier": 0.5,
+    "particlesPerTick": 120,
+    "splitPatternModulo": 2,
+    "disableDomainEffectsDuringClash": true,
+    "forceLookAtOpponent": true,
+    "participantsInvincible": true
+  },
+  "abilityAccess": {
+    "enabled": true,
+    "defaultLockedAbilities": [],
+    "lockedAbilitiesByPlayer": {},
+    "unlockedAbilitiesByPlayer": {}
+  }
+}
