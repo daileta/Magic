@@ -64,6 +64,7 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.PlayerInput;
@@ -153,10 +154,12 @@ public final class MagicAbilityManager {
 	private static boolean DOMAIN_CLASH_ENABLED = true;
 	private static int DOMAIN_CLASH_SIMULTANEOUS_WINDOW_TICKS = 1;
 	private static int DOMAIN_CLASH_MIN_EXTERIOR_DISTANCE = 20;
-	private static int DOMAIN_CLASH_READY_DELAY_TICKS = 3 * TICKS_PER_SECOND;
-	private static int DOMAIN_CLASH_CORRECT_PROGRESS_PERCENT = 2;
-	private static int DOMAIN_CLASH_WRONG_PROGRESS_PENALTY_PERCENT = 4;
-	private static int DOMAIN_CLASH_WIN_PROGRESS_PERCENT = 100;
+	private static int DOMAIN_CLASH_TITLE_FADE_IN_TICKS = 8;
+	private static int DOMAIN_CLASH_TITLE_STAY_TICKS = 44;
+	private static int DOMAIN_CLASH_TITLE_FADE_OUT_TICKS = 8;
+	private static int DOMAIN_CLASH_INSTRUCTIONS_DURATION_TICKS = 15 * TICKS_PER_SECOND;
+	private static int DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS = TICKS_PER_SECOND;
+	private static double DOMAIN_CLASH_DAMAGE_TO_WIN = 250.0;
 	private static int DOMAIN_CLASH_LOSER_MANA_DRAIN_PERCENT = 50;
 	private static double DOMAIN_CLASH_LOSER_COOLDOWN_MULTIPLIER = 0.5;
 	private static int DOMAIN_CLASH_PARTICLES_PER_TICK = 120;
@@ -164,16 +167,6 @@ public final class MagicAbilityManager {
 	private static boolean DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS = true;
 	private static boolean DOMAIN_CLASH_FORCE_LOOK = true;
 	private static boolean DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE = true;
-	private static final int DOMAIN_CLASH_PROMPT_KEY_W = 87;
-	private static final int DOMAIN_CLASH_PROMPT_KEY_A = 65;
-	private static final int DOMAIN_CLASH_PROMPT_KEY_S = 83;
-	private static final int DOMAIN_CLASH_PROMPT_KEY_D = 68;
-	private static final int[] DOMAIN_CLASH_PROMPT_KEYS = {
-		DOMAIN_CLASH_PROMPT_KEY_W,
-		DOMAIN_CLASH_PROMPT_KEY_A,
-		DOMAIN_CLASH_PROMPT_KEY_S,
-		DOMAIN_CLASH_PROMPT_KEY_D
-	};
 	private static final int DOMAIN_BLOCK_PLACE_FLAGS = Block.NOTIFY_LISTENERS | Block.FORCE_STATE_AND_SKIP_CALLBACKS_AND_DROPS;
 	private static final int DOMAIN_BLOCK_RESTORE_FLAGS = Block.NOTIFY_ALL | Block.FORCE_STATE_AND_SKIP_CALLBACKS_AND_DROPS;
 	private static final BlockState DOMAIN_SHELL_BLOCK_STATE = Blocks.BLACK_CONCRETE.getDefaultState();
@@ -328,10 +321,12 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_ENABLED = config.domainClash.enabled;
 		DOMAIN_CLASH_SIMULTANEOUS_WINDOW_TICKS = Math.max(0, config.domainClash.simultaneousCastWindowTicks);
 		DOMAIN_CLASH_MIN_EXTERIOR_DISTANCE = Math.max(0, config.domainClash.minimumExteriorDistance);
-		DOMAIN_CLASH_READY_DELAY_TICKS = Math.max(0, config.domainClash.readyDelayTicks);
-		DOMAIN_CLASH_CORRECT_PROGRESS_PERCENT = Math.max(1, config.domainClash.promptCorrectProgressPercent);
-		DOMAIN_CLASH_WRONG_PROGRESS_PENALTY_PERCENT = Math.max(1, config.domainClash.promptWrongPenaltyPercent);
-		DOMAIN_CLASH_WIN_PROGRESS_PERCENT = MathHelper.clamp(config.domainClash.winProgressPercent, 1, 100);
+		DOMAIN_CLASH_TITLE_FADE_IN_TICKS = Math.max(0, config.domainClash.titleFadeInTicks);
+		DOMAIN_CLASH_TITLE_STAY_TICKS = Math.max(0, config.domainClash.titleStayTicks);
+		DOMAIN_CLASH_TITLE_FADE_OUT_TICKS = Math.max(0, config.domainClash.titleFadeOutTicks);
+		DOMAIN_CLASH_INSTRUCTIONS_DURATION_TICKS = Math.max(0, config.domainClash.instructionsDurationTicks);
+		DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS = Math.max(0, config.domainClash.instructionsFadeOutTicks);
+		DOMAIN_CLASH_DAMAGE_TO_WIN = Math.max(1.0, config.domainClash.damageToWin);
 		DOMAIN_CLASH_LOSER_MANA_DRAIN_PERCENT = MathHelper.clamp(config.domainClash.loserManaDrainPercent, 0, 100);
 		DOMAIN_CLASH_LOSER_COOLDOWN_MULTIPLIER = MathHelper.clamp(config.domainClash.loserCooldownMultiplier, 0.0, 10.0);
 		DOMAIN_CLASH_PARTICLES_PER_TICK = Math.max(0, config.domainClash.particlesPerTick);
@@ -1123,7 +1118,10 @@ public final class MagicAbilityManager {
 		}
 
 		state.clashOccurred = true;
-		state.expiresTick = Math.max(state.expiresTick, currentTick + DOMAIN_CLASH_READY_DELAY_TICKS + TICKS_PER_SECOND);
+		int titleEndTick = currentTick + domainClashTitleDurationTicks();
+		int instructionsFadeStartTick = titleEndTick + DOMAIN_CLASH_INSTRUCTIONS_DURATION_TICKS;
+		int combatStartTick = instructionsFadeStartTick + DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS;
+		state.expiresTick = Math.max(state.expiresTick, currentTick + domainClashIntroLockTicks() + TICKS_PER_SECOND);
 		DomainClashState clashState = new DomainClashState(
 			ownerId,
 			state.ability,
@@ -1132,7 +1130,9 @@ public final class MagicAbilityManager {
 			new Vec3d(owner.getX(), owner.getY(), owner.getZ()),
 			new Vec3d(challenger.getX(), challenger.getY(), challenger.getZ()),
 			currentTick,
-			currentTick + DOMAIN_CLASH_READY_DELAY_TICKS
+			titleEndTick,
+			instructionsFadeStartTick,
+			combatStartTick
 		);
 
 		DOMAIN_CLASHES_BY_OWNER.put(ownerId, clashState);
@@ -1142,9 +1142,11 @@ public final class MagicAbilityManager {
 		MagicPlayerData.setDomainClashActive(owner, true);
 		MagicPlayerData.setDomainClashProgress(owner, 0);
 		MagicPlayerData.setDomainClashPromptKey(owner, 0);
+		MagicPlayerData.setDomainClashInstructionVisibility(owner, 0);
 		MagicPlayerData.setDomainClashActive(challenger, true);
 		MagicPlayerData.setDomainClashProgress(challenger, 0);
 		MagicPlayerData.setDomainClashPromptKey(challenger, 0);
+		MagicPlayerData.setDomainClashInstructionVisibility(challenger, 0);
 
 		showDomainClashTitle(owner);
 		showDomainClashTitle(challenger);
@@ -1187,25 +1189,23 @@ public final class MagicAbilityManager {
 				continue;
 			}
 
-			lockDomainClashParticipant(owner, clash.ownerLockedPos, challenger.getEyePos());
-			lockDomainClashParticipant(challenger, clash.challengerLockedPos, owner.getEyePos());
-			spawnDomainClashParticles(world, domain, DOMAIN_CLASH_PARTICLES_PER_TICK);
-
-			if (currentTick >= clash.promptStartTick) {
-				if (clash.ownerPromptKey == 0) {
-					clash.ownerPromptKey = randomDomainClashPrompt(world);
-				}
-				if (clash.challengerPromptKey == 0) {
-					clash.challengerPromptKey = randomDomainClashPrompt(world);
-				}
+			if (isDomainClashFrozen(clash, currentTick)) {
+				lockDomainClashParticipant(owner, clash.ownerLockedPos, challenger.getEyePos());
+				lockDomainClashParticipant(challenger, clash.challengerLockedPos, owner.getEyePos());
 			}
+			spawnDomainClashParticles(world, domain, DOMAIN_CLASH_PARTICLES_PER_TICK);
+			int ownerProgressPercent = domainClashProgressPercent(clash.ownerDamageDealt);
+			int challengerProgressPercent = domainClashProgressPercent(clash.challengerDamageDealt);
+			int instructionVisibilityPercent = domainClashInstructionVisibilityPercent(clash, currentTick);
 
 			MagicPlayerData.setDomainClashActive(owner, true);
-			MagicPlayerData.setDomainClashProgress(owner, clash.ownerProgressPercent);
-			MagicPlayerData.setDomainClashPromptKey(owner, clash.ownerPromptKey);
+			MagicPlayerData.setDomainClashProgress(owner, ownerProgressPercent);
+			MagicPlayerData.setDomainClashPromptKey(owner, 0);
+			MagicPlayerData.setDomainClashInstructionVisibility(owner, instructionVisibilityPercent);
 			MagicPlayerData.setDomainClashActive(challenger, true);
-			MagicPlayerData.setDomainClashProgress(challenger, clash.challengerProgressPercent);
-			MagicPlayerData.setDomainClashPromptKey(challenger, clash.challengerPromptKey);
+			MagicPlayerData.setDomainClashProgress(challenger, challengerProgressPercent);
+			MagicPlayerData.setDomainClashPromptKey(challenger, 0);
+			MagicPlayerData.setDomainClashInstructionVisibility(challenger, instructionVisibilityPercent);
 		}
 
 		for (DomainClashResolution resolution : pendingResolutions) {
@@ -1214,68 +1214,6 @@ public final class MagicAbilityManager {
 	}
 
 	public static void onDomainClashInput(ServerPlayerEntity player, int keyCode) {
-		if (!isDomainClashPromptKey(keyCode)) {
-			return;
-		}
-
-		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
-			return;
-		}
-
-		UUID ownerId = DOMAIN_CLASH_OWNER_BY_PARTICIPANT.get(player.getUuid());
-		if (ownerId == null) {
-			return;
-		}
-
-		DomainClashState clash = DOMAIN_CLASHES_BY_OWNER.get(ownerId);
-		if (clash == null) {
-			return;
-		}
-
-		MinecraftServer server = player.getEntityWorld().getServer();
-		if (server == null || server.getTicks() < clash.promptStartTick) {
-			return;
-		}
-
-		if (player.getUuid().equals(clash.ownerId)) {
-			if (clash.ownerPromptKey == 0) {
-				return;
-			}
-
-			if (keyCode == clash.ownerPromptKey) {
-				clash.ownerProgressPercent = Math.min(
-					DOMAIN_CLASH_WIN_PROGRESS_PERCENT,
-					clash.ownerProgressPercent + DOMAIN_CLASH_CORRECT_PROGRESS_PERCENT
-				);
-				clash.ownerPromptKey = randomDomainClashPrompt(world);
-			} else {
-				clash.ownerProgressPercent = Math.max(0, clash.ownerProgressPercent - DOMAIN_CLASH_WRONG_PROGRESS_PENALTY_PERCENT);
-			}
-		} else if (player.getUuid().equals(clash.challengerId)) {
-			if (clash.challengerPromptKey == 0) {
-				return;
-			}
-
-			if (keyCode == clash.challengerPromptKey) {
-				clash.challengerProgressPercent = Math.min(
-					DOMAIN_CLASH_WIN_PROGRESS_PERCENT,
-					clash.challengerProgressPercent + DOMAIN_CLASH_CORRECT_PROGRESS_PERCENT
-				);
-				clash.challengerPromptKey = randomDomainClashPrompt(world);
-			} else {
-				clash.challengerProgressPercent = Math.max(0, clash.challengerProgressPercent - DOMAIN_CLASH_WRONG_PROGRESS_PENALTY_PERCENT);
-			}
-		} else {
-			return;
-		}
-
-		if (clash.ownerProgressPercent >= DOMAIN_CLASH_WIN_PROGRESS_PERCENT) {
-			resolveDomainClash(server, ownerId, clash.ownerId, server.getTicks());
-			return;
-		}
-		if (clash.challengerProgressPercent >= DOMAIN_CLASH_WIN_PROGRESS_PERCENT) {
-			resolveDomainClash(server, ownerId, clash.challengerId, server.getTicks());
-		}
 	}
 
 	private static void resolveDomainClash(MinecraftServer server, UUID ownerId, UUID winnerId, int currentTick) {
@@ -1389,6 +1327,102 @@ public final class MagicAbilityManager {
 		MagicPlayerData.setMana(loser, Math.max(0, MagicPlayerData.getMana(loser) - manaDrain));
 	}
 
+	private static int domainClashTitleDurationTicks() {
+		return DOMAIN_CLASH_TITLE_FADE_IN_TICKS + DOMAIN_CLASH_TITLE_STAY_TICKS + DOMAIN_CLASH_TITLE_FADE_OUT_TICKS;
+	}
+
+	private static int domainClashIntroLockTicks() {
+		return domainClashTitleDurationTicks() + DOMAIN_CLASH_INSTRUCTIONS_DURATION_TICKS + DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS;
+	}
+
+	private static boolean isDomainClashFrozen(DomainClashState clash, int currentTick) {
+		return currentTick < clash.combatStartTick;
+	}
+
+	private static boolean isDomainClashCombatActive(DomainClashState clash, int currentTick) {
+		return currentTick >= clash.combatStartTick;
+	}
+
+	private static int domainClashProgressPercent(double damageDealt) {
+		return MathHelper.clamp((int) Math.round((damageDealt / DOMAIN_CLASH_DAMAGE_TO_WIN) * 100.0), 0, 100);
+	}
+
+	private static int domainClashInstructionVisibilityPercent(DomainClashState clash, int currentTick) {
+		if (currentTick < clash.titleEndTick || currentTick >= clash.combatStartTick) {
+			return 0;
+		}
+
+		if (currentTick < clash.instructionsFadeStartTick || DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS <= 0) {
+			return 100;
+		}
+
+		int remainingFadeTicks = Math.max(0, clash.combatStartTick - currentTick);
+		return MathHelper.clamp(
+			(int) Math.round(remainingFadeTicks * 100.0 / Math.max(1, DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS)),
+			0,
+			100
+		);
+	}
+
+	private static DomainClashState domainClashStateForParticipant(UUID playerId) {
+		UUID ownerId = DOMAIN_CLASH_OWNER_BY_PARTICIPANT.get(playerId);
+		if (ownerId == null) {
+			return null;
+		}
+
+		return DOMAIN_CLASHES_BY_OWNER.get(ownerId);
+	}
+
+	private static boolean addDomainClashDamage(DomainClashState clash, UUID attackerId, float amount, MinecraftServer server, int currentTick) {
+		UUID winnerId = null;
+		if (attackerId.equals(clash.ownerId)) {
+			clash.ownerDamageDealt = Math.min(DOMAIN_CLASH_DAMAGE_TO_WIN, clash.ownerDamageDealt + amount);
+			if (clash.ownerDamageDealt >= DOMAIN_CLASH_DAMAGE_TO_WIN) {
+				winnerId = clash.ownerId;
+			}
+		} else if (attackerId.equals(clash.challengerId)) {
+			clash.challengerDamageDealt = Math.min(DOMAIN_CLASH_DAMAGE_TO_WIN, clash.challengerDamageDealt + amount);
+			if (clash.challengerDamageDealt >= DOMAIN_CLASH_DAMAGE_TO_WIN) {
+				winnerId = clash.challengerId;
+			}
+		}
+
+		if (winnerId != null) {
+			resolveDomainClash(server, clash.ownerId, winnerId, currentTick);
+			return true;
+		}
+
+		return false;
+	}
+
+	private static boolean handleDomainClashDamage(ServerPlayerEntity damagedPlayer, DamageSource source, float amount) {
+		DomainClashState clash = domainClashStateForParticipant(damagedPlayer.getUuid());
+		if (clash == null) {
+			return false;
+		}
+
+		MinecraftServer server = damagedPlayer.getEntityWorld().getServer();
+		if (server == null || !isDomainClashCombatActive(clash, server.getTicks())) {
+			return false;
+		}
+
+		Entity attacker = source.getAttacker();
+		if (!(attacker instanceof ServerPlayerEntity attackerPlayer) || !attackerPlayer.isAlive() || attackerPlayer.isSpectator()) {
+			return false;
+		}
+
+		UUID damagedId = damagedPlayer.getUuid();
+		UUID attackerId = attackerPlayer.getUuid();
+		boolean ownerHitChallenger = attackerId.equals(clash.ownerId) && damagedId.equals(clash.challengerId);
+		boolean challengerHitOwner = attackerId.equals(clash.challengerId) && damagedId.equals(clash.ownerId);
+		if (!ownerHitChallenger && !challengerHitOwner) {
+			return false;
+		}
+
+		boolean resolved = addDomainClashDamage(clash, attackerId, amount, server, server.getTicks());
+		return resolved || DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE;
+	}
+
 	private static void lockDomainClashParticipant(ServerPlayerEntity player, Vec3d lockedPos, Vec3d opponentEyePos) {
 		float yaw = player.getYaw();
 		float pitch = player.getPitch();
@@ -1422,19 +1456,10 @@ public final class MagicAbilityManager {
 	}
 
 	private static void showDomainClashTitle(ServerPlayerEntity player) {
-		player.networkHandler.sendPacket(new TitleFadeS2CPacket(8, 36, 8));
-		player.networkHandler.sendPacket(new TitleS2CPacket(Text.translatable("title.magic.domain_clash")));
-	}
-
-	private static int randomDomainClashPrompt(ServerWorld world) {
-		return DOMAIN_CLASH_PROMPT_KEYS[world.random.nextInt(DOMAIN_CLASH_PROMPT_KEYS.length)];
-	}
-
-	private static boolean isDomainClashPromptKey(int keyCode) {
-		return keyCode == DOMAIN_CLASH_PROMPT_KEY_W
-			|| keyCode == DOMAIN_CLASH_PROMPT_KEY_A
-			|| keyCode == DOMAIN_CLASH_PROMPT_KEY_S
-			|| keyCode == DOMAIN_CLASH_PROMPT_KEY_D;
+		player.networkHandler.sendPacket(
+			new TitleFadeS2CPacket(DOMAIN_CLASH_TITLE_FADE_IN_TICKS, DOMAIN_CLASH_TITLE_STAY_TICKS, DOMAIN_CLASH_TITLE_FADE_OUT_TICKS)
+		);
+		player.networkHandler.sendPacket(new TitleS2CPacket(Text.translatable("title.magic.domain_clash").formatted(Formatting.BOLD)));
 	}
 
 	private static void applySplitDomainInteriorVisuals(
@@ -1529,7 +1554,7 @@ public final class MagicAbilityManager {
 	}
 
 	public static boolean isDomainClashParticipantInvincible(Entity entity) {
-		return DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE && DOMAIN_CLASH_OWNER_BY_PARTICIPANT.containsKey(entity.getUuid());
+		return DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE && domainClashStateForParticipant(entity.getUuid()) != null;
 	}
 
 	private static void maintainDomainShell(ServerWorld world, DomainExpansionState state) {
@@ -2495,33 +2520,38 @@ public final class MagicAbilityManager {
 		syncTillDeathDoUsPartHealth(caster, linkedPlayer, state);
 	}
 
-	public static void onPlayerDamaged(ServerPlayerEntity damagedPlayer, DamageSource source, float amount) {
+	public static boolean onPlayerDamaged(ServerPlayerEntity damagedPlayer, DamageSource source, float amount) {
 		if (source == null || amount <= 0.0F || damagedPlayer.getEntityWorld().isClient()) {
-			return;
+			return false;
+		}
+
+		if (handleDomainClashDamage(damagedPlayer, source, amount)) {
+			return true;
 		}
 
 		if (activeAbility(damagedPlayer) != MagicAbility.TILL_DEATH_DO_US_PART) {
-			return;
+			return false;
 		}
 
 		TillDeathDoUsPartState state = TILL_DEATH_DO_US_PART_STATES.get(damagedPlayer.getUuid());
 		if (state == null || state.stage != TillDeathDoUsPartStage.WAITING) {
-			return;
+			return false;
 		}
 
 		Entity attacker = source.getAttacker();
 		if (!(attacker instanceof ServerPlayerEntity attackerPlayer) || attackerPlayer == damagedPlayer || !attackerPlayer.isAlive() || attackerPlayer.isSpectator()) {
-			return;
+			return false;
 		}
 
 		int minimumMana = requiredManaForTillDeathTrigger();
 		int manaCost = requiredManaForTillDeathCost();
 		int casterMana = MagicPlayerData.getMana(damagedPlayer);
 		if (casterMana < minimumMana || casterMana < manaCost) {
-			return;
+			return false;
 		}
 
 		activateTillDeathDoUsPartLink(damagedPlayer, attackerPlayer, damagedPlayer.getEntityWorld().getServer().getTicks());
+		return false;
 	}
 
 	private static void activateTillDeathDoUsPartLink(ServerPlayerEntity caster, ServerPlayerEntity linkedPlayer, int currentTick) {
@@ -3759,7 +3789,16 @@ public final class MagicAbilityManager {
 		debugManipulation(message, args);
 	}
 
+	private static boolean isManipulationPacketServerThread(ServerPlayerEntity player) {
+		MinecraftServer server = player.getEntityWorld().getServer();
+		return server != null && server.isOnThread();
+	}
+
 	public static void onManipulationInputPacket(ServerPlayerEntity player, PlayerInput input) {
+		if (!isManipulationPacketServerThread(player)) {
+			return;
+		}
+
 		UUID playerId = player.getUuid();
 		MANIPULATION_INPUT_BY_CASTER.put(playerId, input);
 		if (!isManipulatingCaster(player) && !isManipulationControlledTarget(player)) {
@@ -3780,6 +3819,10 @@ public final class MagicAbilityManager {
 	}
 
 	public static void onManipulationLookPacket(ServerPlayerEntity player, float yaw, float pitch) {
+		if (!isManipulationPacketServerThread(player)) {
+			return;
+		}
+
 		UUID playerId = player.getUuid();
 		MANIPULATION_LOOK_BY_CASTER.put(playerId, new ManipulationLookState(yaw, pitch));
 		if (!isManipulatingCaster(player) && !isManipulationControlledTarget(player)) {
@@ -3802,7 +3845,17 @@ public final class MagicAbilityManager {
 		UUID playerId = player.getUuid();
 		return LOVE_LOCKED_TARGETS.containsKey(playerId)
 			|| MANIPULATION_CASTER_BY_TARGET.containsKey(playerId)
-			|| DOMAIN_CLASH_OWNER_BY_PARTICIPANT.containsKey(playerId);
+			|| isDomainClashParticipantFrozen(player);
+	}
+
+	private static boolean isDomainClashParticipantFrozen(PlayerEntity player) {
+		DomainClashState clash = domainClashStateForParticipant(player.getUuid());
+		if (clash == null) {
+			return false;
+		}
+
+		MinecraftServer server = player.getEntityWorld().getServer();
+		return server != null && isDomainClashFrozen(clash, server.getTicks());
 	}
 
 	private static boolean isActionLocked(PlayerEntity player) {
@@ -3851,6 +3904,10 @@ public final class MagicAbilityManager {
 	}
 
 	public static void beginManipulationInteractionProxy(ServerPlayerEntity caster) {
+		if (!isManipulationPacketServerThread(caster)) {
+			return;
+		}
+
 		if (!isManipulatingCaster(caster)) {
 			return;
 		}
@@ -3893,6 +3950,10 @@ public final class MagicAbilityManager {
 	}
 
 	public static void endManipulationInteractionProxy(ServerPlayerEntity caster) {
+		if (!isManipulationPacketServerThread(caster)) {
+			return;
+		}
+
 		UUID casterId = caster.getUuid();
 		ManipulationProxyState proxyState = MANIPULATION_INTERACTION_PROXY.remove(casterId);
 		if (proxyState == null) {
@@ -4461,11 +4522,11 @@ public final class MagicAbilityManager {
 		private final Vec3d ownerLockedPos;
 		private final Vec3d challengerLockedPos;
 		private final int startTick;
-		private final int promptStartTick;
-		private int ownerProgressPercent;
-		private int challengerProgressPercent;
-		private int ownerPromptKey;
-		private int challengerPromptKey;
+		private final int titleEndTick;
+		private final int instructionsFadeStartTick;
+		private final int combatStartTick;
+		private double ownerDamageDealt;
+		private double challengerDamageDealt;
 
 		private DomainClashState(
 			UUID ownerId,
@@ -4475,7 +4536,9 @@ public final class MagicAbilityManager {
 			Vec3d ownerLockedPos,
 			Vec3d challengerLockedPos,
 			int startTick,
-			int promptStartTick
+			int titleEndTick,
+			int instructionsFadeStartTick,
+			int combatStartTick
 		) {
 			this.ownerId = ownerId;
 			this.ownerAbility = ownerAbility;
@@ -4484,7 +4547,9 @@ public final class MagicAbilityManager {
 			this.ownerLockedPos = ownerLockedPos;
 			this.challengerLockedPos = challengerLockedPos;
 			this.startTick = startTick;
-			this.promptStartTick = promptStartTick;
+			this.titleEndTick = titleEndTick;
+			this.instructionsFadeStartTick = instructionsFadeStartTick;
+			this.combatStartTick = combatStartTick;
 		}
 	}
 

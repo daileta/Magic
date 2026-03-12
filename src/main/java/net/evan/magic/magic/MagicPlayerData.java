@@ -67,6 +67,13 @@ public final class MagicPlayerData {
 			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
 	);
 
+	private static final AttachmentType<Integer> DOMAIN_CLASH_INSTRUCTION_VISIBILITY = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "domain_clash_instruction_visibility"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
 	private MagicPlayerData() {
 	}
 
@@ -101,6 +108,7 @@ public final class MagicPlayerData {
 		target.setAttached(DOMAIN_CLASH_ACTIVE, false);
 		target.setAttached(DOMAIN_CLASH_PROGRESS, 0);
 		target.setAttached(DOMAIN_CLASH_PROMPT_KEY, 0);
+		target.setAttached(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0);
 	}
 
 	public static void clear(PlayerEntity player) {
@@ -112,6 +120,7 @@ public final class MagicPlayerData {
 		target.setAttached(DOMAIN_CLASH_ACTIVE, false);
 		target.setAttached(DOMAIN_CLASH_PROGRESS, 0);
 		target.setAttached(DOMAIN_CLASH_PROMPT_KEY, 0);
+		target.setAttached(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0);
 	}
 
 	public static int getMana(PlayerEntity player) {
@@ -167,11 +176,20 @@ public final class MagicPlayerData {
 		target(player).setAttached(DOMAIN_CLASH_PROMPT_KEY, Math.max(0, promptKey));
 	}
 
+	public static int getDomainClashInstructionVisibility(PlayerEntity player) {
+		return MathHelper.clamp(target(player).getAttachedOrElse(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0), 0, 100);
+	}
+
+	public static void setDomainClashInstructionVisibility(PlayerEntity player, int visibility) {
+		target(player).setAttached(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, MathHelper.clamp(visibility, 0, 100));
+	}
+
 	public static void clearDomainClashUi(PlayerEntity player) {
 		AttachmentTarget target = target(player);
 		target.setAttached(DOMAIN_CLASH_ACTIVE, false);
 		target.setAttached(DOMAIN_CLASH_PROGRESS, 0);
 		target.setAttached(DOMAIN_CLASH_PROMPT_KEY, 0);
+		target.setAttached(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0);
 	}
 
 	private static AttachmentTarget target(PlayerEntity player) {

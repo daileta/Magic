@@ -28,6 +28,9 @@ public final class ManaHudOverlay {
 	private static final int PROMPT_TRANSITION_TICKS = 4;
 	private static final float PROMPT_SCALE = 2.6F;
 	private static final int PROMPT_COLOR = 0xFFFF2B2B;
+	private static final float INSTRUCTION_SCALE = 1.15F;
+	private static final int INSTRUCTION_LINE_SPACING = 12;
+	private static final int INSTRUCTION_COLOR = 0xFFFFE94D;
 	private static final int FROST_COLOR = 0x66CCFF;
 	private static final int LOVE_COLOR = 0xFF77CC;
 	private static int lastObservedPlayerAge = Integer.MIN_VALUE;
@@ -108,7 +111,8 @@ public final class ManaHudOverlay {
 		}
 
 		int promptKey = MagicPlayerData.getDomainClashPromptKey(client.player);
-		if (promptKey == 0) {
+		int instructionVisibility = MagicPlayerData.getDomainClashInstructionVisibility(client.player);
+		if (promptKey == 0 && instructionVisibility <= 0) {
 			return;
 		}
 
@@ -128,7 +132,28 @@ public final class ManaHudOverlay {
 			lastPromptKey = promptKey;
 		}
 
-		renderPromptLetter(drawContext, client, centerX, centerY, promptKey);
+		if (promptKey != 0) {
+			renderPromptLetter(drawContext, client, centerX, centerY, promptKey);
+			return;
+		}
+
+		renderInstructions(drawContext, client, centerX, centerY, instructionVisibility / 100.0F);
+	}
+
+	private static void renderInstructions(DrawContext drawContext, MinecraftClient client, int centerX, int centerY, float alpha) {
+		Text[] lines = {
+			Text.translatable("overlay.magic.domain_clash.instructions.line1"),
+			Text.translatable("overlay.magic.domain_clash.instructions.line2"),
+			Text.translatable("overlay.magic.domain_clash.instructions.line3"),
+			Text.translatable("overlay.magic.domain_clash.instructions.line4"),
+			Text.translatable("overlay.magic.domain_clash.instructions.line5")
+		};
+
+		int totalHeight = (lines.length - 1) * INSTRUCTION_LINE_SPACING;
+		int startY = centerY - totalHeight / 2;
+		for (int i = 0; i < lines.length; i++) {
+			drawScaledInstruction(drawContext, client, lines[i], centerX, startY + i * INSTRUCTION_LINE_SPACING, alpha);
+		}
 	}
 
 	private static void renderPromptLetter(DrawContext drawContext, MinecraftClient client, int centerX, int centerY, int promptKey) {
@@ -176,6 +201,25 @@ public final class ManaHudOverlay {
 		int drawX = Math.round((centerX - (promptWidth * PROMPT_SCALE) / 2.0F) / PROMPT_SCALE);
 		int drawY = Math.round(centerY / PROMPT_SCALE);
 		drawContext.drawTextWithShadow(client.textRenderer, prompt, drawX, drawY, color);
+		matrices.popMatrix();
+	}
+
+	private static void drawScaledInstruction(
+		DrawContext drawContext,
+		MinecraftClient client,
+		Text line,
+		int centerX,
+		int centerY,
+		float alpha
+	) {
+		int lineWidth = client.textRenderer.getWidth(line);
+		int color = withAlpha(INSTRUCTION_COLOR, alpha);
+		var matrices = drawContext.getMatrices();
+		matrices.pushMatrix();
+		matrices.scale(INSTRUCTION_SCALE, INSTRUCTION_SCALE);
+		int drawX = Math.round((centerX - (lineWidth * INSTRUCTION_SCALE) / 2.0F) / INSTRUCTION_SCALE);
+		int drawY = Math.round(centerY / INSTRUCTION_SCALE);
+		drawContext.drawTextWithShadow(client.textRenderer, line, drawX, drawY, color);
 		matrices.popMatrix();
 	}
 

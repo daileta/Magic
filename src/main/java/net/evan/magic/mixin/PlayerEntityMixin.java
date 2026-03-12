@@ -20,7 +20,10 @@ public abstract class PlayerEntityMixin {
 	) {
 		PlayerEntity self = (PlayerEntity) (Object) this;
 		if (self instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
-			MagicAbilityManager.onPlayerDamaged(serverPlayer, source, amount);
+			if (MagicAbilityManager.onPlayerDamaged(serverPlayer, source, amount)) {
+				cir.setReturnValue(true);
+				return;
+			}
 		}
 		if (MagicAbilityManager.isEntityCapturedByLoveDomain(self) || MagicAbilityManager.isDomainClashParticipantInvincible(self)) {
 			cir.setReturnValue(false);

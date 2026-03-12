@@ -35,7 +35,7 @@ public final class MagicKeybindings {
 			return;
 		}
 
-		if (MagicPlayerData.isDomainClashActive(client.player)) {
+		if (MagicPlayerData.isDomainClashActive(client.player) && MagicPlayerData.getDomainClashPromptKey(client.player) != 0) {
 			sendDomainClashInput(client);
 		}
 

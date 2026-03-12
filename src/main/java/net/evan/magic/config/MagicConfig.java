@@ -346,10 +346,12 @@ public final class MagicConfig {
 		public boolean enabled = true;
 		public int simultaneousCastWindowTicks = 1;
 		public int minimumExteriorDistance = 20;
-		public int readyDelayTicks = 60;
-		public int promptCorrectProgressPercent = 2;
-		public int promptWrongPenaltyPercent = 4;
-		public int winProgressPercent = 100;
+		public int titleFadeInTicks = 8;
+		public int titleStayTicks = 44;
+		public int titleFadeOutTicks = 8;
+		public int instructionsDurationTicks = 300;
+		public int instructionsFadeOutTicks = 20;
+		public double damageToWin = 250.0;
 		public int loserManaDrainPercent = 50;
 		public double loserCooldownMultiplier = 0.5;
 		public int particlesPerTick = 120;
