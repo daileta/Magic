@@ -45,7 +45,7 @@ public final class MagicCommands {
 									.then(cooldownAbilityLiteral(MagicAbility.FROST_DOMAIN_EXPANSION, "frost_domain_expansion"))
 									.then(cooldownAbilityLiteral(MagicAbility.LOVE_DOMAIN_EXPANSION, "love_domain_expansion"))
 									.then(cooldownAbilityLiteral(MagicAbility.TILL_DEATH_DO_US_PART, "till_death_do_us_part"))
-									.then(cooldownAbilityLiteral(MagicAbility.MANIPULATION, "manipulation"))
+									.then(cooldownAbilityLiteral(MagicAbility.MANIPULATION, "empty_embrace"))
 							)
 					)
 					.then(
@@ -72,7 +72,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.FROST_DOMAIN_EXPANSION, "frost_domain_expansion", true))
 									.then(abilityAccessLiteral(MagicAbility.LOVE_AT_FIRST_SIGHT, "love_at_first_sight", true))
 									.then(abilityAccessLiteral(MagicAbility.TILL_DEATH_DO_US_PART, "till_death_do_us_part", true))
-									.then(abilityAccessLiteral(MagicAbility.MANIPULATION, "manipulation", true))
+									.then(abilityAccessLiteral(MagicAbility.MANIPULATION, "empty_embrace", true))
 									.then(abilityAccessLiteral(MagicAbility.LOVE_DOMAIN_EXPANSION, "love_domain_expansion", true))
 							)
 							.then(
@@ -83,7 +83,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.FROST_DOMAIN_EXPANSION, "frost_domain_expansion", false))
 									.then(abilityAccessLiteral(MagicAbility.LOVE_AT_FIRST_SIGHT, "love_at_first_sight", false))
 									.then(abilityAccessLiteral(MagicAbility.TILL_DEATH_DO_US_PART, "till_death_do_us_part", false))
-									.then(abilityAccessLiteral(MagicAbility.MANIPULATION, "manipulation", false))
+									.then(abilityAccessLiteral(MagicAbility.MANIPULATION, "empty_embrace", false))
 									.then(abilityAccessLiteral(MagicAbility.LOVE_DOMAIN_EXPANSION, "love_domain_expansion", false))
 							)
 					)

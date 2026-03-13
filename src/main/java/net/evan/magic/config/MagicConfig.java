@@ -2,6 +2,7 @@ package net.evan.magic.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.SerializedName;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -217,7 +218,8 @@ public final class MagicConfig {
 		public DamageConfig damage = new DamageConfig();
 		public RadiiConfig radii = new RadiiConfig();
 		public PotionEffectsConfig potionEffects = new PotionEffectsConfig();
-		public ManipulationConfig manipulation = new ManipulationConfig();
+		@SerializedName(value = "emptyEmbrace", alternate = { "manipulation" })
+		public EmptyEmbraceConfig emptyEmbrace = new EmptyEmbraceConfig();
 		public PowderedSnowEffectConfig powderedSnowEffect = new PowderedSnowEffectConfig();
 		public DomainClashConfig domainClash = new DomainClashConfig();
 		public AbilityAccessConfig abilityAccess = new AbilityAccessConfig();
@@ -238,8 +240,8 @@ public final class MagicConfig {
 			if (potionEffects == null) {
 				potionEffects = new PotionEffectsConfig();
 			}
-			if (manipulation == null) {
-				manipulation = new ManipulationConfig();
+			if (emptyEmbrace == null) {
+				emptyEmbrace = new EmptyEmbraceConfig();
 			}
 			if (powderedSnowEffect == null) {
 				powderedSnowEffect = new PowderedSnowEffectConfig();
@@ -260,9 +262,11 @@ public final class MagicConfig {
 		public int absoluteZeroDrainPerSecond = 20;
 		public int loveAtFirstSightIdleDrainPerSecond = 2;
 		public int loveAtFirstSightActiveDrainPerSecond = 5;
-		public int tillDeathDoUsPartActivationCostPercent = 50;
-		public int tillDeathDoUsPartMinimumTriggerPercent = 50;
-		public int manipulationDrainPerSecond = 2;
+		public int tillDeathDoUsPartDrainPercentPerSecond = 3;
+		@SerializedName(value = "emptyEmbraceActivationCost", alternate = { "manipulationActivationCost" })
+		public int emptyEmbraceActivationCost = 0;
+		@SerializedName(value = "emptyEmbraceDrainPerSecond", alternate = { "manipulationDrainPerSecond" })
+		public int emptyEmbraceDrainPerSecond = 0;
 		public int domainExpansionActivationCost = 0;
 		public int passiveRegenPerSecond = 10;
 		public int depletedRecoveryRegenPerSecond = 5;
@@ -286,13 +290,12 @@ public final class MagicConfig {
 		public int planckHeatStrengthDurationTicks = 2400;
 		public int planckHeatFireResistanceDurationTicks = 9600;
 		public int loveLockEffectTicks = 5;
-		public int tillDeathDoUsPartWaitDurationTicks = 2400;
 		public int tillDeathDoUsPartLinkDurationTicks = 600;
-		public int tillDeathDoUsPartNoTriggerCooldownTicks = 1200;
-		public int tillDeathDoUsPartTriggeredCooldownTicks = 3600;
-		public int manipulationCooldownTicks = 6000;
-		public int manipulationRequestDebounceTicks = 6;
-		public int manipulationClampLogIntervalTicks = 20;
+		public int tillDeathDoUsPartCooldownTicks = 3000;
+		@SerializedName(value = "emptyEmbraceCooldownTicks", alternate = { "manipulationCooldownTicks" })
+		public int emptyEmbraceCooldownTicks = 6000;
+		@SerializedName(value = "emptyEmbraceRequestDebounceTicks", alternate = { "manipulationRequestDebounceTicks" })
+		public int emptyEmbraceRequestDebounceTicks = 6;
 		public int domainExpansionDurationTicks = 1200;
 		public int frostDomainCooldownTicks = 1200;
 		public int loveDomainCooldownTicks = 36000;
@@ -310,6 +313,10 @@ public final class MagicConfig {
 		public int absoluteZeroAuraRadius = 4;
 		public int planckHeatAuraRadius = 8;
 		public int loveGazeRange = 32;
+		@SerializedName(value = "emptyEmbraceAcquireRange", alternate = { "manipulationAcquireRange" })
+		public int emptyEmbraceAcquireRange = 100;
+		@SerializedName(value = "emptyEmbraceBreakRange", alternate = { "manipulationBreakRange" })
+		public int emptyEmbraceBreakRange = 100;
 		public int domainExpansionRadius = 25;
 		public int domainExpansionHeight = 25;
 		public int domainExpansionShellThickness = 1;
@@ -331,9 +338,14 @@ public final class MagicConfig {
 		public int loveLockMiningFatigueAmplifier = 255;
 	}
 
-	public static final class ManipulationConfig {
-		public double maxInputDeltaPerTick = 0.45;
-		public double verticalInputDeltaPerTick = 0.35;
+	public static final class EmptyEmbraceConfig {
+		public boolean deactivateTargetMagic = true;
+		public boolean disableArtifactPowers = true;
+		public boolean dismissArtifactSummons = true;
+		public boolean disableArtifactArmorEffects = true;
+		public boolean disableInfestedSilverfishEnhancements = true;
+		public boolean blockArtifactUseClicks = true;
+		public boolean blockArtifactAttackClicks = true;
 		public boolean debugLogging = true;
 	}
 

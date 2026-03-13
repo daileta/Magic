@@ -4,9 +4,9 @@
     "absoluteZeroDrainPerSecond": 20,
     "loveAtFirstSightIdleDrainPerSecond": 2,
     "loveAtFirstSightActiveDrainPerSecond": 5,
-    "tillDeathDoUsPartActivationCostPercent": 50,
-    "tillDeathDoUsPartMinimumTriggerPercent": 50,
-    "manipulationDrainPerSecond": 2,
+    "tillDeathDoUsPartDrainPercentPerSecond": 3,
+    "emptyEmbraceActivationCost": 0,
+    "emptyEmbraceDrainPerSecond": 0,
     "domainExpansionActivationCost": 0,
     "passiveRegenPerSecond": 10,
     "depletedRecoveryRegenPerSecond": 5,
@@ -29,13 +29,10 @@
     "planckHeatStrengthDurationTicks": 2400,
     "planckHeatFireResistanceDurationTicks": 9600,
     "loveLockEffectTicks": 5,
-    "tillDeathDoUsPartWaitDurationTicks": 2400,
     "tillDeathDoUsPartLinkDurationTicks": 600,
-    "tillDeathDoUsPartNoTriggerCooldownTicks": 1200,
-    "tillDeathDoUsPartTriggeredCooldownTicks": 3600,
-    "manipulationCooldownTicks": 6000,
-    "manipulationRequestDebounceTicks": 6,
-    "manipulationClampLogIntervalTicks": 20,
+    "tillDeathDoUsPartCooldownTicks": 3000,
+    "emptyEmbraceCooldownTicks": 6000,
+    "emptyEmbraceRequestDebounceTicks": 6,
     "domainExpansionDurationTicks": 1200,
     "frostDomainCooldownTicks": 1200,
     "loveDomainCooldownTicks": 36000
@@ -51,6 +48,8 @@
     "absoluteZeroAuraRadius": 4,
     "planckHeatAuraRadius": 8,
     "loveGazeRange": 32,
+    "emptyEmbraceAcquireRange": 100,
+    "emptyEmbraceBreakRange": 100,
     "domainExpansionRadius": 25,
     "domainExpansionHeight": 25,
     "domainExpansionShellThickness": 1
@@ -70,9 +69,14 @@
     "loveLockSlownessAmplifier": 255,
     "loveLockMiningFatigueAmplifier": 255
   },
-  "manipulation": {
-    "maxInputDeltaPerTick": 0.45,
-    "verticalInputDeltaPerTick": 0.35,
+  "emptyEmbrace": {
+    "deactivateTargetMagic": true,
+    "disableArtifactPowers": true,
+    "dismissArtifactSummons": true,
+    "disableArtifactArmorEffects": true,
+    "disableInfestedSilverfishEnhancements": true,
+    "blockArtifactUseClicks": true,
+    "blockArtifactAttackClicks": true,
     "debugLogging": true
   },
   "powderedSnowEffect": {

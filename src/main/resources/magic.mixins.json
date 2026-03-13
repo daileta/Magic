@@ -4,8 +4,7 @@
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
 		"EnderPearlEntityMixin",
-		"PlayerEntityMixin",
-		"ServerPlayNetworkHandlerMixin"
+		"PlayerEntityMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

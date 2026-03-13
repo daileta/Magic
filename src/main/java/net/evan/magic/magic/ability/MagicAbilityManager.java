@@ -87,9 +87,9 @@ public final class MagicAbilityManager {
 	private static int ABSOLUTE_ZERO_MANA_DRAIN_PER_SECOND = 20;
 	private static int LOVE_AT_FIRST_SIGHT_IDLE_DRAIN_PER_SECOND = 2;
 	private static int LOVE_AT_FIRST_SIGHT_ACTIVE_DRAIN_PER_SECOND = 5;
-	private static int TILL_DEATH_DO_US_PART_ACTIVATION_COST_PERCENT = 50;
-	private static int TILL_DEATH_DO_US_PART_MINIMUM_TRIGGER_PERCENT = 50;
-	private static int MANIPULATION_MANA_DRAIN_PER_SECOND = 2;
+	private static int TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = 3;
+	private static int MANIPULATION_ACTIVATION_MANA_COST = 0;
+	private static int MANIPULATION_MANA_DRAIN_PER_SECOND = 0;
 	private static int PASSIVE_MANA_REGEN_PER_SECOND = 10;
 	private static int DEPLETED_RECOVERY_REGEN_PER_SECOND = 5;
 	private static int EFFECT_REFRESH_TICKS = 40;
@@ -134,15 +134,22 @@ public final class MagicAbilityManager {
 	private static int LOVE_LOCK_EFFECT_TICKS = 5;
 	private static int LOVE_LOCK_SLOWNESS_AMPLIFIER = 255;
 	private static int LOVE_LOCK_MINING_FATIGUE_AMPLIFIER = 255;
-	private static int TILL_DEATH_DO_US_PART_WAIT_DURATION_TICKS = 2 * 60 * TICKS_PER_SECOND;
 	private static int TILL_DEATH_DO_US_PART_LINK_DURATION_TICKS = 30 * TICKS_PER_SECOND;
-	private static int TILL_DEATH_DO_US_PART_NO_TRIGGER_COOLDOWN_TICKS = 60 * TICKS_PER_SECOND;
-	private static int TILL_DEATH_DO_US_PART_TRIGGERED_COOLDOWN_TICKS = 3 * 60 * TICKS_PER_SECOND;
+	private static int TILL_DEATH_DO_US_PART_COOLDOWN_TICKS = 150 * TICKS_PER_SECOND;
 	private static int MANIPULATION_COOLDOWN_TICKS = 6000;
 	private static int MANIPULATION_REQUEST_DEBOUNCE_TICKS = 6;
 	private static double MANIPULATION_MAX_INPUT_DELTA_PER_TICK = 0.45;
 	private static double MANIPULATION_VERTICAL_INPUT_DELTA_PER_TICK = 0.35;
 	private static int MANIPULATION_CLAMP_LOG_INTERVAL_TICKS = 20;
+	private static int MANIPULATION_ACQUIRE_RANGE = 100;
+	private static int MANIPULATION_BREAK_RANGE = 100;
+	private static boolean MANIPULATION_DEACTIVATE_TARGET_MAGIC = true;
+	private static boolean MANIPULATION_DISABLE_ARTIFACT_POWERS = true;
+	private static boolean MANIPULATION_DISMISS_ARTIFACT_SUMMONS = true;
+	private static boolean MANIPULATION_DISABLE_ARTIFACT_ARMOR_EFFECTS = true;
+	private static boolean MANIPULATION_DISABLE_INFESTED_SILVERFISH_ENHANCEMENTS = true;
+	private static boolean MANIPULATION_BLOCK_ARTIFACT_USE_CLICKS = true;
+	private static boolean MANIPULATION_BLOCK_ARTIFACT_ATTACK_CLICKS = true;
 	private static boolean MANIPULATION_DEBUG_LOGGING = true;
 	private static int DOMAIN_EXPANSION_ACTIVATION_MANA_COST = 0;
 	private static int DOMAIN_EXPANSION_DURATION_TICKS = 60 * TICKS_PER_SECOND;
@@ -200,6 +207,7 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, EnhancedFireState> ENHANCED_FIRE_TARGETS = new HashMap<>();
 	private static final Map<UUID, LoveLockState> LOVE_LOCKED_TARGETS = new HashMap<>();
 	private static final Map<UUID, Boolean> LOVE_POWER_ACTIVE_THIS_SECOND = new HashMap<>();
+	private static final Set<UUID> TILL_DEATH_DO_US_PART_PASSIVE_ENABLED = new HashSet<>();
 	private static final Map<UUID, TillDeathDoUsPartState> TILL_DEATH_DO_US_PART_STATES = new HashMap<>();
 	private static final Map<UUID, Integer> TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, ManipulationState> MANIPULATION_STATES = new HashMap<>();
@@ -220,6 +228,12 @@ public final class MagicAbilityManager {
 	private static final String DOMAIN_PERSISTENCE_DOMAINS_KEY = "domains";
 	private static final String DOMAIN_PERSISTENCE_LOVE_COOLDOWNS_KEY = "loveDomainCooldowns";
 	private static final String DOMAIN_PERSISTENCE_FROST_COOLDOWNS_KEY = "frostDomainCooldowns";
+	private static final String EMPTY_EMBRACE_TAG = "magic.empty_embrace";
+	private static final String EMPTY_EMBRACE_ARTIFACT_POWERS_TAG = "magic.empty_embrace.artifact_powers";
+	private static final String EMPTY_EMBRACE_ARTIFACT_SUMMONS_TAG = "magic.empty_embrace.artifact_summons";
+	private static final String EMPTY_EMBRACE_ARTIFACT_ARMOR_TAG = "magic.empty_embrace.artifact_armor";
+	private static final String EMPTY_EMBRACE_INFESTED_SILVERFISH_TAG = "magic.empty_embrace.infested_silverfish";
+	private static final String ARTIFACT_ITEM_NAMESPACE = "evanpack";
 
 	private MagicAbilityManager() {
 	}
@@ -249,9 +263,9 @@ public final class MagicAbilityManager {
 		ABSOLUTE_ZERO_MANA_DRAIN_PER_SECOND = config.mana.absoluteZeroDrainPerSecond;
 		LOVE_AT_FIRST_SIGHT_IDLE_DRAIN_PER_SECOND = config.mana.loveAtFirstSightIdleDrainPerSecond;
 		LOVE_AT_FIRST_SIGHT_ACTIVE_DRAIN_PER_SECOND = config.mana.loveAtFirstSightActiveDrainPerSecond;
-		TILL_DEATH_DO_US_PART_ACTIVATION_COST_PERCENT = MathHelper.clamp(config.mana.tillDeathDoUsPartActivationCostPercent, 0, 100);
-		TILL_DEATH_DO_US_PART_MINIMUM_TRIGGER_PERCENT = MathHelper.clamp(config.mana.tillDeathDoUsPartMinimumTriggerPercent, 0, 100);
-		MANIPULATION_MANA_DRAIN_PER_SECOND = config.mana.manipulationDrainPerSecond;
+		TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = MathHelper.clamp(config.mana.tillDeathDoUsPartDrainPercentPerSecond, 0, 100);
+		MANIPULATION_ACTIVATION_MANA_COST = Math.max(0, config.mana.emptyEmbraceActivationCost);
+		MANIPULATION_MANA_DRAIN_PER_SECOND = Math.max(0, config.mana.emptyEmbraceDrainPerSecond);
 		DOMAIN_EXPANSION_ACTIVATION_MANA_COST = config.mana.domainExpansionActivationCost;
 		PASSIVE_MANA_REGEN_PER_SECOND = config.mana.passiveRegenPerSecond;
 		DEPLETED_RECOVERY_REGEN_PER_SECOND = config.mana.depletedRecoveryRegenPerSecond;
@@ -273,13 +287,10 @@ public final class MagicAbilityManager {
 		PLANCK_HEAT_STRENGTH_DURATION_TICKS = config.timing.planckHeatStrengthDurationTicks;
 		PLANCK_HEAT_FIRE_RESISTANCE_DURATION_TICKS = config.timing.planckHeatFireResistanceDurationTicks;
 		LOVE_LOCK_EFFECT_TICKS = config.timing.loveLockEffectTicks;
-		TILL_DEATH_DO_US_PART_WAIT_DURATION_TICKS = Math.max(1, config.timing.tillDeathDoUsPartWaitDurationTicks);
 		TILL_DEATH_DO_US_PART_LINK_DURATION_TICKS = Math.max(1, config.timing.tillDeathDoUsPartLinkDurationTicks);
-		TILL_DEATH_DO_US_PART_NO_TRIGGER_COOLDOWN_TICKS = Math.max(0, config.timing.tillDeathDoUsPartNoTriggerCooldownTicks);
-		TILL_DEATH_DO_US_PART_TRIGGERED_COOLDOWN_TICKS = Math.max(0, config.timing.tillDeathDoUsPartTriggeredCooldownTicks);
-		MANIPULATION_COOLDOWN_TICKS = config.timing.manipulationCooldownTicks;
-		MANIPULATION_REQUEST_DEBOUNCE_TICKS = config.timing.manipulationRequestDebounceTicks;
-		MANIPULATION_CLAMP_LOG_INTERVAL_TICKS = config.timing.manipulationClampLogIntervalTicks;
+		TILL_DEATH_DO_US_PART_COOLDOWN_TICKS = Math.max(0, config.timing.tillDeathDoUsPartCooldownTicks);
+		MANIPULATION_COOLDOWN_TICKS = Math.max(0, config.timing.emptyEmbraceCooldownTicks);
+		MANIPULATION_REQUEST_DEBOUNCE_TICKS = Math.max(0, config.timing.emptyEmbraceRequestDebounceTicks);
 		DOMAIN_EXPANSION_DURATION_TICKS = config.timing.domainExpansionDurationTicks;
 		FROST_DOMAIN_COOLDOWN_TICKS = Math.max(0, config.timing.frostDomainCooldownTicks);
 		LOVE_DOMAIN_COOLDOWN_TICKS = config.timing.loveDomainCooldownTicks;
@@ -296,6 +307,8 @@ public final class MagicAbilityManager {
 		ABSOLUTE_ZERO_AURA_RADIUS = config.radii.absoluteZeroAuraRadius;
 		PLANCK_HEAT_AURA_RADIUS = config.radii.planckHeatAuraRadius;
 		LOVE_GAZE_RANGE = config.radii.loveGazeRange;
+		MANIPULATION_ACQUIRE_RANGE = Math.max(1, config.radii.emptyEmbraceAcquireRange);
+		MANIPULATION_BREAK_RANGE = Math.max(1, config.radii.emptyEmbraceBreakRange);
 		DOMAIN_EXPANSION_RADIUS = config.radii.domainExpansionRadius;
 		DOMAIN_EXPANSION_HEIGHT = config.radii.domainExpansionHeight;
 		DOMAIN_EXPANSION_SHELL_THICKNESS = Math.max(1, config.radii.domainExpansionShellThickness);
@@ -314,9 +327,14 @@ public final class MagicAbilityManager {
 		LOVE_LOCK_SLOWNESS_AMPLIFIER = config.potionEffects.loveLockSlownessAmplifier;
 		LOVE_LOCK_MINING_FATIGUE_AMPLIFIER = config.potionEffects.loveLockMiningFatigueAmplifier;
 
-		MANIPULATION_MAX_INPUT_DELTA_PER_TICK = config.manipulation.maxInputDeltaPerTick;
-		MANIPULATION_VERTICAL_INPUT_DELTA_PER_TICK = config.manipulation.verticalInputDeltaPerTick;
-		MANIPULATION_DEBUG_LOGGING = config.manipulation.debugLogging;
+		MANIPULATION_DEACTIVATE_TARGET_MAGIC = config.emptyEmbrace.deactivateTargetMagic;
+		MANIPULATION_DISABLE_ARTIFACT_POWERS = config.emptyEmbrace.disableArtifactPowers;
+		MANIPULATION_DISMISS_ARTIFACT_SUMMONS = config.emptyEmbrace.dismissArtifactSummons;
+		MANIPULATION_DISABLE_ARTIFACT_ARMOR_EFFECTS = config.emptyEmbrace.disableArtifactArmorEffects;
+		MANIPULATION_DISABLE_INFESTED_SILVERFISH_ENHANCEMENTS = config.emptyEmbrace.disableInfestedSilverfishEnhancements;
+		MANIPULATION_BLOCK_ARTIFACT_USE_CLICKS = config.emptyEmbrace.blockArtifactUseClicks;
+		MANIPULATION_BLOCK_ARTIFACT_ATTACK_CLICKS = config.emptyEmbrace.blockArtifactAttackClicks;
+		MANIPULATION_DEBUG_LOGGING = config.emptyEmbrace.debugLogging;
 
 		DOMAIN_CLASH_ENABLED = config.domainClash.enabled;
 		DOMAIN_CLASH_SIMULTANEOUS_WINDOW_TICKS = Math.max(0, config.domainClash.simultaneousCastWindowTicks);
@@ -344,6 +362,11 @@ public final class MagicAbilityManager {
 
 		if (!MagicPlayerData.hasMagic(player)) {
 			player.sendMessage(Text.translatable("message.magic.no_access"), true);
+			return;
+		}
+
+		if (isMagicSuppressed(player)) {
+			player.sendMessage(Text.translatable("message.magic.empty_embrace.magic_blocked"), true);
 			return;
 		}
 
@@ -424,7 +447,7 @@ public final class MagicAbilityManager {
 		}
 
 		if (requestedAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
-			handleTillDeathDoUsPartRequest(player, currentTick);
+			handleTillDeathDoUsPartRequest(player);
 			return;
 		}
 
@@ -572,50 +595,34 @@ public final class MagicAbilityManager {
 		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.LOVE_AT_FIRST_SIGHT.displayName()), true);
 	}
 
-	private static void handleTillDeathDoUsPartRequest(ServerPlayerEntity player, int currentTick) {
-		MagicAbility activeAbility = activeAbility(player);
-		if (activeAbility == MagicAbility.MANIPULATION) {
-			deactivateManipulation(player, true, "switched to Till Death Do Us Part");
-		}
-
-		if (activeAbility == MagicAbility.LOVE_AT_FIRST_SIGHT) {
-			deactivateLoveAtFirstSight(player);
-		}
-
-		if (activeAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
+	private static void handleTillDeathDoUsPartRequest(ServerPlayerEntity player) {
+		UUID playerId = player.getUuid();
+		if (TILL_DEATH_DO_US_PART_STATES.containsKey(playerId)) {
 			deactivateTillDeathDoUsPart(player, TillDeathDoUsPartEndReason.MANUAL_CANCEL, true);
 			return;
 		}
 
-		int remainingTicks = tillDeathDoUsPartCooldownRemaining(player, currentTick);
-		if (remainingTicks > 0) {
-			int secondsRemaining = (int) Math.ceil(remainingTicks / 20.0);
+		if (TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.contains(playerId)) {
+			TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.remove(playerId);
 			player.sendMessage(
-				Text.translatable("message.magic.ability.cooldown", MagicAbility.TILL_DEATH_DO_US_PART.displayName(), secondsRemaining),
+				Text.translatable("message.magic.ability.passive_disabled", MagicAbility.TILL_DEATH_DO_US_PART.displayName()),
 				true
 			);
 			return;
 		}
 
-		if (MagicPlayerData.getMana(player) <= 0) {
-			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
-			return;
-		}
-
-		TILL_DEATH_DO_US_PART_STATES.put(
-			player.getUuid(),
-			TillDeathDoUsPartState.waiting(currentTick + TILL_DEATH_DO_US_PART_WAIT_DURATION_TICKS)
+		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.add(playerId);
+		player.sendMessage(
+			Text.translatable("message.magic.ability.passive_enabled", MagicAbility.TILL_DEATH_DO_US_PART.displayName()),
+			true
 		);
-		setActiveAbility(player, MagicAbility.TILL_DEATH_DO_US_PART);
-		MagicPlayerData.setDepletedRecoveryMode(player, false);
-		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.TILL_DEATH_DO_US_PART.displayName()), true);
 	}
 
 	private static void handleManipulationRequest(ServerPlayerEntity player) {
 		MagicAbility activeAbility = activeAbility(player);
 		int currentTick = player.getEntityWorld().getServer().getTicks();
 		debugManipulation(
-			"{} manipulation request: activeAbility={}, mana={}, cooldownRemainingTicks={}",
+			"{} empty embrace request: activeAbility={}, mana={}, cooldownRemainingTicks={}",
 			debugName(player),
 			activeAbility,
 			MagicPlayerData.getMana(player),
@@ -623,7 +630,7 @@ public final class MagicAbilityManager {
 		);
 
 		if (activeAbility == MagicAbility.MANIPULATION) {
-			debugManipulation("{} manipulation toggle requested while active; deactivating", debugName(player));
+			debugManipulation("{} empty embrace toggle requested while active; deactivating", debugName(player));
 			deactivateManipulation(player, true, "manual toggle via ability key");
 			setActiveAbility(player, MagicAbility.NONE);
 			player.sendMessage(Text.translatable("message.magic.ability.deactivated", MagicAbility.MANIPULATION.displayName()), true);
@@ -631,12 +638,12 @@ public final class MagicAbilityManager {
 		}
 
 		if (activeAbility == MagicAbility.LOVE_AT_FIRST_SIGHT) {
-			debugManipulation("{} manipulation request: deactivating prior LOVE_AT_FIRST_SIGHT", debugName(player));
+			debugManipulation("{} empty embrace request: deactivating prior LOVE_AT_FIRST_SIGHT", debugName(player));
 			deactivateLoveAtFirstSight(player);
 		}
 
 		if (activeAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
-			debugManipulation("{} manipulation request: deactivating prior TILL_DEATH_DO_US_PART", debugName(player));
+			debugManipulation("{} empty embrace request: deactivating prior TILL_DEATH_DO_US_PART", debugName(player));
 			deactivateTillDeathDoUsPart(player, TillDeathDoUsPartEndReason.MANUAL_CANCEL, false);
 		}
 
@@ -647,57 +654,125 @@ public final class MagicAbilityManager {
 				Text.translatable("message.magic.ability.cooldown", MagicAbility.MANIPULATION.displayName(), secondsRemaining),
 				true
 			);
-			debugManipulation("{} manipulation denied: cooldown {} ticks", debugName(player), remainingTicks);
+			debugManipulation("{} empty embrace denied: cooldown {} ticks", debugName(player), remainingTicks);
 			return;
 		}
 
-		if (MagicPlayerData.getMana(player) <= 0) {
+		if (MagicPlayerData.getMana(player) < MANIPULATION_ACTIVATION_MANA_COST) {
 			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
-			debugManipulation("{} manipulation denied: no mana", debugName(player));
+			debugManipulation("{} empty embrace denied: activation cost {}", debugName(player), MANIPULATION_ACTIVATION_MANA_COST);
 			return;
 		}
 
-		ServerPlayerEntity target = findPlayerTargetInLineOfSight(player);
-		if (target == null) {
-			player.sendMessage(Text.translatable("message.magic.ability.no_target", MagicAbility.MANIPULATION.displayName()), true);
-			debugManipulation("{} manipulation denied: no line-of-sight target", debugName(player));
-			return;
-		}
-
-		if (MANIPULATION_CASTER_BY_TARGET.containsKey(target.getUuid()) || LOVE_LOCKED_TARGETS.containsKey(target.getUuid())) {
-			player.sendMessage(Text.translatable("message.magic.ability.target_controlled"), true);
-			debugManipulation(
-				"{} manipulation denied: target {} ({}) already controlled",
-				debugName(player),
-				target.getName().getString(),
-				target.getUuid()
-			);
-			return;
+		if (MANIPULATION_ACTIVATION_MANA_COST > 0) {
+			MagicPlayerData.setMana(player, Math.max(0, MagicPlayerData.getMana(player) - MANIPULATION_ACTIVATION_MANA_COST));
 		}
 
 		setActiveAbility(player, MagicAbility.MANIPULATION);
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
-		activateManipulation(player, target);
-		debugManipulation(
-			"{} manipulation activation finalized: casterPos=[{}, {}, {}], targetPos=[{}, {}, {}]",
-			debugName(player),
-			round3(player.getX()),
-			round3(player.getY()),
-			round3(player.getZ()),
-			round3(target.getX()),
-			round3(target.getY()),
-			round3(target.getZ())
+		MANIPULATION_STATES.put(player.getUuid(), ManipulationState.waiting(currentTick, new Vec3d(player.getX(), player.getY(), player.getZ())));
+		player.sendMessage(Text.translatable("message.magic.empty_embrace.waiting"), true);
+		tryAcquireManipulationTarget(player, currentTick);
+	}
+
+	private static void tryAcquireManipulationTarget(ServerPlayerEntity caster, int currentTick) {
+		ManipulationState state = MANIPULATION_STATES.get(caster.getUuid());
+		if (state == null || state.stage != ManipulationStage.WAITING) {
+			return;
+		}
+
+		ServerPlayerEntity target = findPlayerTargetInLineOfSight(caster, MANIPULATION_ACQUIRE_RANGE);
+		if (target == null) {
+			return;
+		}
+
+		UUID existingCasterId = MANIPULATION_CASTER_BY_TARGET.get(target.getUuid());
+		if (existingCasterId != null && !existingCasterId.equals(caster.getUuid())) {
+			caster.sendMessage(Text.translatable("message.magic.ability.target_controlled"), true);
+			deactivateManipulation(caster, true, "target already affected by empty embrace");
+			setActiveAbility(caster, MagicAbility.NONE);
+			return;
+		}
+
+		if (targetHasActiveDomain(target)) {
+			caster.sendMessage(Text.translatable("message.magic.empty_embrace.domain_overwhelmed", target.getDisplayName()), true);
+			deactivateManipulation(caster, true, "target domain overwhelmed empty embrace");
+			setActiveAbility(caster, MagicAbility.NONE);
+			return;
+		}
+
+		activateManipulation(caster, target, currentTick);
+	}
+
+	private static boolean targetHasActiveDomain(ServerPlayerEntity target) {
+		return DOMAIN_EXPANSIONS.containsKey(target.getUuid()) || isDomainExpansion(activeAbility(target));
+	}
+
+	private static void activateManipulation(ServerPlayerEntity caster, ServerPlayerEntity target, int currentTick) {
+		UUID casterId = caster.getUuid();
+		ManipulationState state = MANIPULATION_STATES.computeIfAbsent(
+			casterId,
+			ignored -> ManipulationState.waiting(currentTick, new Vec3d(caster.getX(), caster.getY(), caster.getZ()))
 		);
+		state.stage = ManipulationStage.LINKED;
+		state.targetDimension = target.getEntityWorld().getRegistryKey();
+		state.targetId = target.getUuid();
+		state.lockedCasterPos = new Vec3d(caster.getX(), caster.getY(), caster.getZ());
+		state.controlledPos = new Vec3d(target.getX(), target.getY(), target.getZ());
+		MANIPULATION_CASTER_BY_TARGET.put(target.getUuid(), casterId);
+		if (MANIPULATION_DEACTIVATE_TARGET_MAGIC) {
+			cancelMagicOnTarget(target, currentTick);
+		}
+		applyManipulationSuppressionTags(target);
 		debugManipulation(
-			"{} manipulation activated on target {} ({}) at [{}, {}, {}]",
-			debugName(player),
+			"{} empty embrace locked target {} ({}) at [{}, {}, {}]",
+			debugName(caster),
 			target.getName().getString(),
 			target.getUuid(),
 			round3(target.getX()),
 			round3(target.getY()),
 			round3(target.getZ())
 		);
-		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.MANIPULATION.displayName()), true);
+		caster.sendMessage(Text.translatable("message.magic.empty_embrace.locked", target.getDisplayName()), true);
+		target.sendMessage(Text.translatable("message.magic.empty_embrace.target_status", caster.getDisplayName()), true);
+	}
+
+	private static void cancelMagicOnTarget(ServerPlayerEntity target, int currentTick) {
+		MagicAbility targetAbility = activeAbility(target);
+		if (targetAbility == MagicAbility.ABSOLUTE_ZERO) {
+			deactivateAbsoluteZero(target);
+		}
+		if (targetAbility == MagicAbility.PLANCK_HEAT) {
+			deactivatePlanckHeat(target);
+		}
+		if (targetAbility == MagicAbility.LOVE_AT_FIRST_SIGHT) {
+			deactivateLoveAtFirstSight(target);
+		}
+		if (targetAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
+			deactivateTillDeathDoUsPart(target, TillDeathDoUsPartEndReason.MANUAL_CANCEL, true);
+		}
+		if (targetAbility == MagicAbility.MANIPULATION) {
+			deactivateManipulation(target, true, "suppressed by empty embrace");
+		}
+
+		setActiveAbility(target, MagicAbility.NONE);
+		LOVE_LOCKED_TARGETS.remove(target.getUuid());
+
+		List<UUID> linkedTillDeathCasters = new ArrayList<>();
+		for (Map.Entry<UUID, TillDeathDoUsPartState> entry : TILL_DEATH_DO_US_PART_STATES.entrySet()) {
+			if (target.getUuid().equals(entry.getValue().linkedPlayerId)) {
+				linkedTillDeathCasters.add(entry.getKey());
+			}
+		}
+		for (UUID casterId : linkedTillDeathCasters) {
+			ServerPlayerEntity linkedCaster = target.getEntityWorld().getServer().getPlayerManager().getPlayer(casterId);
+			if (linkedCaster != null) {
+				deactivateTillDeathDoUsPart(linkedCaster, TillDeathDoUsPartEndReason.LINK_TARGET_INVALID, false);
+			} else {
+				TILL_DEATH_DO_US_PART_STATES.remove(casterId);
+				startTillDeathDoUsPartCooldown(casterId, currentTick);
+			}
+		}
 	}
 
 	private static void handleDomainExpansionRequest(ServerPlayerEntity player, MagicAbility requestedAbility, int currentTick) {
@@ -1753,6 +1828,7 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_OWNER_BY_PARTICIPANT.clear();
 		FROST_DOMAIN_COOLDOWN_END_TICK.clear();
 		LOVE_DOMAIN_COOLDOWN_END_TICK.clear();
+		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.clear();
 		TILL_DEATH_DO_US_PART_STATES.clear();
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
 		loadPersistedDomainRuntimeState(server);
@@ -1767,6 +1843,7 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_OWNER_BY_PARTICIPANT.clear();
 		persistDomainRuntimeState(server);
 		domainRuntimePersistentState = null;
+		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.clear();
 		TILL_DEATH_DO_US_PART_STATES.clear();
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
 	}
@@ -2095,6 +2172,7 @@ public final class MagicAbilityManager {
 
 		updateLoveLockedTargets(server, currentTick);
 		cleanupManipulationStates(server);
+		syncManipulationSuppressionTags(server);
 		cleanupPlanckHeatStates(server);
 		trimAbsoluteZeroAuraTimers(absoluteZeroAuraSeenThisTick);
 		updateFrostbittenTargets(server, currentTick);
@@ -2122,14 +2200,19 @@ public final class MagicAbilityManager {
 
 		if (activeAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
 			LOVE_POWER_ACTIVE_THIS_SECOND.put(playerId, false);
-			TillDeathDoUsPartState state = TILL_DEATH_DO_US_PART_STATES.get(playerId);
-			if (state == null) {
+			if (!TILL_DEATH_DO_US_PART_STATES.containsKey(playerId)) {
 				setActiveAbility(player, MagicAbility.NONE);
 				return;
 			}
 
-			if (state.stage == TillDeathDoUsPartStage.WAITING) {
-				regenerateMana(player, mana);
+			int manaDrain = manaFromPercent(TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND);
+			int nextMana = Math.max(0, mana - manaDrain);
+			MagicPlayerData.setMana(player, nextMana);
+
+			if (nextMana == 0 && manaDrain > 0) {
+				deactivateTillDeathDoUsPart(player, TillDeathDoUsPartEndReason.MANA_DEPLETED, false);
+				MagicPlayerData.setDepletedRecoveryMode(player, true);
+				player.sendMessage(Text.translatable("message.magic.ability.out_of_mana", activeAbility.displayName()), true);
 			}
 			return;
 		}
@@ -2494,13 +2577,6 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		if (state.stage == TillDeathDoUsPartStage.WAITING) {
-			if (currentTick > state.waitEndTick) {
-				deactivateTillDeathDoUsPart(caster, TillDeathDoUsPartEndReason.WAIT_TIMEOUT, true);
-			}
-			return;
-		}
-
 		ServerPlayerEntity linkedPlayer = caster.getEntityWorld().getServer().getPlayerManager().getPlayer(state.linkedPlayerId);
 		if (linkedPlayer == null || linkedPlayer.isSpectator()) {
 			deactivateTillDeathDoUsPart(caster, TillDeathDoUsPartEndReason.LINK_TARGET_INVALID, true);
@@ -2529,12 +2605,25 @@ public final class MagicAbilityManager {
 			return true;
 		}
 
-		if (activeAbility(damagedPlayer) != MagicAbility.TILL_DEATH_DO_US_PART) {
+		if (isMagicSuppressed(damagedPlayer)) {
 			return false;
 		}
 
-		TillDeathDoUsPartState state = TILL_DEATH_DO_US_PART_STATES.get(damagedPlayer.getUuid());
-		if (state == null || state.stage != TillDeathDoUsPartStage.WAITING) {
+		UUID playerId = damagedPlayer.getUuid();
+		if (!TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.contains(playerId) || TILL_DEATH_DO_US_PART_STATES.containsKey(playerId)) {
+			return false;
+		}
+
+		if (MagicPlayerData.getSchool(damagedPlayer) != MagicSchool.LOVE) {
+			return false;
+		}
+
+		if (!MagicConfig.get().abilityAccess.isAbilityUnlocked(playerId, MagicAbility.TILL_DEATH_DO_US_PART)) {
+			return false;
+		}
+
+		DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.get(playerId);
+		if (ownedDomain != null || activeAbility(damagedPlayer) == MagicAbility.LOVE_DOMAIN_EXPANSION) {
 			return false;
 		}
 
@@ -2543,39 +2632,47 @@ public final class MagicAbilityManager {
 			return false;
 		}
 
-		int minimumMana = requiredManaForTillDeathTrigger();
-		int manaCost = requiredManaForTillDeathCost();
-		int casterMana = MagicPlayerData.getMana(damagedPlayer);
-		if (casterMana < minimumMana || casterMana < manaCost) {
+		int currentTick = damagedPlayer.getEntityWorld().getServer().getTicks();
+		if (tillDeathDoUsPartCooldownRemaining(damagedPlayer, currentTick) > 0 || MagicPlayerData.getMana(damagedPlayer) <= 0) {
 			return false;
 		}
 
-		activateTillDeathDoUsPartLink(damagedPlayer, attackerPlayer, damagedPlayer.getEntityWorld().getServer().getTicks());
+		activateTillDeathDoUsPartLink(damagedPlayer, attackerPlayer, currentTick);
 		return false;
 	}
 
 	private static void activateTillDeathDoUsPartLink(ServerPlayerEntity caster, ServerPlayerEntity linkedPlayer, int currentTick) {
-		TillDeathDoUsPartState state = TILL_DEATH_DO_US_PART_STATES.get(caster.getUuid());
-		if (state == null || state.stage != TillDeathDoUsPartStage.WAITING) {
+		UUID casterId = caster.getUuid();
+		if (!TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.contains(casterId) || TILL_DEATH_DO_US_PART_STATES.containsKey(casterId)) {
 			return;
 		}
 
-		int manaCost = requiredManaForTillDeathCost();
-		int currentMana = MagicPlayerData.getMana(caster);
-		if (currentMana < manaCost) {
+		MagicAbility currentAbility = activeAbility(caster);
+		if (currentAbility == MagicAbility.LOVE_DOMAIN_EXPANSION || DOMAIN_EXPANSIONS.containsKey(casterId)) {
 			return;
 		}
-
-		MagicPlayerData.setMana(caster, currentMana - manaCost);
-		state.stage = TillDeathDoUsPartStage.LINKED;
-		state.linkedPlayerId = linkedPlayer.getUuid();
-		state.linkEndTick = currentTick + TILL_DEATH_DO_US_PART_LINK_DURATION_TICKS;
 
 		float averagedHealth = (float) Math.ceil((caster.getHealth() + linkedPlayer.getHealth()) / 2.0F);
 		float maxSharedHealth = Math.min(caster.getMaxHealth(), linkedPlayer.getMaxHealth());
-		state.sharedHealth = MathHelper.clamp(averagedHealth, 0.0F, maxSharedHealth);
-		caster.setHealth(state.sharedHealth);
-		linkedPlayer.setHealth(state.sharedHealth);
+		float sharedHealth = MathHelper.clamp(averagedHealth, 0.0F, maxSharedHealth);
+
+		if (currentAbility == MagicAbility.MANIPULATION) {
+			deactivateManipulation(caster, true, "interrupted by Till Death Do Us Part");
+		}
+
+		if (currentAbility == MagicAbility.LOVE_AT_FIRST_SIGHT) {
+			deactivateLoveAtFirstSight(caster);
+		}
+
+		TILL_DEATH_DO_US_PART_STATES.put(
+			casterId,
+			new TillDeathDoUsPartState(currentTick + TILL_DEATH_DO_US_PART_LINK_DURATION_TICKS, linkedPlayer.getUuid(), sharedHealth)
+		);
+		setActiveAbility(caster, MagicAbility.TILL_DEATH_DO_US_PART);
+		MagicPlayerData.setDepletedRecoveryMode(caster, false);
+		caster.setHealth(sharedHealth);
+		linkedPlayer.setHealth(sharedHealth);
+		caster.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.TILL_DEATH_DO_US_PART.displayName()), true);
 	}
 
 	private static void syncTillDeathDoUsPartHealth(
@@ -2606,31 +2703,28 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private static int requiredManaForTillDeathCost() {
-		return manaFromPercent(TILL_DEATH_DO_US_PART_ACTIVATION_COST_PERCENT);
-	}
-
-	private static int requiredManaForTillDeathTrigger() {
-		return manaFromPercent(TILL_DEATH_DO_US_PART_MINIMUM_TRIGGER_PERCENT);
-	}
-
 	private static int manaFromPercent(int percent) {
 		int normalizedPercent = MathHelper.clamp(percent, 0, 100);
 		return (int) Math.ceil(MagicPlayerData.MAX_MANA * (normalizedPercent / 100.0));
 	}
 
 	private static LivingEntity findLivingTargetInLineOfSight(ServerPlayerEntity caster) {
+		return findLivingTargetInLineOfSight(caster, LOVE_GAZE_RANGE);
+	}
+
+	private static LivingEntity findLivingTargetInLineOfSight(ServerPlayerEntity caster, double range) {
 		Vec3d eyePos = caster.getEyePos();
 		Vec3d look = caster.getRotationVec(1.0F);
-		Vec3d end = eyePos.add(look.multiply(LOVE_GAZE_RANGE));
-		Box area = caster.getBoundingBox().stretch(look.multiply(LOVE_GAZE_RANGE)).expand(1.0);
+		double clampedRange = Math.max(1.0, range);
+		Vec3d end = eyePos.add(look.multiply(clampedRange));
+		Box area = caster.getBoundingBox().stretch(look.multiply(clampedRange)).expand(1.0);
 		Predicate<Entity> filter = entity ->
 			entity instanceof LivingEntity living &&
 			living.isAlive() &&
 			entity != caster &&
 			(!(entity instanceof PlayerEntity player) || !player.isSpectator());
 
-		EntityHitResult hitResult = ProjectileUtil.raycast(caster, eyePos, end, area, filter, LOVE_GAZE_RANGE * LOVE_GAZE_RANGE);
+		EntityHitResult hitResult = ProjectileUtil.raycast(caster, eyePos, end, area, filter, clampedRange * clampedRange);
 		if (hitResult == null || !(hitResult.getEntity() instanceof LivingEntity target)) {
 			return null;
 		}
@@ -2661,7 +2755,11 @@ public final class MagicAbilityManager {
 	}
 
 	private static ServerPlayerEntity findPlayerTargetInLineOfSight(ServerPlayerEntity caster) {
-		LivingEntity target = findLivingTargetInLineOfSight(caster);
+		return findPlayerTargetInLineOfSight(caster, LOVE_GAZE_RANGE);
+	}
+
+	private static ServerPlayerEntity findPlayerTargetInLineOfSight(ServerPlayerEntity caster, double range) {
+		LivingEntity target = findLivingTargetInLineOfSight(caster, range);
 		if (target == null) {
 			debugManipulation("{} manipulation target search: no living target found", debugName(caster));
 			return null;
@@ -2690,151 +2788,45 @@ public final class MagicAbilityManager {
 	}
 
 	private static void activateManipulation(ServerPlayerEntity caster, ServerPlayerEntity target) {
-		UUID casterId = caster.getUuid();
-		ManipulationState state = new ManipulationState(
-			target.getEntityWorld().getRegistryKey(),
-			target.getUuid(),
-			new Vec3d(caster.getX(), caster.getY(), caster.getZ()),
-			new Vec3d(target.getX(), target.getY(), target.getZ())
-		);
-		MANIPULATION_STATES.put(casterId, state);
-		MANIPULATION_CASTER_BY_TARGET.put(target.getUuid(), casterId);
-		MANIPULATION_INPUT_BY_CASTER.putIfAbsent(casterId, PlayerInput.DEFAULT);
-		MANIPULATION_LOOK_BY_CASTER.put(casterId, new ManipulationLookState(caster.getYaw(), caster.getPitch()));
-		debugManipulation(
-			"{} manipulation maps updated: activeStates={}, controlledTargets={}",
-			debugName(caster),
-			MANIPULATION_STATES.size(),
-			MANIPULATION_CASTER_BY_TARGET.size()
-		);
-
-		target.stopUsingItem();
-		caster.setCameraEntity(target);
-		debugManipulation("{} manipulation camera switched to target {}", debugName(caster), target.getUuid());
-		debugManipulation(
-			"{} manipulation state created: lockedCasterPos=[{}, {}, {}], targetPos=[{}, {}, {}]",
-			debugName(caster),
-			round3(state.lockedCasterPos.x),
-			round3(state.lockedCasterPos.y),
-			round3(state.lockedCasterPos.z),
-			round3(state.controlledPos.x),
-			round3(state.controlledPos.y),
-			round3(state.controlledPos.z)
-		);
+		activateManipulation(caster, target, caster.getEntityWorld().getServer().getTicks());
 	}
 
 	private static void applyManipulation(ServerPlayerEntity caster) {
 		ManipulationState state = MANIPULATION_STATES.get(caster.getUuid());
 		if (state == null) {
-			debugManipulation("{} manipulation state missing during tick; canceling ability", debugName(caster));
+			debugManipulation("{} empty embrace state missing during tick; canceling ability", debugName(caster));
 			setActiveAbility(caster, MagicAbility.NONE);
-			caster.setCameraEntity(caster);
+			return;
+		}
+
+		int currentTick = caster.getEntityWorld().getServer().getTicks();
+		if (state.stage == ManipulationStage.WAITING) {
+			tryAcquireManipulationTarget(caster, currentTick);
 			return;
 		}
 
 		ServerPlayerEntity targetPlayer = resolveManipulationTarget(caster.getEntityWorld().getServer(), state);
-		if (targetPlayer == null) {
+		if (targetPlayer == null || !targetPlayer.isAlive() || targetPlayer.isSpectator()) {
 			deactivateManipulation(caster, true, "target missing or dead");
 			setActiveAbility(caster, MagicAbility.NONE);
 			return;
 		}
 
-		PlayerInput input = MANIPULATION_INPUT_BY_CASTER.getOrDefault(caster.getUuid(), PlayerInput.DEFAULT);
-		boolean sneaking = input.sneak();
-		boolean jumping = input.jump();
-		boolean sprinting = input.sprint();
-		double forward = (input.forward() ? 1.0 : 0.0) - (input.backward() ? 1.0 : 0.0);
-		double sideways = (input.right() ? 1.0 : 0.0) - (input.left() ? 1.0 : 0.0);
-		Vec3d rawInput = new Vec3d(sideways, 0.0, forward);
-		Vec3d horizontalDelta = manipulationHorizontalDelta(rawInput, caster.getYaw(), MANIPULATION_MAX_INPUT_DELTA_PER_TICK);
-		debugManipulation(
-			"{} manipulation tick start: target={}, casterPos=[{}, {}, {}], targetPos=[{}, {}, {}], rawInput=[{}, {}, {}], scaledDelta=[{}, {}, {}], jumping={}, sneaking={}, sprinting={}",
-			debugName(caster),
-			targetPlayer.getUuid(),
-			round3(caster.getX()),
-			round3(caster.getY()),
-			round3(caster.getZ()),
-			round3(targetPlayer.getX()),
-			round3(targetPlayer.getY()),
-			round3(targetPlayer.getZ()),
-			round3(rawInput.x),
-			round3(rawInput.y),
-			round3(rawInput.z),
-			round3(horizontalDelta.x),
-			round3(horizontalDelta.y),
-			round3(horizontalDelta.z),
-			jumping,
-			sneaking,
-			sprinting
-		);
-		ManipulationLookState lookState = MANIPULATION_LOOK_BY_CASTER.get(caster.getUuid());
-		float yaw = lookState == null ? caster.getYaw() : lookState.yaw;
-		float pitch = lookState == null ? caster.getPitch() : lookState.pitch;
-
-		targetPlayer.move(MovementType.SELF, horizontalDelta);
-		targetPlayer.stopUsingItem();
-		targetPlayer.setYaw(yaw);
-		targetPlayer.setPitch(pitch);
-		targetPlayer.setHeadYaw(yaw);
-		targetPlayer.setBodyYaw(yaw);
-		targetPlayer.setSneaking(sneaking);
-		targetPlayer.setSprinting(sprinting);
-		if (jumping && targetPlayer.isOnGround()) {
-			Vec3d velocity = targetPlayer.getVelocity();
-			targetPlayer.setVelocity(velocity.x, Math.max(velocity.y, MANIPULATION_VERTICAL_INPUT_DELTA_PER_TICK), velocity.z);
-			debugManipulation(
-				"{} manipulation jump impulse applied to target {}: priorVelocity=[{}, {}, {}], jumpVelocityY={}",
-				debugName(caster),
-				targetPlayer.getUuid(),
-				round3(velocity.x),
-				round3(velocity.y),
-				round3(velocity.z),
-				round3(Math.max(velocity.y, MANIPULATION_VERTICAL_INPUT_DELTA_PER_TICK))
-			);
+		if (targetPlayer.getEntityWorld() != caster.getEntityWorld()) {
+			deactivateManipulation(caster, true, "target changed dimension");
+			setActiveAbility(caster, MagicAbility.NONE);
+			return;
 		}
+
+		double breakRangeSquared = MANIPULATION_BREAK_RANGE * (double) MANIPULATION_BREAK_RANGE;
+		if (caster.squaredDistanceTo(targetPlayer) > breakRangeSquared) {
+			deactivateManipulation(caster, true, "target moved out of range");
+			setActiveAbility(caster, MagicAbility.NONE);
+			return;
+		}
+
+		targetPlayer.sendMessage(Text.translatable("message.magic.empty_embrace.target_status", caster.getDisplayName()), true);
 		spawnManipulationTargetParticles(targetPlayer);
-
-		targetPlayer.closeHandledScreen();
-		targetPlayer.getInventory().setSelectedSlot(caster.getInventory().getSelectedSlot());
-		double newX = targetPlayer.getX();
-		double newY = targetPlayer.getY();
-		double newZ = targetPlayer.getZ();
-		state.controlledPos = new Vec3d(newX, newY, newZ);
-		debugManipulation(
-			"{} manipulation tick target update: targetNextPos=[{}, {}, {}], casterLook=[{}, {}]",
-			debugName(caster),
-			round3(newX),
-			round3(newY),
-			round3(newZ),
-			round3(yaw),
-			round3(pitch)
-		);
-		targetPlayer.networkHandler.requestTeleport(newX, newY, newZ, yaw, pitch);
-		targetPlayer.sendMessage(Text.translatable("message.magic.manipulation.target_status", caster.getName()), true);
-		debugManipulation(
-			"{} manipulation tick complete: targetSyncedPos=[{}, {}, {}], targetSneaking={}, targetOnGround={}, selectedSlot={}",
-			debugName(caster),
-			round3(targetPlayer.getX()),
-			round3(targetPlayer.getY()),
-			round3(targetPlayer.getZ()),
-			targetPlayer.isSneaking(),
-			targetPlayer.isOnGround(),
-			targetPlayer.getInventory().getSelectedSlot()
-		);
-
-		caster.requestTeleport(state.lockedCasterPos.x, state.lockedCasterPos.y, state.lockedCasterPos.z);
-		caster.setVelocity(0.0, 0.0, 0.0);
-		caster.setOnGround(true);
-		caster.stopUsingItem();
-		caster.setCameraEntity(targetPlayer);
-		debugManipulation(
-			"{} manipulation caster locked: lockedPos=[{}, {}, {}], cameraTarget={}",
-			debugName(caster),
-			round3(state.lockedCasterPos.x),
-			round3(state.lockedCasterPos.y),
-			round3(state.lockedCasterPos.z),
-			targetPlayer.getUuid()
-		);
 	}
 
 	private static void cleanupManipulationStates(MinecraftServer server) {
@@ -2870,6 +2862,42 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static void syncManipulationSuppressionTags(MinecraftServer server) {
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			if (isMagicSuppressed(player)) {
+				applyManipulationSuppressionTags(player);
+				continue;
+			}
+
+			clearManipulationSuppressionTags(player);
+		}
+	}
+
+	private static void applyManipulationSuppressionTags(ServerPlayerEntity target) {
+		target.addCommandTag(EMPTY_EMBRACE_TAG);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_POWERS_TAG, MANIPULATION_DISABLE_ARTIFACT_POWERS);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_SUMMONS_TAG, MANIPULATION_DISMISS_ARTIFACT_SUMMONS);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_ARMOR_TAG, MANIPULATION_DISABLE_ARTIFACT_ARMOR_EFFECTS);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_INFESTED_SILVERFISH_TAG, MANIPULATION_DISABLE_INFESTED_SILVERFISH_ENHANCEMENTS);
+	}
+
+	private static void clearManipulationSuppressionTags(ServerPlayerEntity target) {
+		target.removeCommandTag(EMPTY_EMBRACE_TAG);
+		target.removeCommandTag(EMPTY_EMBRACE_ARTIFACT_POWERS_TAG);
+		target.removeCommandTag(EMPTY_EMBRACE_ARTIFACT_SUMMONS_TAG);
+		target.removeCommandTag(EMPTY_EMBRACE_ARTIFACT_ARMOR_TAG);
+		target.removeCommandTag(EMPTY_EMBRACE_INFESTED_SILVERFISH_TAG);
+	}
+
+	private static void setManipulationSuppressionTag(ServerPlayerEntity target, String tag, boolean enabled) {
+		if (enabled) {
+			target.addCommandTag(tag);
+			return;
+		}
+
+		target.removeCommandTag(tag);
+	}
+
 	private static void cleanupPlanckHeatStates(MinecraftServer server) {
 		Iterator<Map.Entry<UUID, PlanckHeatState>> iterator = PLANCK_HEAT_STATES.entrySet().iterator();
 		while (iterator.hasNext()) {
@@ -2886,10 +2914,14 @@ public final class MagicAbilityManager {
 	}
 
 	private static ServerPlayerEntity resolveManipulationTarget(MinecraftServer server, ManipulationState state) {
+		if (state == null || state.stage != ManipulationStage.LINKED || state.targetDimension == null || state.targetId == null) {
+			return null;
+		}
+
 		ServerWorld world = server.getWorld(state.targetDimension);
 		if (world == null) {
 			debugManipulation(
-				"manipulation target resolve failed: dimension {} was not loaded for targetId={}",
+				"empty embrace target resolve failed: dimension {} was not loaded for targetId={}",
 				state.targetDimension.getValue(),
 				state.targetId
 			);
@@ -2901,7 +2933,7 @@ public final class MagicAbilityManager {
 			return targetPlayer;
 		}
 		debugManipulation(
-			"manipulation target resolve failed: targetId={} entityType={}, alive={}, spectator={}",
+			"empty embrace target resolve failed: targetId={} entityType={}, alive={}, spectator={}",
 			state.targetId,
 			entity == null ? "null" : entity.getClass().getSimpleName(),
 			entity instanceof LivingEntity living && living.isAlive(),
@@ -3024,6 +3056,9 @@ public final class MagicAbilityManager {
 		if (isActionLocked(player)) {
 			return ActionResult.FAIL;
 		}
+		if (shouldBlockArtifactUse(player, hand)) {
+			return ActionResult.FAIL;
+		}
 
 		if (world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer)) {
 			return ActionResult.PASS;
@@ -3048,6 +3083,9 @@ public final class MagicAbilityManager {
 		Hand hand,
 		net.minecraft.util.hit.BlockHitResult hitResult
 	) {
+		if (shouldBlockArtifactUse(player, hand)) {
+			return ActionResult.FAIL;
+		}
 		return isActionLocked(player) ? ActionResult.FAIL : ActionResult.PASS;
 	}
 
@@ -3058,6 +3096,9 @@ public final class MagicAbilityManager {
 		Entity entity,
 		net.minecraft.util.hit.EntityHitResult hitResult
 	) {
+		if (shouldBlockArtifactUse(player, hand)) {
+			return ActionResult.FAIL;
+		}
 		return isActionLocked(player) ? ActionResult.FAIL : ActionResult.PASS;
 	}
 
@@ -3068,10 +3109,16 @@ public final class MagicAbilityManager {
 		net.minecraft.util.math.BlockPos pos,
 		net.minecraft.util.math.Direction direction
 	) {
+		if (shouldBlockArtifactAttack(player)) {
+			return ActionResult.FAIL;
+		}
 		return isActionLocked(player) ? ActionResult.FAIL : ActionResult.PASS;
 	}
 
 	private static boolean onBeforeBlockBreak(World world, PlayerEntity player, BlockPos pos) {
+		if (shouldBlockArtifactAttack(player)) {
+			return false;
+		}
 		if (world.isClient()) {
 			return true;
 		}
@@ -3094,6 +3141,9 @@ public final class MagicAbilityManager {
 		EntityHitResult hitResult
 	) {
 		if (isActionLocked(player)) {
+			return ActionResult.FAIL;
+		}
+		if (shouldBlockArtifactAttack(player)) {
 			return ActionResult.FAIL;
 		}
 
@@ -3122,6 +3172,31 @@ public final class MagicAbilityManager {
 
 		applyOrRefreshFrostbite(target, currentTick);
 		return ActionResult.PASS;
+	}
+
+	private static boolean shouldBlockArtifactUse(PlayerEntity player, Hand hand) {
+		if (!MANIPULATION_BLOCK_ARTIFACT_USE_CLICKS || !isMagicSuppressed(player)) {
+			return false;
+		}
+
+		return isArtifactItem(player.getStackInHand(hand));
+	}
+
+	private static boolean shouldBlockArtifactAttack(PlayerEntity player) {
+		if (!MANIPULATION_BLOCK_ARTIFACT_ATTACK_CLICKS || !isMagicSuppressed(player)) {
+			return false;
+		}
+
+		return isArtifactItem(player.getMainHandStack());
+	}
+
+	private static boolean isArtifactItem(ItemStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+
+		Identifier itemId = Registries.ITEM.getId(stack.getItem());
+		return ARTIFACT_ITEM_NAMESPACE.equals(itemId.getNamespace());
 	}
 
 	private static void applyOrRefreshFrostbite(LivingEntity target, int currentTick) {
@@ -3844,8 +3919,11 @@ public final class MagicAbilityManager {
 	private static boolean isControlLocked(PlayerEntity player) {
 		UUID playerId = player.getUuid();
 		return LOVE_LOCKED_TARGETS.containsKey(playerId)
-			|| MANIPULATION_CASTER_BY_TARGET.containsKey(playerId)
 			|| isDomainClashParticipantFrozen(player);
+	}
+
+	private static boolean isMagicSuppressed(PlayerEntity player) {
+		return MANIPULATION_CASTER_BY_TARGET.containsKey(player.getUuid());
 	}
 
 	private static boolean isDomainClashParticipantFrozen(PlayerEntity player) {
@@ -4073,6 +4151,7 @@ public final class MagicAbilityManager {
 		setActiveAbility(player, MagicAbility.NONE);
 		player.setCameraEntity(player);
 		MagicPlayerData.clearDomainClashUi(player);
+		clearManipulationSuppressionTags(player);
 
 		boolean domainStateChanged = false;
 
@@ -4096,6 +4175,7 @@ public final class MagicAbilityManager {
 		PLANCK_HEAT_STATES.remove(playerId);
 		PLANCK_HEAT_FROST_NEXT_DAMAGE_TICK.remove(playerId);
 		LOVE_POWER_ACTIVE_THIS_SECOND.remove(playerId);
+		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.remove(playerId);
 		FROSTBITTEN_TARGETS.remove(playerId);
 		ENHANCED_FIRE_TARGETS.remove(playerId);
 		LOVE_LOCKED_TARGETS.remove(playerId);
@@ -4127,10 +4207,7 @@ public final class MagicAbilityManager {
 				continue;
 			}
 
-			int cooldownTicks = state.stage == TillDeathDoUsPartStage.LINKED
-				? TILL_DEATH_DO_US_PART_TRIGGERED_COOLDOWN_TICKS
-				: TILL_DEATH_DO_US_PART_NO_TRIGGER_COOLDOWN_TICKS;
-			TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.put(casterId, server.getTicks() + cooldownTicks);
+			startTillDeathDoUsPartCooldown(casterId, server.getTicks());
 		}
 
 		ManipulationState ownManipulation = MANIPULATION_STATES.remove(playerId);
@@ -4198,26 +4275,34 @@ public final class MagicAbilityManager {
 		UUID casterId = player.getUuid();
 		TillDeathDoUsPartState state = TILL_DEATH_DO_US_PART_STATES.remove(casterId);
 		if (state == null) {
-			setActiveAbility(player, MagicAbility.NONE);
+			if (activeAbility(player) == MagicAbility.TILL_DEATH_DO_US_PART) {
+				setActiveAbility(player, MagicAbility.NONE);
+			}
 			return;
 		}
 
-		if (reason == TillDeathDoUsPartEndReason.CASTER_DIED && state.stage == TillDeathDoUsPartStage.LINKED) {
+		if (reason == TillDeathDoUsPartEndReason.CASTER_DIED) {
 			ServerPlayerEntity linkedPlayer = player.getEntityWorld().getServer().getPlayerManager().getPlayer(state.linkedPlayerId);
 			if (linkedPlayer != null && linkedPlayer.isAlive()) {
 				linkedPlayer.setHealth(0.0F);
 			}
 		}
 
-		int cooldownTicks = state.stage == TillDeathDoUsPartStage.LINKED
-			? TILL_DEATH_DO_US_PART_TRIGGERED_COOLDOWN_TICKS
-			: TILL_DEATH_DO_US_PART_NO_TRIGGER_COOLDOWN_TICKS;
-		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.put(casterId, player.getEntityWorld().getServer().getTicks() + cooldownTicks);
+		startTillDeathDoUsPartCooldown(casterId, player.getEntityWorld().getServer().getTicks());
 		setActiveAbility(player, MagicAbility.NONE);
 
 		if (sendFeedback) {
 			player.sendMessage(Text.translatable("message.magic.ability.deactivated", MagicAbility.TILL_DEATH_DO_US_PART.displayName()), true);
 		}
+	}
+
+	private static void startTillDeathDoUsPartCooldown(UUID playerId, int currentTick) {
+		if (TILL_DEATH_DO_US_PART_COOLDOWN_TICKS <= 0) {
+			TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.remove(playerId);
+			return;
+		}
+
+		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.put(playerId, currentTick + TILL_DEATH_DO_US_PART_COOLDOWN_TICKS);
 	}
 
 	private static void deactivateManipulation(ServerPlayerEntity caster, boolean startCooldown) {
@@ -4249,7 +4334,6 @@ public final class MagicAbilityManager {
 					caster.getEntityWorld().getServer().getTicks() + MANIPULATION_COOLDOWN_TICKS
 				);
 			}
-			caster.setCameraEntity(caster);
 			return;
 		}
 
@@ -4286,7 +4370,7 @@ public final class MagicAbilityManager {
 		MinecraftServer server,
 		ServerPlayerEntity caster
 	) {
-		boolean removedMapping = MANIPULATION_CASTER_BY_TARGET.remove(state.targetId, casterId);
+		boolean removedMapping = state.targetId != null && MANIPULATION_CASTER_BY_TARGET.remove(state.targetId, casterId);
 		MANIPULATION_INTERACTION_PROXY.remove(casterId);
 		debugManipulation(
 			"{} manipulation state release: targetId={}, mappingRemoved={}, serverTick={}",
@@ -4296,9 +4380,15 @@ public final class MagicAbilityManager {
 			server.getTicks()
 		);
 
+		if (state.targetId != null) {
+			ServerPlayerEntity target = server.getPlayerManager().getPlayer(state.targetId);
+			if (target != null) {
+				clearManipulationSuppressionTags(target);
+			}
+		}
+
 		if (caster != null) {
-			caster.setCameraEntity(caster);
-			debugManipulation("{} manipulation state release: camera restored to self", debugName(caster));
+			debugManipulation("{} empty embrace state release complete", debugName(caster));
 		}
 	}
 
@@ -4427,38 +4517,25 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private enum TillDeathDoUsPartStage {
-		WAITING,
-		LINKED
-	}
-
 	private enum TillDeathDoUsPartEndReason {
 		MANUAL_CANCEL,
-		WAIT_TIMEOUT,
 		LINK_EXPIRED,
 		LINK_TARGET_INVALID,
 		LINK_TARGET_DIED,
 		CASTER_DIED,
+		MANA_DEPLETED,
 		SCHOOL_CHANGED
 	}
 
 	private static final class TillDeathDoUsPartState {
-		private TillDeathDoUsPartStage stage;
-		private final int waitEndTick;
-		private int linkEndTick;
-		private UUID linkedPlayerId;
+		private final int linkEndTick;
+		private final UUID linkedPlayerId;
 		private float sharedHealth;
 
-		private TillDeathDoUsPartState(TillDeathDoUsPartStage stage, int waitEndTick, int linkEndTick, UUID linkedPlayerId, float sharedHealth) {
-			this.stage = stage;
-			this.waitEndTick = waitEndTick;
+		private TillDeathDoUsPartState(int linkEndTick, UUID linkedPlayerId, float sharedHealth) {
 			this.linkEndTick = linkEndTick;
 			this.linkedPlayerId = linkedPlayerId;
 			this.sharedHealth = sharedHealth;
-		}
-
-		private static TillDeathDoUsPartState waiting(int waitEndTick) {
-			return new TillDeathDoUsPartState(TillDeathDoUsPartStage.WAITING, waitEndTick, 0, null, 0.0F);
 		}
 	}
 
@@ -4603,22 +4680,44 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private enum ManipulationStage {
+		WAITING,
+		LINKED
+	}
+
 	private static final class ManipulationState {
-		private final RegistryKey<World> targetDimension;
-		private final UUID targetId;
-		private final Vec3d lockedCasterPos;
+		private ManipulationStage stage;
+		private RegistryKey<World> targetDimension;
+		private UUID targetId;
+		private Vec3d lockedCasterPos;
 		private Vec3d controlledPos;
+		private final int startedTick;
 
 		private ManipulationState(
+			ManipulationStage stage,
 			RegistryKey<World> targetDimension,
 			UUID targetId,
 			Vec3d lockedCasterPos,
-			Vec3d controlledPos
+			Vec3d controlledPos,
+			int startedTick
 		) {
+			this.stage = stage;
 			this.targetDimension = targetDimension;
 			this.targetId = targetId;
 			this.lockedCasterPos = lockedCasterPos;
 			this.controlledPos = controlledPos;
+			this.startedTick = startedTick;
+		}
+
+		private static ManipulationState waiting(int startedTick, Vec3d casterPos) {
+			return new ManipulationState(
+				ManipulationStage.WAITING,
+				null,
+				null,
+				casterPos,
+				Vec3d.ZERO,
+				startedTick
+			);
 		}
 	}
 
