@@ -343,6 +343,7 @@ public final class MagicConfig {
 		public int loveLockMiningFatigueAmplifier = 255;
 		public int domainClashRegenerationAmplifier = 9;
 		public int domainClashInstantHealthAmplifier = 9;
+		public int domainClashResistanceAmplifier = 5;
 	}
 
 	public static final class ParticlesConfig {

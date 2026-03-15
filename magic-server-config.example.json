@@ -70,7 +70,8 @@
     "loveLockSlownessAmplifier": 255,
     "loveLockMiningFatigueAmplifier": 255,
     "domainClashRegenerationAmplifier": 9,
-    "domainClashInstantHealthAmplifier": 9
+    "domainClashInstantHealthAmplifier": 9,
+    "domainClashResistanceAmplifier": 5
   },
   "particles": {
     "loveAtFirstSightParticleIntervalTicks": 8,

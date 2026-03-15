@@ -152,15 +152,8 @@ public final class MagicCommands {
 
 		for (ServerPlayerEntity target : targets) {
 			playerIds.add(target.getUuid());
-			target.getInventory().clear();
-			target.getEnderChestInventory().clear();
-			target.clearStatusEffects();
-			target.extinguish();
-			target.setExperienceLevel(0);
-			target.setExperiencePoints(0);
 			MagicAbilityManager.clearAllRuntimeState(target);
 			MagicPlayerData.clear(target);
-			target.playerScreenHandler.sendContentUpdates();
 		}
 
 		boolean clearedOverrides = MagicConfig.clearPlayerAbilityOverrides(playerIds);
