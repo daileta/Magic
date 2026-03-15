@@ -16,6 +16,7 @@ import net.evan.magic.magic.MagicSchool;
 import net.evan.magic.registry.ModItems;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
@@ -47,6 +48,7 @@ import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
 import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtHelper;
@@ -83,11 +85,12 @@ import net.minecraft.world.RaycastContext;
 
 public final class MagicAbilityManager {
 	private static final int TICKS_PER_SECOND = 20;
+	private static final int COOLDOWN_MESSAGE_DEBOUNCE_TICKS = 20;
 	private static int BELOW_FREEZING_MANA_DRAIN_PER_SECOND = 5;
 	private static int ABSOLUTE_ZERO_MANA_DRAIN_PER_SECOND = 20;
 	private static int LOVE_AT_FIRST_SIGHT_IDLE_DRAIN_PER_SECOND = 2;
 	private static int LOVE_AT_FIRST_SIGHT_ACTIVE_DRAIN_PER_SECOND = 5;
-	private static int TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = 3;
+	private static double TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = 3.0;
 	private static int MANIPULATION_ACTIVATION_MANA_COST = 0;
 	private static int MANIPULATION_MANA_DRAIN_PER_SECOND = 0;
 	private static int PASSIVE_MANA_REGEN_PER_SECOND = 10;
@@ -134,6 +137,8 @@ public final class MagicAbilityManager {
 	private static int LOVE_LOCK_EFFECT_TICKS = 5;
 	private static int LOVE_LOCK_SLOWNESS_AMPLIFIER = 255;
 	private static int LOVE_LOCK_MINING_FATIGUE_AMPLIFIER = 255;
+	private static int DOMAIN_CLASH_REGENERATION_AMPLIFIER = 9;
+	private static int DOMAIN_CLASH_INSTANT_HEALTH_AMPLIFIER = 9;
 	private static int TILL_DEATH_DO_US_PART_LINK_DURATION_TICKS = 30 * TICKS_PER_SECOND;
 	private static int TILL_DEATH_DO_US_PART_COOLDOWN_TICKS = 150 * TICKS_PER_SECOND;
 	private static int MANIPULATION_COOLDOWN_TICKS = 6000;
@@ -155,6 +160,9 @@ public final class MagicAbilityManager {
 	private static int DOMAIN_EXPANSION_DURATION_TICKS = 60 * TICKS_PER_SECOND;
 	private static int FROST_DOMAIN_COOLDOWN_TICKS = 60 * TICKS_PER_SECOND;
 	private static int LOVE_DOMAIN_COOLDOWN_TICKS = 30 * 60 * TICKS_PER_SECOND;
+	private static int LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS = 8;
+	private static int LOVE_AT_FIRST_SIGHT_HEART_PARTICLES = 1;
+	private static int LOVE_AT_FIRST_SIGHT_HAPPY_VILLAGER_PARTICLES = 0;
 	private static int DOMAIN_EXPANSION_RADIUS = 25;
 	private static int DOMAIN_EXPANSION_HEIGHT = 25;
 	private static int DOMAIN_EXPANSION_SHELL_THICKNESS = 1;
@@ -166,14 +174,15 @@ public final class MagicAbilityManager {
 	private static int DOMAIN_CLASH_TITLE_FADE_OUT_TICKS = 8;
 	private static int DOMAIN_CLASH_INSTRUCTIONS_DURATION_TICKS = 15 * TICKS_PER_SECOND;
 	private static int DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS = TICKS_PER_SECOND;
+	private static int DOMAIN_CLASH_REGENERATION_REFRESH_TICKS = 40;
 	private static double DOMAIN_CLASH_DAMAGE_TO_WIN = 250.0;
 	private static int DOMAIN_CLASH_LOSER_MANA_DRAIN_PERCENT = 50;
-	private static double DOMAIN_CLASH_LOSER_COOLDOWN_MULTIPLIER = 0.5;
+	private static double DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER = 0.5;
 	private static int DOMAIN_CLASH_PARTICLES_PER_TICK = 120;
 	private static int DOMAIN_CLASH_SPLIT_PATTERN_MODULO = 2;
-	private static boolean DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS = true;
+	private static boolean DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS = false;
 	private static boolean DOMAIN_CLASH_FORCE_LOOK = true;
-	private static boolean DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE = true;
+	private static boolean DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE = false;
 	private static final int DOMAIN_BLOCK_PLACE_FLAGS = Block.NOTIFY_LISTENERS | Block.FORCE_STATE_AND_SKIP_CALLBACKS_AND_DROPS;
 	private static final int DOMAIN_BLOCK_RESTORE_FLAGS = Block.NOTIFY_ALL | Block.FORCE_STATE_AND_SKIP_CALLBACKS_AND_DROPS;
 	private static final BlockState DOMAIN_SHELL_BLOCK_STATE = Blocks.BLACK_CONCRETE.getDefaultState();
@@ -210,6 +219,8 @@ public final class MagicAbilityManager {
 	private static final Set<UUID> TILL_DEATH_DO_US_PART_PASSIVE_ENABLED = new HashSet<>();
 	private static final Map<UUID, TillDeathDoUsPartState> TILL_DEATH_DO_US_PART_STATES = new HashMap<>();
 	private static final Map<UUID, Integer> TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, Double> TILL_DEATH_DO_US_PART_DRAIN_BUFFER = new HashMap<>();
+	private static final Map<UUID, Integer> TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK = new HashMap<>();
 	private static final Map<UUID, ManipulationState> MANIPULATION_STATES = new HashMap<>();
 	private static final Map<UUID, UUID> MANIPULATION_CASTER_BY_TARGET = new HashMap<>();
 	private static final Map<UUID, PlayerInput> MANIPULATION_INPUT_BY_CASTER = new HashMap<>();
@@ -223,11 +234,13 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, UUID> DOMAIN_CLASH_OWNER_BY_PARTICIPANT = new HashMap<>();
 	private static final Map<UUID, Integer> FROST_DOMAIN_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, Integer> LOVE_DOMAIN_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, DomainPendingReturnState> DOMAIN_PENDING_RETURNS = new HashMap<>();
 	private static final RegistryEntryLookup<Block> BLOCK_ENTRY_LOOKUP = Registries.createEntryLookup(Registries.BLOCK);
 	private static DomainRuntimePersistentState domainRuntimePersistentState;
 	private static final String DOMAIN_PERSISTENCE_DOMAINS_KEY = "domains";
 	private static final String DOMAIN_PERSISTENCE_LOVE_COOLDOWNS_KEY = "loveDomainCooldowns";
 	private static final String DOMAIN_PERSISTENCE_FROST_COOLDOWNS_KEY = "frostDomainCooldowns";
+	private static final String DOMAIN_PERSISTENCE_PENDING_RETURNS_KEY = "pendingDomainReturns";
 	private static final String EMPTY_EMBRACE_TAG = "magic.empty_embrace";
 	private static final String EMPTY_EMBRACE_ARTIFACT_POWERS_TAG = "magic.empty_embrace.artifact_powers";
 	private static final String EMPTY_EMBRACE_ARTIFACT_SUMMONS_TAG = "magic.empty_embrace.artifact_summons";
@@ -247,6 +260,7 @@ public final class MagicAbilityManager {
 		ServerLifecycleEvents.SERVER_STARTED.register(MagicAbilityManager::onServerStarted);
 		ServerLifecycleEvents.SERVER_STOPPING.register(MagicAbilityManager::onServerStopping);
 		ServerTickEvents.END_SERVER_TICK.register(MagicAbilityManager::onEndServerTick);
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> applyPendingDomainReturn(handler.player, server));
 		AttackEntityCallback.EVENT.register(MagicAbilityManager::onAttackEntity);
 		UseItemCallback.EVENT.register(MagicAbilityManager::onUseItem);
 		UseBlockCallback.EVENT.register(MagicAbilityManager::onUseBlock);
@@ -263,7 +277,7 @@ public final class MagicAbilityManager {
 		ABSOLUTE_ZERO_MANA_DRAIN_PER_SECOND = config.mana.absoluteZeroDrainPerSecond;
 		LOVE_AT_FIRST_SIGHT_IDLE_DRAIN_PER_SECOND = config.mana.loveAtFirstSightIdleDrainPerSecond;
 		LOVE_AT_FIRST_SIGHT_ACTIVE_DRAIN_PER_SECOND = config.mana.loveAtFirstSightActiveDrainPerSecond;
-		TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = MathHelper.clamp(config.mana.tillDeathDoUsPartDrainPercentPerSecond, 0, 100);
+		TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = MathHelper.clamp(config.mana.tillDeathDoUsPartDrainPercentPerSecond, 0.0, 100.0);
 		MANIPULATION_ACTIVATION_MANA_COST = Math.max(0, config.mana.emptyEmbraceActivationCost);
 		MANIPULATION_MANA_DRAIN_PER_SECOND = Math.max(0, config.mana.emptyEmbraceDrainPerSecond);
 		DOMAIN_EXPANSION_ACTIVATION_MANA_COST = config.mana.domainExpansionActivationCost;
@@ -294,6 +308,7 @@ public final class MagicAbilityManager {
 		DOMAIN_EXPANSION_DURATION_TICKS = config.timing.domainExpansionDurationTicks;
 		FROST_DOMAIN_COOLDOWN_TICKS = Math.max(0, config.timing.frostDomainCooldownTicks);
 		LOVE_DOMAIN_COOLDOWN_TICKS = config.timing.loveDomainCooldownTicks;
+		DOMAIN_CLASH_REGENERATION_REFRESH_TICKS = Math.max(1, config.timing.domainClashRegenerationRefreshTicks);
 
 		FROSTBITE_DAMAGE_INTERVAL_TICKS = config.powderedSnowEffect.damageIntervalTicks;
 		POWDERED_SNOW_DAMAGE_ON_INITIAL_APPLICATION = config.powderedSnowEffect.dealDamageOnInitialApplication;
@@ -326,6 +341,12 @@ public final class MagicAbilityManager {
 		PLANCK_HEAT_FIRE_PHASE_NAUSEA_AMPLIFIER = config.potionEffects.planckHeatFirePhaseNauseaAmplifier;
 		LOVE_LOCK_SLOWNESS_AMPLIFIER = config.potionEffects.loveLockSlownessAmplifier;
 		LOVE_LOCK_MINING_FATIGUE_AMPLIFIER = config.potionEffects.loveLockMiningFatigueAmplifier;
+		DOMAIN_CLASH_REGENERATION_AMPLIFIER = Math.max(0, config.potionEffects.domainClashRegenerationAmplifier);
+		DOMAIN_CLASH_INSTANT_HEALTH_AMPLIFIER = Math.max(0, config.potionEffects.domainClashInstantHealthAmplifier);
+
+		LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS = Math.max(1, config.particles.loveAtFirstSightParticleIntervalTicks);
+		LOVE_AT_FIRST_SIGHT_HEART_PARTICLES = Math.max(0, config.particles.loveAtFirstSightHeartParticles);
+		LOVE_AT_FIRST_SIGHT_HAPPY_VILLAGER_PARTICLES = Math.max(0, config.particles.loveAtFirstSightHappyVillagerParticles);
 
 		MANIPULATION_DEACTIVATE_TARGET_MAGIC = config.emptyEmbrace.deactivateTargetMagic;
 		MANIPULATION_DISABLE_ARTIFACT_POWERS = config.emptyEmbrace.disableArtifactPowers;
@@ -346,7 +367,7 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_INSTRUCTIONS_FADE_OUT_TICKS = Math.max(0, config.domainClash.instructionsFadeOutTicks);
 		DOMAIN_CLASH_DAMAGE_TO_WIN = Math.max(1.0, config.domainClash.damageToWin);
 		DOMAIN_CLASH_LOSER_MANA_DRAIN_PERCENT = MathHelper.clamp(config.domainClash.loserManaDrainPercent, 0, 100);
-		DOMAIN_CLASH_LOSER_COOLDOWN_MULTIPLIER = MathHelper.clamp(config.domainClash.loserCooldownMultiplier, 0.0, 10.0);
+		DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER = MathHelper.clamp(config.domainClash.postClashDomainCooldownMultiplier, 0.0, 10.0);
 		DOMAIN_CLASH_PARTICLES_PER_TICK = Math.max(0, config.domainClash.particlesPerTick);
 		DOMAIN_CLASH_SPLIT_PATTERN_MODULO = Math.max(2, config.domainClash.splitPatternModulo);
 		DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS = config.domainClash.disableDomainEffectsDuringClash;
@@ -377,30 +398,34 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.get(player.getUuid());
-		if (ownedDomain != null) {
-			if (isDomainExpansion(requestedAbility) && requestedAbility == ownedDomain.ability) {
-				deactivateDomainExpansion(player);
-				setActiveAbility(player, MagicAbility.NONE);
-				player.sendMessage(Text.translatable("message.magic.ability.deactivated", ownedDomain.ability.displayName()), true);
-				return;
-			}
+		UUID playerId = player.getUuid();
+		DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.get(playerId);
+		boolean inDomainClash = domainClashStateForParticipant(playerId) != null;
+		boolean ownsLoveDomain = ownsLoveDomain(playerId);
+		if (inDomainClash && isDomainExpansion(requestedAbility)) {
+			player.sendMessage(Text.translatable("message.magic.domain.clash.active"), true);
+			return;
+		}
 
-			if (ownedDomain.ability == MagicAbility.LOVE_DOMAIN_EXPANSION) {
-				player.sendMessage(Text.translatable("message.magic.love_domain.abilities_locked"), true);
-			} else {
-				player.sendMessage(Text.translatable("message.magic.domain.already_active", ownedDomain.ability.displayName()), true);
-			}
+		if (ownedDomain != null && requestedAbility == ownedDomain.ability && !inDomainClash) {
+			deactivateDomainExpansion(player);
+			setActiveAbility(player, MagicAbility.NONE);
+			player.sendMessage(Text.translatable("message.magic.ability.deactivated", ownedDomain.ability.displayName()), true);
+			return;
+		}
+
+		if (ownedDomain != null && !inDomainClash && !ownsLoveDomain) {
+			player.sendMessage(Text.translatable("message.magic.domain.already_active", ownedDomain.ability.displayName()), true);
 			return;
 		}
 
 		MagicAbility currentActiveAbility = activeAbility(player);
-		if (currentActiveAbility == MagicAbility.LOVE_DOMAIN_EXPANSION && requestedAbility != MagicAbility.LOVE_DOMAIN_EXPANSION) {
+		if (currentActiveAbility == MagicAbility.LOVE_DOMAIN_EXPANSION && requestedAbility != MagicAbility.LOVE_DOMAIN_EXPANSION && !inDomainClash && !ownsLoveDomain) {
 			player.sendMessage(Text.translatable("message.magic.love_domain.abilities_locked"), true);
 			return;
 		}
 
-		if (currentActiveAbility == MagicAbility.FROST_DOMAIN_EXPANSION && !isDomainExpansion(requestedAbility)) {
+		if (currentActiveAbility == MagicAbility.FROST_DOMAIN_EXPANSION && !isDomainExpansion(requestedAbility) && !inDomainClash) {
 			deactivateDomainExpansion(player);
 			setActiveAbility(player, MagicAbility.NONE);
 			currentActiveAbility = MagicAbility.NONE;
@@ -411,7 +436,7 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		if (!MagicConfig.get().abilityAccess.isAbilityUnlocked(player.getUuid(), requestedAbility)) {
+		if (!MagicConfig.get().abilityAccess.isAbilityUnlocked(playerId, requestedAbility)) {
 			player.sendMessage(Text.translatable("message.magic.ability.locked", requestedAbility.displayName()), true);
 			return;
 		}
@@ -597,6 +622,7 @@ public final class MagicAbilityManager {
 
 	private static void handleTillDeathDoUsPartRequest(ServerPlayerEntity player) {
 		UUID playerId = player.getUuid();
+		int currentTick = player.getEntityWorld().getServer().getTicks();
 		if (TILL_DEATH_DO_US_PART_STATES.containsKey(playerId)) {
 			deactivateTillDeathDoUsPart(player, TillDeathDoUsPartEndReason.MANUAL_CANCEL, true);
 			return;
@@ -606,7 +632,7 @@ public final class MagicAbilityManager {
 			TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.remove(playerId);
 			player.sendMessage(
 				Text.translatable("message.magic.ability.passive_disabled", MagicAbility.TILL_DEATH_DO_US_PART.displayName()),
-				true
+				false
 			);
 			return;
 		}
@@ -614,8 +640,12 @@ public final class MagicAbilityManager {
 		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.add(playerId);
 		player.sendMessage(
 			Text.translatable("message.magic.ability.passive_enabled", MagicAbility.TILL_DEATH_DO_US_PART.displayName()),
-			true
+			false
 		);
+		int remainingTicks = tillDeathDoUsPartCooldownRemaining(player, currentTick);
+		if (remainingTicks > 0) {
+			sendAbilityCooldownMessage(player, MagicAbility.TILL_DEATH_DO_US_PART, remainingTicks, false);
+		}
 	}
 
 	private static void handleManipulationRequest(ServerPlayerEntity player) {
@@ -1032,6 +1062,7 @@ public final class MagicAbilityManager {
 			innerHeight,
 			currentTick,
 			false,
+			1.0,
 			savedBlocks,
 			protectedShellStates,
 			capturedEntities
@@ -1049,7 +1080,7 @@ public final class MagicAbilityManager {
 		MinecraftServer server = player.getEntityWorld().getServer();
 		cancelDomainClash(player.getUuid(), server);
 		restoreDomainExpansion(server, state);
-		startDomainCooldown(player.getUuid(), state.ability, server.getTicks(), 1.0);
+		startDomainCooldown(player.getUuid(), state.ability, server.getTicks(), state.cooldownMultiplier);
 		persistDomainRuntimeState(server);
 		applyDomainInstabilityPenalty(player);
 		return true;
@@ -1111,14 +1142,14 @@ public final class MagicAbilityManager {
 				}
 				if (!(clashActive && DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS)) {
 					enforceCapturedEntitiesInsideDomain(world, state);
-					maintainDomainShell(world, state);
 				}
+				maintainDomainShell(world, state);
 				continue;
 			}
 
 			cancelDomainClash(ownerId, server);
 			restoreDomainExpansion(server, state);
-			startDomainCooldown(ownerId, state.ability, currentTick, 1.0);
+			startDomainCooldown(ownerId, state.ability, currentTick, state.cooldownMultiplier);
 			iterator.remove();
 			changed = true;
 
@@ -1226,6 +1257,8 @@ public final class MagicAbilityManager {
 		showDomainClashTitle(owner);
 		showDomainClashTitle(challenger);
 		applySplitDomainInteriorVisuals(world, state, state.ability, challengerAbility);
+		applyDomainClashStartEffects(owner);
+		applyDomainClashStartEffects(challenger);
 		owner.sendMessage(Text.translatable("message.magic.domain.clash.started"), true);
 		challenger.sendMessage(Text.translatable("message.magic.domain.clash.started"), true);
 		persistDomainRuntimeState(server);
@@ -1268,6 +1301,8 @@ public final class MagicAbilityManager {
 				lockDomainClashParticipant(owner, clash.ownerLockedPos, challenger.getEyePos());
 				lockDomainClashParticipant(challenger, clash.challengerLockedPos, owner.getEyePos());
 			}
+			applyDomainClashCombatEffects(owner);
+			applyDomainClashCombatEffects(challenger);
 			spawnDomainClashParticles(world, domain, DOMAIN_CLASH_PARTICLES_PER_TICK);
 			int ownerProgressPercent = domainClashProgressPercent(clash.ownerDamageDealt);
 			int challengerProgressPercent = domainClashProgressPercent(clash.challengerDamageDealt);
@@ -1330,9 +1365,10 @@ public final class MagicAbilityManager {
 			domain.ability = clash.challengerAbility;
 			domain.expiresTick = expiresTick;
 			domain.activationTick = currentTick;
+			domain.cooldownMultiplier = DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER;
 			DOMAIN_EXPANSIONS.remove(ownerId);
 			DOMAIN_EXPANSIONS.put(clash.challengerId, domain);
-			startDomainCooldown(clash.ownerId, clash.ownerAbility, currentTick, DOMAIN_CLASH_LOSER_COOLDOWN_MULTIPLIER);
+			startDomainCooldown(clash.ownerId, clash.ownerAbility, currentTick, DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER);
 			if (owner != null) {
 				setActiveAbility(owner, MagicAbility.NONE);
 				applyDomainClashLoserManaPenalty(owner);
@@ -1344,7 +1380,8 @@ public final class MagicAbilityManager {
 			}
 		} else {
 			applyDomainVisualForAbility(world, domain, clash.ownerAbility);
-			startDomainCooldown(clash.challengerId, clash.challengerAbility, currentTick, DOMAIN_CLASH_LOSER_COOLDOWN_MULTIPLIER);
+			domain.cooldownMultiplier = DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER;
+			startDomainCooldown(clash.challengerId, clash.challengerAbility, currentTick, DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER);
 			if (challenger != null) {
 				setActiveAbility(challenger, MagicAbility.NONE);
 				applyDomainClashLoserManaPenalty(challenger);
@@ -1689,6 +1726,10 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		if (state.ability == MagicAbility.LOVE_DOMAIN_EXPANSION || domainClashStateForParticipant(player.getUuid()) != null) {
+			return;
+		}
+
 		if (activeAbility(player) != state.ability) {
 			setActiveAbility(player, state.ability);
 		}
@@ -1724,6 +1765,7 @@ public final class MagicAbilityManager {
 				entity.getUuid(),
 				new DomainCapturedEntityState(
 					entity.getUuid(),
+					entity instanceof PlayerEntity,
 					new Vec3d(entity.getX(), entity.getY(), entity.getZ()),
 					entity.getYaw(),
 					entity.getPitch()
@@ -1780,6 +1822,23 @@ public final class MagicAbilityManager {
 
 		for (DomainCapturedEntityState captured : state.capturedEntities.values()) {
 			Entity entity = world.getEntity(captured.entityId);
+			if (entity == null) {
+				if (captured.playerEntity) {
+					DOMAIN_PENDING_RETURNS.put(
+						captured.entityId,
+						new DomainPendingReturnState(
+							state.dimension,
+							captured.position.x,
+							captured.position.y,
+							captured.position.z,
+							captured.yaw,
+							captured.pitch
+						)
+					);
+				}
+				continue;
+			}
+
 			if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
 				continue;
 			}
@@ -1828,9 +1887,12 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_OWNER_BY_PARTICIPANT.clear();
 		FROST_DOMAIN_COOLDOWN_END_TICK.clear();
 		LOVE_DOMAIN_COOLDOWN_END_TICK.clear();
+		DOMAIN_PENDING_RETURNS.clear();
 		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.clear();
 		TILL_DEATH_DO_US_PART_STATES.clear();
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
+		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.clear();
+		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.clear();
 		loadPersistedDomainRuntimeState(server);
 	}
 
@@ -1846,6 +1908,9 @@ public final class MagicAbilityManager {
 		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.clear();
 		TILL_DEATH_DO_US_PART_STATES.clear();
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
+		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.clear();
+		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.clear();
+		DOMAIN_PENDING_RETURNS.clear();
 	}
 
 	private static void loadPersistedDomainRuntimeState(MinecraftServer server) {
@@ -1901,6 +1966,7 @@ public final class MagicAbilityManager {
 			domainTag.putInt("innerRadius", state.innerRadius);
 			domainTag.putInt("innerHeight", state.innerHeight);
 			domainTag.putBoolean("clashOccurred", state.clashOccurred);
+			domainTag.putDouble("cooldownMultiplier", state.cooldownMultiplier);
 
 			NbtList savedBlocks = new NbtList();
 			for (Map.Entry<BlockPos, DomainSavedBlockState> savedEntry : state.savedBlocks.entrySet()) {
@@ -1927,6 +1993,7 @@ public final class MagicAbilityManager {
 			for (DomainCapturedEntityState captured : state.capturedEntities.values()) {
 				NbtCompound capturedTag = new NbtCompound();
 				capturedTag.putString("entityId", captured.entityId.toString());
+				capturedTag.putBoolean("playerEntity", captured.playerEntity);
 				capturedTag.putDouble("x", captured.position.x);
 				capturedTag.putDouble("y", captured.position.y);
 				capturedTag.putDouble("z", captured.position.z);
@@ -1974,6 +2041,21 @@ public final class MagicAbilityManager {
 		}
 		root.put(DOMAIN_PERSISTENCE_FROST_COOLDOWNS_KEY, frostCooldowns);
 
+		NbtList pendingReturns = new NbtList();
+		for (Map.Entry<UUID, DomainPendingReturnState> entry : DOMAIN_PENDING_RETURNS.entrySet()) {
+			DomainPendingReturnState state = entry.getValue();
+			NbtCompound returnTag = new NbtCompound();
+			returnTag.putString("playerId", entry.getKey().toString());
+			returnTag.putString("dimension", state.dimension.getValue().toString());
+			returnTag.putDouble("x", state.x);
+			returnTag.putDouble("y", state.y);
+			returnTag.putDouble("z", state.z);
+			returnTag.putFloat("yaw", state.yaw);
+			returnTag.putFloat("pitch", state.pitch);
+			pendingReturns.add(returnTag);
+		}
+		root.put(DOMAIN_PERSISTENCE_PENDING_RETURNS_KEY, pendingReturns);
+
 		return root;
 	}
 
@@ -1983,6 +2065,7 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_OWNER_BY_PARTICIPANT.clear();
 		FROST_DOMAIN_COOLDOWN_END_TICK.clear();
 		LOVE_DOMAIN_COOLDOWN_END_TICK.clear();
+		DOMAIN_PENDING_RETURNS.clear();
 		int currentTick = server.getTicks();
 
 		NbtList domains = root.getListOrEmpty(DOMAIN_PERSISTENCE_DOMAINS_KEY);
@@ -2022,6 +2105,7 @@ public final class MagicAbilityManager {
 			int innerRadius = Math.max(0, domainTag.getInt("innerRadius", 0));
 			int innerHeight = Math.max(1, domainTag.getInt("innerHeight", 1));
 			boolean clashOccurred = domainTag.getBoolean("clashOccurred", false);
+			double cooldownMultiplier = MathHelper.clamp(domainTag.getDouble("cooldownMultiplier", 1.0), 0.0, 10.0);
 
 			Map<BlockPos, DomainSavedBlockState> savedBlocks = new HashMap<>();
 			for (NbtElement savedElement : domainTag.getListOrEmpty("savedBlocks")) {
@@ -2057,6 +2141,7 @@ public final class MagicAbilityManager {
 					continue;
 				}
 
+				boolean playerEntity = capturedTag.getBoolean("playerEntity", false);
 				Vec3d position = new Vec3d(
 					capturedTag.getDouble("x", 0.0),
 					capturedTag.getDouble("y", 0.0),
@@ -2064,7 +2149,7 @@ public final class MagicAbilityManager {
 				);
 				float yaw = capturedTag.getFloat("yaw", 0.0F);
 				float pitch = capturedTag.getFloat("pitch", 0.0F);
-				DomainCapturedEntityState capturedState = new DomainCapturedEntityState(entityId, position, yaw, pitch);
+				DomainCapturedEntityState capturedState = new DomainCapturedEntityState(entityId, playerEntity, position, yaw, pitch);
 				capturedState.lastSafePos = new Vec3d(
 					capturedTag.getDouble("lastSafeX", position.x),
 					capturedTag.getDouble("lastSafeY", position.y),
@@ -2090,6 +2175,7 @@ public final class MagicAbilityManager {
 					innerHeight,
 					currentTick - DOMAIN_CLASH_SIMULTANEOUS_WINDOW_TICKS - 1,
 					clashOccurred,
+					cooldownMultiplier,
 					savedBlocks,
 					protectedShellStates,
 					capturedEntities
@@ -2133,6 +2219,40 @@ public final class MagicAbilityManager {
 			}
 
 			FROST_DOMAIN_COOLDOWN_END_TICK.put(ownerId, currentTick + remainingTicks);
+		}
+
+		NbtList pendingReturns = root.getListOrEmpty(DOMAIN_PERSISTENCE_PENDING_RETURNS_KEY);
+		for (NbtElement element : pendingReturns) {
+			if (!(element instanceof NbtCompound returnTag)) {
+				continue;
+			}
+
+			UUID playerId = readUuid(returnTag, "playerId");
+			if (playerId == null) {
+				continue;
+			}
+
+			Identifier dimensionId = Identifier.tryParse(returnTag.getString("dimension", ""));
+			if (dimensionId == null) {
+				continue;
+			}
+
+			RegistryKey<World> dimension = RegistryKey.of(RegistryKeys.WORLD, dimensionId);
+			if (server.getWorld(dimension) == null) {
+				continue;
+			}
+
+			DOMAIN_PENDING_RETURNS.put(
+				playerId,
+				new DomainPendingReturnState(
+					dimension,
+					returnTag.getDouble("x", 0.0),
+					returnTag.getDouble("y", 0.0),
+					returnTag.getDouble("z", 0.0),
+					returnTag.getFloat("yaw", 0.0F),
+					returnTag.getFloat("pitch", 0.0F)
+				)
+			);
 		}
 	}
 
@@ -2201,15 +2321,25 @@ public final class MagicAbilityManager {
 		if (activeAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
 			LOVE_POWER_ACTIVE_THIS_SECOND.put(playerId, false);
 			if (!TILL_DEATH_DO_US_PART_STATES.containsKey(playerId)) {
+				TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
 				setActiveAbility(player, MagicAbility.NONE);
 				return;
 			}
 
-			int manaDrain = manaFromPercent(TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND);
+			double bufferedDrain = TILL_DEATH_DO_US_PART_DRAIN_BUFFER.getOrDefault(playerId, 0.0)
+				+ manaFromPercentExact(TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND);
+			int manaDrain = Math.max(0, (int) Math.floor(bufferedDrain + 1.0E-7));
+			double remainingDrain = Math.max(0.0, bufferedDrain - manaDrain);
+			if (remainingDrain > 1.0E-7) {
+				TILL_DEATH_DO_US_PART_DRAIN_BUFFER.put(playerId, remainingDrain);
+			} else {
+				TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
+			}
 			int nextMana = Math.max(0, mana - manaDrain);
 			MagicPlayerData.setMana(player, nextMana);
 
 			if (nextMana == 0 && manaDrain > 0) {
+				TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
 				deactivateTillDeathDoUsPart(player, TillDeathDoUsPartEndReason.MANA_DEPLETED, false);
 				MagicPlayerData.setDepletedRecoveryMode(player, true);
 				player.sendMessage(Text.translatable("message.magic.ability.out_of_mana", activeAbility.displayName()), true);
@@ -2217,6 +2347,7 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
 		if (activeAbility != MagicAbility.NONE) {
 			int manaDrain = switch (activeAbility) {
 				case ABSOLUTE_ZERO -> ABSOLUTE_ZERO_MANA_DRAIN_PER_SECOND;
@@ -2623,7 +2754,7 @@ public final class MagicAbilityManager {
 		}
 
 		DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.get(playerId);
-		if (ownedDomain != null || activeAbility(damagedPlayer) == MagicAbility.LOVE_DOMAIN_EXPANSION) {
+		if (ownedDomain != null && ownedDomain.ability != MagicAbility.LOVE_DOMAIN_EXPANSION) {
 			return false;
 		}
 
@@ -2633,7 +2764,15 @@ public final class MagicAbilityManager {
 		}
 
 		int currentTick = damagedPlayer.getEntityWorld().getServer().getTicks();
-		if (tillDeathDoUsPartCooldownRemaining(damagedPlayer, currentTick) > 0 || MagicPlayerData.getMana(damagedPlayer) <= 0) {
+		int remainingTicks = tillDeathDoUsPartCooldownRemaining(damagedPlayer, currentTick);
+		if (remainingTicks > 0) {
+			if (shouldSendTillDeathCooldownMessage(playerId, currentTick)) {
+				sendAbilityCooldownMessage(damagedPlayer, MagicAbility.TILL_DEATH_DO_US_PART, remainingTicks, true);
+			}
+			return false;
+		}
+
+		if (MagicPlayerData.getMana(damagedPlayer) <= 0) {
 			return false;
 		}
 
@@ -2648,7 +2787,8 @@ public final class MagicAbilityManager {
 		}
 
 		MagicAbility currentAbility = activeAbility(caster);
-		if (currentAbility == MagicAbility.LOVE_DOMAIN_EXPANSION || DOMAIN_EXPANSIONS.containsKey(casterId)) {
+		DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.get(casterId);
+		if (ownedDomain != null && ownedDomain.ability != MagicAbility.LOVE_DOMAIN_EXPANSION) {
 			return;
 		}
 
@@ -2703,9 +2843,9 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private static int manaFromPercent(int percent) {
-		int normalizedPercent = MathHelper.clamp(percent, 0, 100);
-		return (int) Math.ceil(MagicPlayerData.MAX_MANA * (normalizedPercent / 100.0));
+	private static double manaFromPercentExact(double percent) {
+		double normalizedPercent = MathHelper.clamp(percent, 0.0, 100.0);
+		return MagicPlayerData.MAX_MANA * (normalizedPercent / 100.0);
 	}
 
 	private static LivingEntity findLivingTargetInLineOfSight(ServerPlayerEntity caster) {
@@ -2825,7 +2965,6 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		targetPlayer.sendMessage(Text.translatable("message.magic.empty_embrace.target_status", caster.getDisplayName()), true);
 		spawnManipulationTargetParticles(targetPlayer);
 	}
 
@@ -2973,11 +3112,11 @@ public final class MagicAbilityManager {
 				continue;
 			}
 
-			enforceLoveLock(caster, target, state);
+			enforceLoveLock(caster, target, state, currentTick);
 		}
 	}
 
-	private static void enforceLoveLock(ServerPlayerEntity caster, LivingEntity target, LoveLockState state) {
+	private static void enforceLoveLock(ServerPlayerEntity caster, LivingEntity target, LoveLockState state, int currentTick) {
 		target.requestTeleport(state.lockedX, state.lockedY, state.lockedZ);
 		target.setVelocity(0.0, 0.0, 0.0);
 		target.setOnGround(true);
@@ -2995,7 +3134,10 @@ public final class MagicAbilityManager {
 				false
 			)
 		);
-		spawnLoveAtFirstSightTargetParticles(target);
+		if (currentTick - state.lastParticleTick >= LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS) {
+			spawnLoveAtFirstSightTargetParticles(target);
+			state.lastParticleTick = currentTick;
+		}
 
 		if (target instanceof MobEntity mob) {
 			mob.getNavigation().stop();
@@ -3053,10 +3195,12 @@ public final class MagicAbilityManager {
 	}
 
 	private static ActionResult onUseItem(PlayerEntity player, World world, Hand hand) {
-		if (isActionLocked(player)) {
+		if (shouldBlockArtifactUse(player, hand)) {
 			return ActionResult.FAIL;
 		}
-		if (shouldBlockArtifactUse(player, hand)) {
+
+		ItemStack stack = player.getStackInHand(hand);
+		if (!canUseWindChargeWhileLocked(player, stack) && isActionLocked(player)) {
 			return ActionResult.FAIL;
 		}
 
@@ -3068,7 +3212,6 @@ public final class MagicAbilityManager {
 			return ActionResult.PASS;
 		}
 
-		ItemStack stack = player.getStackInHand(hand);
 		if (stack.isOf(Items.CHORUS_FRUIT) || stack.isOf(Items.ENDER_PEARL)) {
 			serverPlayer.sendMessage(Text.translatable("message.magic.domain.teleport_blocked"), true);
 			return ActionResult.FAIL;
@@ -3438,8 +3581,22 @@ public final class MagicAbilityManager {
 		double x = entity.getX();
 		double y = entity.getBodyY(0.7);
 		double z = entity.getZ();
-		world.spawnParticles(ParticleTypes.HEART, x, y, z, 1, 0.24, 0.30, 0.24, 0.0);
-		world.spawnParticles(ParticleTypes.HAPPY_VILLAGER, x, y, z, 2, 0.28, 0.35, 0.28, 0.01);
+		if (LOVE_AT_FIRST_SIGHT_HEART_PARTICLES > 0) {
+			world.spawnParticles(ParticleTypes.HEART, x, y, z, LOVE_AT_FIRST_SIGHT_HEART_PARTICLES, 0.24, 0.30, 0.24, 0.0);
+		}
+		if (LOVE_AT_FIRST_SIGHT_HAPPY_VILLAGER_PARTICLES > 0) {
+			world.spawnParticles(
+				ParticleTypes.HAPPY_VILLAGER,
+				x,
+				y,
+				z,
+				LOVE_AT_FIRST_SIGHT_HAPPY_VILLAGER_PARTICLES,
+				0.28,
+				0.35,
+				0.28,
+				0.01
+			);
+		}
 	}
 
 	private static void spawnManipulationTargetParticles(LivingEntity entity) {
@@ -3471,6 +3628,139 @@ public final class MagicAbilityManager {
 			double z = box.minZ + entity.getRandom().nextDouble() * box.getLengthZ();
 			world.spawnParticles(shardParticle, x, y, z, 1, 0.08, 0.12, 0.08, 0.005);
 		}
+	}
+
+	public static void onCooldownCheckRequested(ServerPlayerEntity player) {
+		if (!MagicPlayerData.hasMagic(player)) {
+			player.sendMessage(Text.translatable("message.magic.no_access"), false);
+			return;
+		}
+
+		int currentTick = player.getEntityWorld().getServer().getTicks();
+		boolean foundCooldown = false;
+		for (MagicAbility ability : abilitiesForSchool(MagicPlayerData.getSchool(player))) {
+			int remainingTicks = cooldownRemaining(player, ability, currentTick);
+			if (remainingTicks <= 0) {
+				continue;
+			}
+
+			sendAbilityCooldownMessage(player, ability, remainingTicks, false);
+			foundCooldown = true;
+		}
+
+		if (!foundCooldown) {
+			player.sendMessage(Text.translatable("message.magic.cooldown.none"), false);
+		}
+	}
+
+	private static List<MagicAbility> abilitiesForSchool(MagicSchool school) {
+		return switch (school) {
+			case FROST -> List.of(
+				MagicAbility.BELOW_FREEZING,
+				MagicAbility.ABSOLUTE_ZERO,
+				MagicAbility.PLANCK_HEAT,
+				MagicAbility.FROST_DOMAIN_EXPANSION
+			);
+			case LOVE -> List.of(
+				MagicAbility.LOVE_AT_FIRST_SIGHT,
+				MagicAbility.TILL_DEATH_DO_US_PART,
+				MagicAbility.MANIPULATION,
+				MagicAbility.LOVE_DOMAIN_EXPANSION
+			);
+			default -> List.of();
+		};
+	}
+
+	private static int cooldownRemaining(ServerPlayerEntity player, MagicAbility ability, int currentTick) {
+		return switch (ability) {
+			case ABSOLUTE_ZERO -> absoluteZeroCooldownRemaining(player, currentTick);
+			case PLANCK_HEAT -> planckHeatCooldownRemaining(player, currentTick);
+			case TILL_DEATH_DO_US_PART -> tillDeathDoUsPartCooldownRemaining(player, currentTick);
+			case MANIPULATION -> manipulationCooldownRemaining(player, currentTick);
+			case FROST_DOMAIN_EXPANSION, LOVE_DOMAIN_EXPANSION -> domainCooldownRemaining(player, ability, currentTick);
+			default -> 0;
+		};
+	}
+
+	private static void sendAbilityCooldownMessage(
+		ServerPlayerEntity player,
+		MagicAbility ability,
+		int remainingTicks,
+		boolean actionBar
+	) {
+		int secondsRemaining = (int) Math.ceil(remainingTicks / 20.0);
+		player.sendMessage(Text.translatable("message.magic.ability.cooldown", ability.displayName(), secondsRemaining), actionBar);
+	}
+
+	private static boolean shouldSendTillDeathCooldownMessage(UUID playerId, int currentTick) {
+		int nextAllowedTick = TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.getOrDefault(playerId, 0);
+		if (currentTick < nextAllowedTick) {
+			return false;
+		}
+
+		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.put(playerId, currentTick + COOLDOWN_MESSAGE_DEBOUNCE_TICKS);
+		return true;
+	}
+
+	private static boolean ownsLoveDomain(UUID playerId) {
+		DomainExpansionState state = DOMAIN_EXPANSIONS.get(playerId);
+		return state != null && state.ability == MagicAbility.LOVE_DOMAIN_EXPANSION;
+	}
+
+	private static boolean canUseWindChargeWhileLocked(PlayerEntity player, ItemStack stack) {
+		if (!stack.isOf(Items.WIND_CHARGE)) {
+			return false;
+		}
+
+		UUID playerId = player.getUuid();
+		return ownsLoveDomain(playerId) || domainClashStateForParticipant(playerId) != null;
+	}
+
+	private static void applyDomainClashStartEffects(ServerPlayerEntity player) {
+		player.addStatusEffect(
+			new StatusEffectInstance(StatusEffects.INSTANT_HEALTH, 1, DOMAIN_CLASH_INSTANT_HEALTH_AMPLIFIER, true, false, true)
+		);
+		applyDomainClashCombatEffects(player);
+	}
+
+	private static void applyDomainClashCombatEffects(ServerPlayerEntity player) {
+		player.addStatusEffect(
+			new StatusEffectInstance(
+				StatusEffects.REGENERATION,
+				DOMAIN_CLASH_REGENERATION_REFRESH_TICKS,
+				DOMAIN_CLASH_REGENERATION_AMPLIFIER,
+				true,
+				false,
+				true
+			)
+		);
+	}
+
+	private static void applyPendingDomainReturn(ServerPlayerEntity player, MinecraftServer server) {
+		DomainPendingReturnState pendingReturn = DOMAIN_PENDING_RETURNS.remove(player.getUuid());
+		if (pendingReturn == null) {
+			return;
+		}
+
+		ServerWorld targetWorld = server.getWorld(pendingReturn.dimension);
+		if (targetWorld == null) {
+			DOMAIN_PENDING_RETURNS.put(player.getUuid(), pendingReturn);
+			return;
+		}
+
+		player.teleport(
+			targetWorld,
+			pendingReturn.x,
+			pendingReturn.y,
+			pendingReturn.z,
+			Set.<PositionFlag>of(),
+			pendingReturn.yaw,
+			pendingReturn.pitch,
+			false
+		);
+		player.setVelocity(0.0, 0.0, 0.0);
+		player.setOnGround(true);
+		persistDomainRuntimeState(server);
 	}
 
 	private static int absoluteZeroCooldownRemaining(ServerPlayerEntity player, int currentTick) {
@@ -3568,11 +3858,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static int manipulationCooldownRemaining(ServerPlayerEntity player, int currentTick) {
-		int remaining = Math.max(0, MANIPULATION_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
-		if (remaining > 0) {
-			debugManipulation("{} manipulation cooldown check: remainingTicks={}", debugName(player), remaining);
-		}
-		return remaining;
+		return Math.max(0, MANIPULATION_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
 	}
 
 	private static Vec3d clampVector(Vec3d vector, double maxLength) {
@@ -3623,6 +3909,10 @@ public final class MagicAbilityManager {
 	}
 
 	public static boolean isEntityCapturedByLoveDomain(Entity entity) {
+		if (domainClashStateForParticipant(entity.getUuid()) != null) {
+			return false;
+		}
+
 		RegistryKey<World> dimension = entity.getEntityWorld().getRegistryKey();
 		UUID entityId = entity.getUuid();
 		for (Map.Entry<UUID, DomainExpansionState> entry : DOMAIN_EXPANSIONS.entrySet()) {
@@ -3645,10 +3935,6 @@ public final class MagicAbilityManager {
 
 	private static boolean isDomainBlockProtected(RegistryKey<World> dimension, BlockPos pos) {
 		for (Map.Entry<UUID, DomainExpansionState> entry : DOMAIN_EXPANSIONS.entrySet()) {
-			if (DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS && DOMAIN_CLASHES_BY_OWNER.containsKey(entry.getKey())) {
-				continue;
-			}
-
 			DomainExpansionState state = entry.getValue();
 			if (state.dimension.equals(dimension) && state.protectedShellStates.containsKey(pos)) {
 				return true;
@@ -4165,6 +4451,8 @@ public final class MagicAbilityManager {
 		ABSOLUTE_ZERO_COOLDOWN_END_TICK.remove(playerId);
 		PLANCK_HEAT_COOLDOWN_END_TICK.remove(playerId);
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.remove(playerId);
+		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
+		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.remove(playerId);
 		MANIPULATION_COOLDOWN_END_TICK.remove(playerId);
 		MANIPULATION_NEXT_REQUEST_TICK.remove(playerId);
 		MANIPULATION_LAST_CLAMP_LOG_TICK.remove(playerId);
@@ -4185,6 +4473,9 @@ public final class MagicAbilityManager {
 			domainStateChanged = true;
 		}
 		if (LOVE_DOMAIN_COOLDOWN_END_TICK.remove(playerId) != null) {
+			domainStateChanged = true;
+		}
+		if (DOMAIN_PENDING_RETURNS.remove(playerId) != null) {
 			domainStateChanged = true;
 		}
 
@@ -4288,6 +4579,7 @@ public final class MagicAbilityManager {
 			}
 		}
 
+		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(casterId);
 		startTillDeathDoUsPartCooldown(casterId, player.getEntityWorld().getServer().getTicks());
 		setActiveAbility(player, MagicAbility.NONE);
 
@@ -4297,6 +4589,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static void startTillDeathDoUsPartCooldown(UUID playerId, int currentTick) {
+		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
 		if (TILL_DEATH_DO_US_PART_COOLDOWN_TICKS <= 0) {
 			TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.remove(playerId);
 			return;
@@ -4499,6 +4792,7 @@ public final class MagicAbilityManager {
 		private final double lockedY;
 		private final double lockedZ;
 		private int lastSeenTick;
+		private int lastParticleTick;
 
 		private LoveLockState(
 			RegistryKey<World> dimension,
@@ -4514,6 +4808,7 @@ public final class MagicAbilityManager {
 			this.lockedY = lockedY;
 			this.lockedZ = lockedZ;
 			this.lastSeenTick = lastSeenTick;
+			this.lastParticleTick = lastSeenTick;
 		}
 	}
 
@@ -4552,6 +4847,7 @@ public final class MagicAbilityManager {
 		private final int innerHeight;
 		private int activationTick;
 		private boolean clashOccurred;
+		private double cooldownMultiplier;
 		private final Map<BlockPos, DomainSavedBlockState> savedBlocks;
 		private final Map<BlockPos, BlockState> protectedShellStates;
 		private final Map<UUID, DomainCapturedEntityState> capturedEntities;
@@ -4569,6 +4865,7 @@ public final class MagicAbilityManager {
 			int innerHeight,
 			int activationTick,
 			boolean clashOccurred,
+			double cooldownMultiplier,
 			Map<BlockPos, DomainSavedBlockState> savedBlocks,
 			Map<BlockPos, BlockState> protectedShellStates,
 			Map<UUID, DomainCapturedEntityState> capturedEntities
@@ -4585,6 +4882,7 @@ public final class MagicAbilityManager {
 			this.innerHeight = innerHeight;
 			this.activationTick = activationTick;
 			this.clashOccurred = clashOccurred;
+			this.cooldownMultiplier = cooldownMultiplier;
 			this.savedBlocks = savedBlocks;
 			this.protectedShellStates = protectedShellStates;
 			this.capturedEntities = capturedEntities;
@@ -4660,8 +4958,27 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static final class DomainPendingReturnState {
+		private final RegistryKey<World> dimension;
+		private final double x;
+		private final double y;
+		private final double z;
+		private final float yaw;
+		private final float pitch;
+
+		private DomainPendingReturnState(RegistryKey<World> dimension, double x, double y, double z, float yaw, float pitch) {
+			this.dimension = dimension;
+			this.x = x;
+			this.y = y;
+			this.z = z;
+			this.yaw = yaw;
+			this.pitch = pitch;
+		}
+	}
+
 	private static final class DomainCapturedEntityState {
 		private final UUID entityId;
+		private final boolean playerEntity;
 		private final Vec3d position;
 		private final float yaw;
 		private final float pitch;
@@ -4669,8 +4986,9 @@ public final class MagicAbilityManager {
 		private float lastSafeYaw;
 		private float lastSafePitch;
 
-		private DomainCapturedEntityState(UUID entityId, Vec3d position, float yaw, float pitch) {
+		private DomainCapturedEntityState(UUID entityId, boolean playerEntity, Vec3d position, float yaw, float pitch) {
 			this.entityId = entityId;
+			this.playerEntity = playerEntity;
 			this.position = position;
 			this.yaw = yaw;
 			this.pitch = pitch;

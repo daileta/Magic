@@ -30,7 +30,7 @@ public final class ManaHudOverlay {
 	private static final int PROMPT_COLOR = 0xFFFF2B2B;
 	private static final float INSTRUCTION_SCALE = 1.15F;
 	private static final int INSTRUCTION_LINE_SPACING = 12;
-	private static final int INSTRUCTION_COLOR = 0xFFFFE94D;
+	private static final int INSTRUCTION_COLOR = 0xFF2EA8FF;
 	private static final int FROST_COLOR = 0x66CCFF;
 	private static final int LOVE_COLOR = 0xFF77CC;
 	private static int lastObservedPlayerAge = Integer.MIN_VALUE;

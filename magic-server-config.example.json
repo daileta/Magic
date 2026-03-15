@@ -4,7 +4,7 @@
     "absoluteZeroDrainPerSecond": 20,
     "loveAtFirstSightIdleDrainPerSecond": 2,
     "loveAtFirstSightActiveDrainPerSecond": 5,
-    "tillDeathDoUsPartDrainPercentPerSecond": 3,
+    "tillDeathDoUsPartDrainPercentPerSecond": 3.0,
     "emptyEmbraceActivationCost": 0,
     "emptyEmbraceDrainPerSecond": 0,
     "domainExpansionActivationCost": 0,
@@ -35,7 +35,8 @@
     "emptyEmbraceRequestDebounceTicks": 6,
     "domainExpansionDurationTicks": 1200,
     "frostDomainCooldownTicks": 1200,
-    "loveDomainCooldownTicks": 36000
+    "loveDomainCooldownTicks": 36000,
+    "domainClashRegenerationRefreshTicks": 40
   },
   "damage": {
     "frostbiteDamage": 2.0,
@@ -67,7 +68,14 @@
     "planckHeatFirePhaseHungerAmplifier": 1,
     "planckHeatFirePhaseNauseaAmplifier": 1,
     "loveLockSlownessAmplifier": 255,
-    "loveLockMiningFatigueAmplifier": 255
+    "loveLockMiningFatigueAmplifier": 255,
+    "domainClashRegenerationAmplifier": 9,
+    "domainClashInstantHealthAmplifier": 9
+  },
+  "particles": {
+    "loveAtFirstSightParticleIntervalTicks": 8,
+    "loveAtFirstSightHeartParticles": 1,
+    "loveAtFirstSightHappyVillagerParticles": 0
   },
   "emptyEmbrace": {
     "deactivateTargetMagic": true,
@@ -94,12 +102,12 @@
     "instructionsFadeOutTicks": 20,
     "damageToWin": 250.0,
     "loserManaDrainPercent": 50,
-    "loserCooldownMultiplier": 0.5,
+    "postClashDomainCooldownMultiplier": 0.5,
     "particlesPerTick": 120,
     "splitPatternModulo": 2,
-    "disableDomainEffectsDuringClash": true,
+    "disableDomainEffectsDuringClash": false,
     "forceLookAtOpponent": true,
-    "participantsInvincible": true
+    "participantsInvincible": false
   },
   "abilityAccess": {
     "enabled": true,

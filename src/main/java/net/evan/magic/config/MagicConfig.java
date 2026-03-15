@@ -218,6 +218,7 @@ public final class MagicConfig {
 		public DamageConfig damage = new DamageConfig();
 		public RadiiConfig radii = new RadiiConfig();
 		public PotionEffectsConfig potionEffects = new PotionEffectsConfig();
+		public ParticlesConfig particles = new ParticlesConfig();
 		@SerializedName(value = "emptyEmbrace", alternate = { "manipulation" })
 		public EmptyEmbraceConfig emptyEmbrace = new EmptyEmbraceConfig();
 		public PowderedSnowEffectConfig powderedSnowEffect = new PowderedSnowEffectConfig();
@@ -239,6 +240,9 @@ public final class MagicConfig {
 			}
 			if (potionEffects == null) {
 				potionEffects = new PotionEffectsConfig();
+			}
+			if (particles == null) {
+				particles = new ParticlesConfig();
 			}
 			if (emptyEmbrace == null) {
 				emptyEmbrace = new EmptyEmbraceConfig();
@@ -262,7 +266,7 @@ public final class MagicConfig {
 		public int absoluteZeroDrainPerSecond = 20;
 		public int loveAtFirstSightIdleDrainPerSecond = 2;
 		public int loveAtFirstSightActiveDrainPerSecond = 5;
-		public int tillDeathDoUsPartDrainPercentPerSecond = 3;
+		public double tillDeathDoUsPartDrainPercentPerSecond = 3.0;
 		@SerializedName(value = "emptyEmbraceActivationCost", alternate = { "manipulationActivationCost" })
 		public int emptyEmbraceActivationCost = 0;
 		@SerializedName(value = "emptyEmbraceDrainPerSecond", alternate = { "manipulationDrainPerSecond" })
@@ -299,6 +303,7 @@ public final class MagicConfig {
 		public int domainExpansionDurationTicks = 1200;
 		public int frostDomainCooldownTicks = 1200;
 		public int loveDomainCooldownTicks = 36000;
+		public int domainClashRegenerationRefreshTicks = 40;
 	}
 
 	public static final class DamageConfig {
@@ -336,6 +341,14 @@ public final class MagicConfig {
 		public int planckHeatFirePhaseNauseaAmplifier = 1;
 		public int loveLockSlownessAmplifier = 255;
 		public int loveLockMiningFatigueAmplifier = 255;
+		public int domainClashRegenerationAmplifier = 9;
+		public int domainClashInstantHealthAmplifier = 9;
+	}
+
+	public static final class ParticlesConfig {
+		public int loveAtFirstSightParticleIntervalTicks = 8;
+		public int loveAtFirstSightHeartParticles = 1;
+		public int loveAtFirstSightHappyVillagerParticles = 0;
 	}
 
 	public static final class EmptyEmbraceConfig {
@@ -365,12 +378,13 @@ public final class MagicConfig {
 		public int instructionsFadeOutTicks = 20;
 		public double damageToWin = 250.0;
 		public int loserManaDrainPercent = 50;
-		public double loserCooldownMultiplier = 0.5;
+		@SerializedName(value = "postClashDomainCooldownMultiplier", alternate = { "loserCooldownMultiplier" })
+		public double postClashDomainCooldownMultiplier = 0.5;
 		public int particlesPerTick = 120;
 		public int splitPatternModulo = 2;
-		public boolean disableDomainEffectsDuringClash = true;
+		public boolean disableDomainEffectsDuringClash = false;
 		public boolean forceLookAtOpponent = true;
-		public boolean participantsInvincible = true;
+		public boolean participantsInvincible = false;
 	}
 
 	public static final class AbilityAccessConfig {
