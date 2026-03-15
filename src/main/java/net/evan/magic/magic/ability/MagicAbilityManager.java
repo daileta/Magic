@@ -270,7 +270,7 @@ public final class MagicAbilityManager {
 		});
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, damageSource, baseDamageTaken, damageTaken, blocked) -> {
 			if (entity instanceof ServerPlayerEntity player) {
-				onPlayerAfterDamage(player, damageSource);
+				onPlayerAfterDamage(player, damageSource, damageTaken);
 			}
 		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> applyPendingDomainReturn(handler.player, server));
@@ -1511,7 +1511,7 @@ public final class MagicAbilityManager {
 		return false;
 	}
 
-	private static void captureDomainClashDamage(ServerPlayerEntity damagedPlayer, DamageSource source) {
+	private static void captureDomainClashDamage(ServerPlayerEntity damagedPlayer, DamageSource source, float amount) {
 		DomainClashState clash = domainClashStateForParticipant(damagedPlayer.getUuid());
 		if (clash == null) {
 			DOMAIN_CLASH_PENDING_DAMAGE.remove(damagedPlayer.getUuid());
@@ -1532,11 +1532,11 @@ public final class MagicAbilityManager {
 
 		DOMAIN_CLASH_PENDING_DAMAGE.put(
 			damagedPlayer.getUuid(),
-			new DomainClashPendingDamageState(attackerId, damagedPlayer.getHealth())
+			new DomainClashPendingDamageState(attackerId, damagedPlayer.getHealth(), amount)
 		);
 	}
 
-	private static void onPlayerAfterDamage(ServerPlayerEntity damagedPlayer, DamageSource source) {
+	private static void onPlayerAfterDamage(ServerPlayerEntity damagedPlayer, DamageSource source, float damageTaken) {
 		DomainClashPendingDamageState pendingDamage = DOMAIN_CLASH_PENDING_DAMAGE.remove(damagedPlayer.getUuid());
 		if (pendingDamage == null) {
 			return;
@@ -1557,12 +1557,18 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		float actualDamage = Math.max(0.0F, pendingDamage.healthBefore - damagedPlayer.getHealth());
-		if (actualDamage <= 0.0F) {
+		float clashDamage = Math.max(0.0F, pendingDamage.healthBefore - damagedPlayer.getHealth());
+		if (clashDamage <= 0.0F) {
+			clashDamage = Math.max(0.0F, damageTaken);
+		}
+		if (clashDamage <= 0.0F) {
+			clashDamage = Math.max(0.0F, pendingDamage.incomingAmount);
+		}
+		if (clashDamage <= 0.0F) {
 			return;
 		}
 
-		addDomainClashDamage(clash, attackerId, actualDamage, server, server.getTicks());
+		addDomainClashDamage(clash, attackerId, clashDamage, server, server.getTicks());
 	}
 
 	private static UUID resolveDomainClashAttackerId(
@@ -2802,7 +2808,7 @@ public final class MagicAbilityManager {
 			return false;
 		}
 
-		captureDomainClashDamage(damagedPlayer, source);
+		captureDomainClashDamage(damagedPlayer, source, amount);
 
 		if (isMagicSuppressed(damagedPlayer)) {
 			return false;
@@ -5069,10 +5075,12 @@ public final class MagicAbilityManager {
 	private static final class DomainClashPendingDamageState {
 		private final UUID attackerId;
 		private final float healthBefore;
+		private final float incomingAmount;
 
-		private DomainClashPendingDamageState(UUID attackerId, float healthBefore) {
+		private DomainClashPendingDamageState(UUID attackerId, float healthBefore, float incomingAmount) {
 			this.attackerId = attackerId;
 			this.healthBefore = healthBefore;
+			this.incomingAmount = incomingAmount;
 		}
 	}
 
