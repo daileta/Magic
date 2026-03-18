@@ -219,6 +219,7 @@ public final class MagicConfig {
 		public RadiiConfig radii = new RadiiConfig();
 		public PotionEffectsConfig potionEffects = new PotionEffectsConfig();
 		public ParticlesConfig particles = new ParticlesConfig();
+		public LoveAtFirstSightConfig loveAtFirstSight = new LoveAtFirstSightConfig();
 		@SerializedName(value = "emptyEmbrace", alternate = { "manipulation" })
 		public EmptyEmbraceConfig emptyEmbrace = new EmptyEmbraceConfig();
 		public PowderedSnowEffectConfig powderedSnowEffect = new PowderedSnowEffectConfig();
@@ -243,6 +244,9 @@ public final class MagicConfig {
 			}
 			if (particles == null) {
 				particles = new ParticlesConfig();
+			}
+			if (loveAtFirstSight == null) {
+				loveAtFirstSight = new LoveAtFirstSightConfig();
 			}
 			if (emptyEmbrace == null) {
 				emptyEmbrace = new EmptyEmbraceConfig();
@@ -350,6 +354,11 @@ public final class MagicConfig {
 		public int loveAtFirstSightParticleIntervalTicks = 8;
 		public int loveAtFirstSightHeartParticles = 1;
 		public int loveAtFirstSightHappyVillagerParticles = 0;
+	}
+
+	public static final class LoveAtFirstSightConfig {
+		public boolean blockItemUse = true;
+		public boolean blockAttacks = true;
 	}
 
 	public static final class EmptyEmbraceConfig {

@@ -137,6 +137,8 @@ public final class MagicAbilityManager {
 	private static int LOVE_LOCK_EFFECT_TICKS = 5;
 	private static int LOVE_LOCK_SLOWNESS_AMPLIFIER = 255;
 	private static int LOVE_LOCK_MINING_FATIGUE_AMPLIFIER = 255;
+	private static boolean LOVE_AT_FIRST_SIGHT_BLOCK_ITEM_USE = true;
+	private static boolean LOVE_AT_FIRST_SIGHT_BLOCK_ATTACKS = true;
 	private static int DOMAIN_CLASH_REGENERATION_AMPLIFIER = 9;
 	private static int DOMAIN_CLASH_INSTANT_HEALTH_AMPLIFIER = 9;
 	private static int DOMAIN_CLASH_RESISTANCE_AMPLIFIER = 5;
@@ -361,6 +363,8 @@ public final class MagicAbilityManager {
 		LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS = Math.max(1, config.particles.loveAtFirstSightParticleIntervalTicks);
 		LOVE_AT_FIRST_SIGHT_HEART_PARTICLES = Math.max(0, config.particles.loveAtFirstSightHeartParticles);
 		LOVE_AT_FIRST_SIGHT_HAPPY_VILLAGER_PARTICLES = Math.max(0, config.particles.loveAtFirstSightHappyVillagerParticles);
+		LOVE_AT_FIRST_SIGHT_BLOCK_ITEM_USE = config.loveAtFirstSight.blockItemUse;
+		LOVE_AT_FIRST_SIGHT_BLOCK_ATTACKS = config.loveAtFirstSight.blockAttacks;
 
 		MANIPULATION_DEACTIVATE_TARGET_MAGIC = config.emptyEmbrace.deactivateTargetMagic;
 		MANIPULATION_DISABLE_ARTIFACT_POWERS = config.emptyEmbrace.disableArtifactPowers;
@@ -3274,7 +3278,11 @@ public final class MagicAbilityManager {
 		}
 
 		ItemStack stack = player.getStackInHand(hand);
-		if (!canUseWindChargeWhileLocked(player, stack) && isActionLocked(player)) {
+		if (isLoveItemUseBlocked(player)) {
+			return ActionResult.FAIL;
+		}
+
+		if (isDomainClashParticipantFrozen(player) && !canUseWindChargeWhileLocked(player, stack)) {
 			return ActionResult.FAIL;
 		}
 
@@ -3303,7 +3311,7 @@ public final class MagicAbilityManager {
 		if (shouldBlockArtifactUse(player, hand)) {
 			return ActionResult.FAIL;
 		}
-		return isActionLocked(player) ? ActionResult.FAIL : ActionResult.PASS;
+		return isItemUseBlocked(player) ? ActionResult.FAIL : ActionResult.PASS;
 	}
 
 	private static ActionResult onUseEntity(
@@ -3316,7 +3324,7 @@ public final class MagicAbilityManager {
 		if (shouldBlockArtifactUse(player, hand)) {
 			return ActionResult.FAIL;
 		}
-		return isActionLocked(player) ? ActionResult.FAIL : ActionResult.PASS;
+		return isItemUseBlocked(player) ? ActionResult.FAIL : ActionResult.PASS;
 	}
 
 	private static ActionResult onAttackBlock(
@@ -3329,11 +3337,14 @@ public final class MagicAbilityManager {
 		if (shouldBlockArtifactAttack(player)) {
 			return ActionResult.FAIL;
 		}
-		return isActionLocked(player) ? ActionResult.FAIL : ActionResult.PASS;
+		return isAttackBlocked(player) ? ActionResult.FAIL : ActionResult.PASS;
 	}
 
 	private static boolean onBeforeBlockBreak(World world, PlayerEntity player, BlockPos pos) {
 		if (shouldBlockArtifactAttack(player)) {
+			return false;
+		}
+		if (isAttackBlocked(player)) {
 			return false;
 		}
 		if (world.isClient()) {
@@ -3357,7 +3368,7 @@ public final class MagicAbilityManager {
 		Entity entity,
 		EntityHitResult hitResult
 	) {
-		if (isActionLocked(player)) {
+		if (isAttackBlocked(player)) {
 			return ActionResult.FAIL;
 		}
 		if (shouldBlockArtifactAttack(player)) {
@@ -4326,9 +4337,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean isControlLocked(PlayerEntity player) {
-		UUID playerId = player.getUuid();
-		return LOVE_LOCKED_TARGETS.containsKey(playerId)
-			|| isDomainClashParticipantFrozen(player);
+		return isLoveLocked(player) || isDomainClashParticipantFrozen(player);
 	}
 
 	private static boolean isMagicSuppressed(PlayerEntity player) {
@@ -4345,12 +4354,25 @@ public final class MagicAbilityManager {
 		return server != null && isDomainClashFrozen(clash, server.getTicks());
 	}
 
-	private static boolean isActionLocked(PlayerEntity player) {
-		return isControlLocked(player);
+	private static boolean isLoveLocked(PlayerEntity player) {
+		return LOVE_LOCKED_TARGETS.containsKey(player.getUuid());
+	}
+
+	private static boolean isLoveItemUseBlocked(PlayerEntity player) {
+		return LOVE_AT_FIRST_SIGHT_BLOCK_ITEM_USE && isLoveLocked(player);
+	}
+
+	private static boolean isItemUseBlocked(PlayerEntity player) {
+		return isLoveItemUseBlocked(player) || isDomainClashParticipantFrozen(player);
+	}
+
+	private static boolean isAttackBlocked(PlayerEntity player) {
+		return (LOVE_AT_FIRST_SIGHT_BLOCK_ATTACKS && isLoveLocked(player))
+			|| isDomainClashParticipantFrozen(player);
 	}
 
 	public static boolean isPlayerControlLocked(ServerPlayerEntity player) {
-		return isActionLocked(player);
+		return isControlLocked(player);
 	}
 
 	public static boolean isManipulatingCaster(ServerPlayerEntity player) {

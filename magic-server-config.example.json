@@ -78,6 +78,10 @@
     "loveAtFirstSightHeartParticles": 1,
     "loveAtFirstSightHappyVillagerParticles": 0
   },
+  "loveAtFirstSight": {
+    "blockItemUse": true,
+    "blockAttacks": true
+  },
   "emptyEmbrace": {
     "deactivateTargetMagic": true,
     "disableArtifactPowers": true,
