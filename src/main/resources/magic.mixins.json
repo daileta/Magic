@@ -3,8 +3,17 @@
 	"package": "net.evan.magic.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
+		"EndCrystalEntityMixin",
+		"EntityTeleportMixin",
 		"EnderPearlEntityMixin",
-		"PlayerEntityMixin"
+		"LivingEntityDamageInvokerMixin",
+		"LivingEntityMixin",
+		"PlayerEntityMixin",
+		"ServerPlayNetworkHandlerMixin",
+		"TntMinecartEntityMixin"
+	],
+	"client": [
+		"MinecraftClientMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

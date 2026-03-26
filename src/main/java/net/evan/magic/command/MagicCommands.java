@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import net.evan.magic.config.MagicConfig;
 import net.evan.magic.magic.MagicPlayerData;
+import net.evan.magic.magic.MagicSchool;
 import net.evan.magic.magic.ability.MagicAbility;
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -40,12 +41,24 @@ public final class MagicCommands {
 													)
 											)
 									)
+									.then(cooldownAbilityLiteral(MagicAbility.MARTYRS_FLAME, "martyrs_flame"))
 									.then(cooldownAbilityLiteral(MagicAbility.ABSOLUTE_ZERO, "absolute_zero"))
 									.then(cooldownAbilityLiteral(MagicAbility.PLANCK_HEAT, "planck_heat"))
 									.then(cooldownAbilityLiteral(MagicAbility.FROST_DOMAIN_EXPANSION, "frost_domain_expansion"))
 									.then(cooldownAbilityLiteral(MagicAbility.LOVE_DOMAIN_EXPANSION, "love_domain_expansion"))
 									.then(cooldownAbilityLiteral(MagicAbility.TILL_DEATH_DO_US_PART, "till_death_do_us_part"))
 									.then(cooldownAbilityLiteral(MagicAbility.MANIPULATION, "empty_embrace"))
+									.then(cooldownAbilityLiteral(MagicAbility.SPOTLIGHT, "spotlight"))
+									.then(cooldownAbilityLiteral(MagicAbility.WITTY_ONE_LINER, "witty_one_liner"))
+									.then(cooldownAbilityLiteral(MagicAbility.COMEDIC_REWRITE, "comedic_rewrite"))
+									.then(cooldownAbilityLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky"))
+									.then(cooldownAbilityLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow"))
+									.then(cooldownAbilityLiteral(MagicAbility.ORIONS_GAMBIT, "orions_gambit"))
+									.then(cooldownAbilityLiteral(MagicAbility.ASTRAL_CATACLYSM, "astral_cataclysm"))
+									.then(cooldownAbilityLiteral(MagicAbility.APPRAISERS_MARK, "appraisers_mark"))
+									.then(cooldownAbilityLiteral(MagicAbility.TOLLKEEPERS_CLAIM, "tollkeepers_claim"))
+									.then(cooldownAbilityLiteral(MagicAbility.KINGS_DUES, "kings_dues"))
+									.then(cooldownAbilityLiteral(MagicAbility.BANKRUPTCY, "bankruptcy"))
 							)
 					)
 					.then(
@@ -53,6 +66,17 @@ public final class MagicCommands {
 							.then(
 								CommandManager.literal("reload")
 									.executes(context -> reloadConfig(context.getSource()))
+							)
+							.then(
+								CommandManager.literal("astral_cataclysm_mob_targeting")
+									.then(
+										CommandManager.literal("on")
+											.executes(context -> setAstralCataclysmMobTargeting(context.getSource(), true))
+									)
+									.then(
+										CommandManager.literal("off")
+											.executes(context -> setAstralCataclysmMobTargeting(context.getSource(), false))
+									)
 							)
 					)
 					.then(
@@ -63,9 +87,24 @@ public final class MagicCommands {
 							)
 					)
 					.then(
+						CommandManager.literal("testing")
+							.then(testingModeLiteral("enable", true))
+							.then(testingModeLiteral("disable", false))
+					)
+					.then(
+						CommandManager.literal("school")
+							.then(schoolLiteral(MagicSchool.FROST, "frost"))
+							.then(schoolLiteral(MagicSchool.LOVE, "love"))
+							.then(schoolLiteral(MagicSchool.BURNING_PASSION, "burning_passion"))
+							.then(schoolLiteral(MagicSchool.JESTER, "jester"))
+							.then(schoolLiteral(MagicSchool.CONSTELLATION, "constellation"))
+							.then(schoolLiteral(MagicSchool.GREED, "greed"))
+					)
+					.then(
 						CommandManager.literal("ability")
 							.then(
 								CommandManager.literal("lock")
+									.then(abilityAccessLiteral(MagicAbility.MARTYRS_FLAME, "martyrs_flame", true))
 									.then(abilityAccessLiteral(MagicAbility.BELOW_FREEZING, "below_freezing", true))
 									.then(abilityAccessLiteral(MagicAbility.ABSOLUTE_ZERO, "absolute_zero", true))
 									.then(abilityAccessLiteral(MagicAbility.PLANCK_HEAT, "planck_heat", true))
@@ -74,9 +113,22 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.TILL_DEATH_DO_US_PART, "till_death_do_us_part", true))
 									.then(abilityAccessLiteral(MagicAbility.MANIPULATION, "empty_embrace", true))
 									.then(abilityAccessLiteral(MagicAbility.LOVE_DOMAIN_EXPANSION, "love_domain_expansion", true))
+									.then(abilityAccessLiteral(MagicAbility.SPOTLIGHT, "spotlight", true))
+									.then(abilityAccessLiteral(MagicAbility.WITTY_ONE_LINER, "witty_one_liner", true))
+									.then(abilityAccessLiteral(MagicAbility.COMEDIC_REWRITE, "comedic_rewrite", true))
+									.then(abilityAccessLiteral(MagicAbility.CASSIOPEIA, "cassiopeia", true))
+									.then(abilityAccessLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky", true))
+									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow", true))
+									.then(abilityAccessLiteral(MagicAbility.ORIONS_GAMBIT, "orions_gambit", true))
+									.then(abilityAccessLiteral(MagicAbility.ASTRAL_CATACLYSM, "astral_cataclysm", true))
+									.then(abilityAccessLiteral(MagicAbility.APPRAISERS_MARK, "appraisers_mark", true))
+									.then(abilityAccessLiteral(MagicAbility.TOLLKEEPERS_CLAIM, "tollkeepers_claim", true))
+									.then(abilityAccessLiteral(MagicAbility.KINGS_DUES, "kings_dues", true))
+									.then(abilityAccessLiteral(MagicAbility.BANKRUPTCY, "bankruptcy", true))
 							)
 							.then(
 								CommandManager.literal("unlock")
+									.then(abilityAccessLiteral(MagicAbility.MARTYRS_FLAME, "martyrs_flame", false))
 									.then(abilityAccessLiteral(MagicAbility.BELOW_FREEZING, "below_freezing", false))
 									.then(abilityAccessLiteral(MagicAbility.ABSOLUTE_ZERO, "absolute_zero", false))
 									.then(abilityAccessLiteral(MagicAbility.PLANCK_HEAT, "planck_heat", false))
@@ -85,6 +137,18 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.TILL_DEATH_DO_US_PART, "till_death_do_us_part", false))
 									.then(abilityAccessLiteral(MagicAbility.MANIPULATION, "empty_embrace", false))
 									.then(abilityAccessLiteral(MagicAbility.LOVE_DOMAIN_EXPANSION, "love_domain_expansion", false))
+									.then(abilityAccessLiteral(MagicAbility.SPOTLIGHT, "spotlight", false))
+									.then(abilityAccessLiteral(MagicAbility.WITTY_ONE_LINER, "witty_one_liner", false))
+									.then(abilityAccessLiteral(MagicAbility.COMEDIC_REWRITE, "comedic_rewrite", false))
+									.then(abilityAccessLiteral(MagicAbility.CASSIOPEIA, "cassiopeia", false))
+									.then(abilityAccessLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky", false))
+									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow", false))
+									.then(abilityAccessLiteral(MagicAbility.ORIONS_GAMBIT, "orions_gambit", false))
+									.then(abilityAccessLiteral(MagicAbility.ASTRAL_CATACLYSM, "astral_cataclysm", false))
+									.then(abilityAccessLiteral(MagicAbility.APPRAISERS_MARK, "appraisers_mark", false))
+									.then(abilityAccessLiteral(MagicAbility.TOLLKEEPERS_CLAIM, "tollkeepers_claim", false))
+									.then(abilityAccessLiteral(MagicAbility.KINGS_DUES, "kings_dues", false))
+									.then(abilityAccessLiteral(MagicAbility.BANKRUPTCY, "bankruptcy", false))
 							)
 					)
 			)
@@ -106,6 +170,7 @@ public final class MagicCommands {
 		boolean locked
 	) {
 		return CommandManager.literal(literal)
+			.executes(context -> setAbilityAccessForSelf(context.getSource(), ability, locked))
 			.then(
 				CommandManager.argument("targets", EntityArgumentType.players())
 					.executes(context ->
@@ -119,12 +184,58 @@ public final class MagicCommands {
 			);
 	}
 
+	private static LiteralArgumentBuilder<ServerCommandSource> testingModeLiteral(String literal, boolean enabled) {
+		return CommandManager.literal(literal)
+			.executes(context -> setTestingModeForSelf(context.getSource(), enabled))
+			.then(
+				CommandManager.argument("targets", EntityArgumentType.players())
+					.executes(context ->
+						setTestingMode(
+							context.getSource(),
+							EntityArgumentType.getPlayers(context, "targets"),
+							enabled
+						)
+					)
+			);
+	}
+
+	private static LiteralArgumentBuilder<ServerCommandSource> schoolLiteral(MagicSchool school, String literal) {
+		return CommandManager.literal(literal)
+			.executes(context -> setSchoolForSelf(context.getSource(), school))
+			.then(
+				CommandManager.argument("targets", EntityArgumentType.players())
+					.executes(context ->
+						setSchool(
+							context.getSource(),
+							EntityArgumentType.getPlayers(context, "targets"),
+							school
+						)
+					)
+			);
+	}
+
 	private static int resetAllForSelf(ServerCommandSource source) throws CommandSyntaxException {
 		return resetAll(source, List.of(source.getPlayerOrThrow()));
 	}
 
 	private static int resetAbilityForSelf(ServerCommandSource source, MagicAbility ability) throws CommandSyntaxException {
 		return resetAbility(source, List.of(source.getPlayerOrThrow()), ability);
+	}
+
+	private static int setAbilityAccessForSelf(
+		ServerCommandSource source,
+		MagicAbility ability,
+		boolean locked
+	) throws CommandSyntaxException {
+		return setAbilityAccess(source, List.of(source.getPlayerOrThrow()), ability, locked);
+	}
+
+	private static int setTestingModeForSelf(ServerCommandSource source, boolean enabled) throws CommandSyntaxException {
+		return setTestingMode(source, List.of(source.getPlayerOrThrow()), enabled);
+	}
+
+	private static int setSchoolForSelf(ServerCommandSource source, MagicSchool school) throws CommandSyntaxException {
+		return setSchool(source, List.of(source.getPlayerOrThrow()), school);
 	}
 
 	private static int resetAll(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
@@ -152,6 +263,7 @@ public final class MagicCommands {
 
 		for (ServerPlayerEntity target : targets) {
 			playerIds.add(target.getUuid());
+			MagicAbilityManager.setTestingMode(target, false);
 			MagicAbilityManager.clearAllRuntimeState(target);
 			MagicPlayerData.clear(target);
 		}
@@ -184,6 +296,38 @@ public final class MagicCommands {
 
 		sendAbilityAccessFeedback(source, targets, ability, locked);
 		return targets.size();
+	}
+
+	private static int setTestingMode(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		boolean enabled
+	) {
+		int changedCount = 0;
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setTestingMode(target, enabled)) {
+				changedCount++;
+			}
+		}
+
+		sendTestingModeFeedback(source, targets, enabled);
+		return changedCount == 0 ? Command.SINGLE_SUCCESS : changedCount;
+	}
+
+	private static int setSchool(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		MagicSchool school
+	) {
+		int changedCount = 0;
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setMagicSchool(target, school)) {
+				changedCount++;
+			}
+		}
+
+		sendSchoolSetFeedback(source, targets, school);
+		return changedCount == 0 ? Command.SINGLE_SUCCESS : changedCount;
 	}
 
 	private static void sendAllResetFeedback(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
@@ -257,6 +401,48 @@ public final class MagicCommands {
 		);
 	}
 
+	private static void sendTestingModeFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		boolean enabled
+	) {
+		String keyPrefix = enabled ? "command.magic.testing.enable" : "command.magic.testing.disable";
+
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable(keyPrefix + ".single", target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable(keyPrefix + ".multiple", targets.size()),
+			true
+		);
+	}
+
+	private static void sendSchoolSetFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		MagicSchool school
+	) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.school.set.single", school.displayName(), target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.school.set.multiple", school.displayName(), targets.size()),
+			true
+		);
+	}
+
 	private static int reloadConfig(ServerCommandSource source) {
 		boolean reloaded = MagicConfig.reload();
 		if (!reloaded) {
@@ -267,6 +453,25 @@ public final class MagicCommands {
 		MagicAbilityManager.reloadConfigValues();
 		source.sendFeedback(
 			() -> Text.translatable("command.magic.config.reload.success", MagicConfig.path().toString()),
+			true
+		);
+		return Command.SINGLE_SUCCESS;
+	}
+
+	private static int setAstralCataclysmMobTargeting(ServerCommandSource source, boolean enabled) {
+		boolean updated = MagicConfig.setAstralCataclysmAllowMobTargets(enabled);
+		if (!updated) {
+			source.sendError(Text.translatable("command.magic.config.astral_cataclysm_mob_targeting.failure", MagicConfig.path().toString()));
+			return 0;
+		}
+
+		MagicAbilityManager.reloadConfigValues();
+		source.sendFeedback(
+			() -> Text.translatable(
+				enabled
+					? "command.magic.config.astral_cataclysm_mob_targeting.enabled"
+					: "command.magic.config.astral_cataclysm_mob_targeting.disabled"
+			),
 			true
 		);
 		return Command.SINGLE_SUCCESS;

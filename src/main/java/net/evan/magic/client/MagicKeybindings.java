@@ -16,12 +16,13 @@ import org.lwjgl.glfw.GLFW;
 
 public final class MagicKeybindings {
 	private static final KeyBinding.Category MAGIC_ABILITY_CATEGORY = KeyBinding.Category.create(Identifier.of(Magic.MOD_ID, "magic_abilities"));
-	private static final KeyBinding ABILITY_1 = register("ability_1", GLFW.GLFW_KEY_Z);
-	private static final KeyBinding ABILITY_2 = register("ability_2", GLFW.GLFW_KEY_X);
-	private static final KeyBinding ABILITY_3 = register("ability_3", GLFW.GLFW_KEY_C);
-	private static final KeyBinding ABILITY_4 = register("ability_4", GLFW.GLFW_KEY_V);
-	private static final KeyBinding ABILITY_5 = register("ability_5", GLFW.GLFW_KEY_B);
-	private static final KeyBinding COOLDOWN_CHECK = register("cooldown_check", GLFW.GLFW_KEY_N);
+	private static final int UNBOUND_KEY = InputUtil.UNKNOWN_KEY.getCode();
+	private static final KeyBinding ABILITY_1 = register("ability_1", UNBOUND_KEY);
+	private static final KeyBinding ABILITY_2 = register("ability_2", UNBOUND_KEY);
+	private static final KeyBinding ABILITY_3 = register("ability_3", UNBOUND_KEY);
+	private static final KeyBinding ABILITY_4 = register("ability_4", UNBOUND_KEY);
+	private static final KeyBinding ABILITY_5 = register("ability_5", UNBOUND_KEY);
+	private static final KeyBinding COOLDOWN_CHECK = register("cooldown_check", UNBOUND_KEY);
 	private static final int[] CLASH_KEYS = { GLFW.GLFW_KEY_W, GLFW.GLFW_KEY_A, GLFW.GLFW_KEY_S, GLFW.GLFW_KEY_D };
 	private static final boolean[] CLASH_KEY_PREVIOUS_DOWN = new boolean[CLASH_KEYS.length];
 

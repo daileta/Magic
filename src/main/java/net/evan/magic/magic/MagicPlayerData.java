@@ -13,6 +13,7 @@ import net.minecraft.util.math.MathHelper;
 
 public final class MagicPlayerData {
 	public static final int MAX_MANA = 100;
+	private static final int GREED_COIN_UNITS_PER_COIN = 2;
 
 	private static final AttachmentType<String> MAGIC_SCHOOL = AttachmentRegistry.create(
 		Identifier.of(Magic.MOD_ID, "magic_school"),
@@ -74,6 +75,13 @@ public final class MagicPlayerData {
 			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
 	);
 
+	private static final AttachmentType<Integer> GREED_COINS = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "greed_coins"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
 	private MagicPlayerData() {
 	}
 
@@ -109,6 +117,7 @@ public final class MagicPlayerData {
 		target.setAttached(DOMAIN_CLASH_PROGRESS, 0);
 		target.setAttached(DOMAIN_CLASH_PROMPT_KEY, 0);
 		target.setAttached(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0);
+		target.setAttached(GREED_COINS, 0);
 	}
 
 	public static void clear(PlayerEntity player) {
@@ -121,6 +130,7 @@ public final class MagicPlayerData {
 		target.setAttached(DOMAIN_CLASH_PROGRESS, 0);
 		target.setAttached(DOMAIN_CLASH_PROMPT_KEY, 0);
 		target.setAttached(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0);
+		target.setAttached(GREED_COINS, 0);
 	}
 
 	public static int getMana(PlayerEntity player) {
@@ -190,6 +200,26 @@ public final class MagicPlayerData {
 		target.setAttached(DOMAIN_CLASH_PROGRESS, 0);
 		target.setAttached(DOMAIN_CLASH_PROMPT_KEY, 0);
 		target.setAttached(DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0);
+	}
+
+	public static int getGreedCoinUnits(PlayerEntity player) {
+		return Math.max(0, target(player).getAttachedOrElse(GREED_COINS, 0));
+	}
+
+	public static double getGreedCoins(PlayerEntity player) {
+		return getGreedCoinUnits(player) / (double) GREED_COIN_UNITS_PER_COIN;
+	}
+
+	public static String formatGreedCoins(PlayerEntity player) {
+		int coinUnits = getGreedCoinUnits(player);
+		if (coinUnits % GREED_COIN_UNITS_PER_COIN == 0) {
+			return Integer.toString(coinUnits / GREED_COIN_UNITS_PER_COIN);
+		}
+		return coinUnits / GREED_COIN_UNITS_PER_COIN + ".5";
+	}
+
+	public static void setGreedCoinUnits(PlayerEntity player, int coinUnits) {
+		target(player).setAttached(GREED_COINS, Math.max(0, coinUnits));
 	}
 
 	private static AttachmentTarget target(PlayerEntity player) {

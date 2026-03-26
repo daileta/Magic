@@ -24,6 +24,26 @@ public final class ModItems {
 		new MagicAffinityAppleItem(MagicSchool.LOVE, settings("love_apple").food(FoodComponents.APPLE))
 	);
 
+	public static final Item BURNING_PASSION_APPLE = register(
+		"burning_passion_apple",
+		new MagicAffinityAppleItem(MagicSchool.BURNING_PASSION, settings("burning_passion_apple").food(FoodComponents.APPLE))
+	);
+
+	public static final Item JESTER_APPLE = register(
+		"jester_apple",
+		new MagicAffinityAppleItem(MagicSchool.JESTER, settings("jester_apple").food(FoodComponents.APPLE))
+	);
+
+	public static final Item CONSTELLATION_APPLE = register(
+		"constellation_apple",
+		new MagicAffinityAppleItem(MagicSchool.CONSTELLATION, settings("constellation_apple").food(FoodComponents.APPLE))
+	);
+
+	public static final Item GREED_APPLE = register(
+		"greed_apple",
+		new MagicAffinityAppleItem(MagicSchool.GREED, settings("greed_apple").food(FoodComponents.APPLE))
+	);
+
 	public static final Item FROST_SHARD = register(
 		"frost_shard",
 		new Item(settings("frost_shard"))
@@ -45,6 +65,10 @@ public final class ModItems {
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.FOOD_AND_DRINK).register(entries -> {
 			entries.add(FROST_APPLE);
 			entries.add(LOVE_APPLE);
+			entries.add(BURNING_PASSION_APPLE);
+			entries.add(JESTER_APPLE);
+			entries.add(CONSTELLATION_APPLE);
+			entries.add(GREED_APPLE);
 		});
 	}
 }

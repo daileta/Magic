@@ -5,7 +5,11 @@ import net.minecraft.text.Text;
 public enum MagicSchool {
 	NONE("none"),
 	FROST("frost"),
-	LOVE("love");
+	LOVE("love"),
+	BURNING_PASSION("burning_passion"),
+	JESTER("jester"),
+	CONSTELLATION("constellation"),
+	GREED("greed");
 
 	private final String id;
 

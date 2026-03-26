@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +21,7 @@ import java.util.UUID;
 import net.evan.magic.Magic;
 import net.evan.magic.magic.ability.MagicAbility;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.util.math.MathHelper;
 
 public final class MagicConfig {
 	private static final Gson GSON = new GsonBuilder()
@@ -137,6 +139,24 @@ public final class MagicConfig {
 		}
 	}
 
+	public static synchronized boolean setAstralCataclysmAllowMobTargets(boolean allowMobTargets) {
+		try {
+			MagicConfigData updated = copyOf(data);
+			if (updated.constellationDomain.allowMobTargets == allowMobTargets) {
+				return true;
+			}
+
+			updated.constellationDomain.allowMobTargets = allowMobTargets;
+			updated.normalize();
+			write(updated);
+			data = updated;
+			return true;
+		} catch (Exception exception) {
+			Magic.LOGGER.error("Failed to persist Astral Cataclysm mob targeting={} toggle.", allowMobTargets, exception);
+			return false;
+		}
+	}
+
 	private static MagicConfigData defaultData() {
 		MagicConfigData defaults = new MagicConfigData();
 		defaults.normalize();
@@ -220,8 +240,19 @@ public final class MagicConfig {
 		public PotionEffectsConfig potionEffects = new PotionEffectsConfig();
 		public ParticlesConfig particles = new ParticlesConfig();
 		public LoveAtFirstSightConfig loveAtFirstSight = new LoveAtFirstSightConfig();
+		public MartyrsFlameConfig martyrsFlame = new MartyrsFlameConfig();
+		public DomainControlConfig domainControl = new DomainControlConfig();
 		@SerializedName(value = "emptyEmbrace", alternate = { "manipulation" })
 		public EmptyEmbraceConfig emptyEmbrace = new EmptyEmbraceConfig();
+		public JesterSpotlightConfig jesterSpotlight = new JesterSpotlightConfig();
+		public JesterWittyOneLinerConfig jesterWittyOneLiner = new JesterWittyOneLinerConfig();
+		public JesterComedicRewriteConfig jesterComedicRewrite = new JesterComedicRewriteConfig();
+		public ConstellationCassiopeiaConfig constellationCassiopeia = new ConstellationCassiopeiaConfig();
+		public ConstellationHerculesConfig constellationHercules = new ConstellationHerculesConfig();
+		public ConstellationSagittariusConfig constellationSagittarius = new ConstellationSagittariusConfig();
+		public ConstellationOrionConfig constellationOrion = new ConstellationOrionConfig();
+		public ConstellationDomainConfig constellationDomain = new ConstellationDomainConfig();
+		public GreedConfig greed = new GreedConfig();
 		public PowderedSnowEffectConfig powderedSnowEffect = new PowderedSnowEffectConfig();
 		public DomainClashConfig domainClash = new DomainClashConfig();
 		public AbilityAccessConfig abilityAccess = new AbilityAccessConfig();
@@ -248,8 +279,41 @@ public final class MagicConfig {
 			if (loveAtFirstSight == null) {
 				loveAtFirstSight = new LoveAtFirstSightConfig();
 			}
+			if (martyrsFlame == null) {
+				martyrsFlame = new MartyrsFlameConfig();
+			}
+			if (domainControl == null) {
+				domainControl = new DomainControlConfig();
+			}
 			if (emptyEmbrace == null) {
 				emptyEmbrace = new EmptyEmbraceConfig();
+			}
+			if (jesterSpotlight == null) {
+				jesterSpotlight = new JesterSpotlightConfig();
+			}
+			if (jesterWittyOneLiner == null) {
+				jesterWittyOneLiner = new JesterWittyOneLinerConfig();
+			}
+			if (jesterComedicRewrite == null) {
+				jesterComedicRewrite = new JesterComedicRewriteConfig();
+			}
+			if (constellationCassiopeia == null) {
+				constellationCassiopeia = new ConstellationCassiopeiaConfig();
+			}
+			if (constellationHercules == null) {
+				constellationHercules = new ConstellationHerculesConfig();
+			}
+			if (constellationSagittarius == null) {
+				constellationSagittarius = new ConstellationSagittariusConfig();
+			}
+			if (constellationOrion == null) {
+				constellationOrion = new ConstellationOrionConfig();
+			}
+			if (constellationDomain == null) {
+				constellationDomain = new ConstellationDomainConfig();
+			}
+			if (greed == null) {
+				greed = new GreedConfig();
 			}
 			if (powderedSnowEffect == null) {
 				powderedSnowEffect = new PowderedSnowEffectConfig();
@@ -261,6 +325,18 @@ public final class MagicConfig {
 				abilityAccess = new AbilityAccessConfig();
 			}
 
+			martyrsFlame.normalize();
+			jesterSpotlight.normalize();
+			jesterWittyOneLiner.normalize();
+			jesterComedicRewrite.normalize();
+			constellationCassiopeia.normalize();
+			constellationHercules.normalize();
+			constellationSagittarius.normalize();
+			constellationOrion.normalize();
+			constellationDomain.normalize();
+			greed.normalize();
+			domainControl.normalize();
+			domainClash.normalize();
 			abilityAccess.normalize();
 		}
 	}
@@ -270,6 +346,7 @@ public final class MagicConfig {
 		public int absoluteZeroDrainPerSecond = 20;
 		public int loveAtFirstSightIdleDrainPerSecond = 2;
 		public int loveAtFirstSightActiveDrainPerSecond = 5;
+		public double martyrsFlameDrainPercentPerSecond = 1.0;
 		public double tillDeathDoUsPartDrainPercentPerSecond = 3.0;
 		@SerializedName(value = "emptyEmbraceActivationCost", alternate = { "manipulationActivationCost" })
 		public int emptyEmbraceActivationCost = 0;
@@ -298,6 +375,8 @@ public final class MagicConfig {
 		public int planckHeatStrengthDurationTicks = 2400;
 		public int planckHeatFireResistanceDurationTicks = 9600;
 		public int loveLockEffectTicks = 5;
+		public int martyrsFlameCooldownTicks = 600;
+		public int martyrsFlameFireDurationTicks = 80;
 		public int tillDeathDoUsPartLinkDurationTicks = 600;
 		public int tillDeathDoUsPartCooldownTicks = 3000;
 		@SerializedName(value = "emptyEmbraceCooldownTicks", alternate = { "manipulationCooldownTicks" })
@@ -315,6 +394,7 @@ public final class MagicConfig {
 		public float absoluteZeroAuraDamage = 4.0F;
 		public float planckHeatFrostDamage = 14.0F;
 		public float planckHeatEnhancedFireDamage = 6.0F;
+		public float martyrsFlameRetaliationDamage = 2.0F;
 	}
 
 	public static final class RadiiConfig {
@@ -361,6 +441,28 @@ public final class MagicConfig {
 		public boolean blockAttacks = true;
 	}
 
+	public static final class MartyrsFlameConfig {
+		public boolean applyGlowingEffect = true;
+		public boolean disableManaRegenWhileActive = true;
+		public boolean fireIgnoresNormalExtinguish = true;
+		public int fireParticleIntervalTicks = 4;
+		public int fireFlameParticleCount = 6;
+		public int fireSmokeParticleCount = 4;
+
+		private void normalize() {
+			fireParticleIntervalTicks = Math.max(1, fireParticleIntervalTicks);
+			fireFlameParticleCount = Math.max(0, fireFlameParticleCount);
+			fireSmokeParticleCount = Math.max(0, fireSmokeParticleCount);
+		}
+	}
+
+	public static final class DomainControlConfig {
+		public boolean blockTeleportAcrossDomainBoundaries = true;
+
+		private void normalize() {
+		}
+	}
+
 	public static final class EmptyEmbraceConfig {
 		public boolean deactivateTargetMagic = true;
 		public boolean disableArtifactPowers = true;
@@ -370,6 +472,1131 @@ public final class MagicConfig {
 		public boolean blockArtifactUseClicks = true;
 		public boolean blockArtifactAttackClicks = true;
 		public boolean debugLogging = true;
+	}
+
+	public static final class JesterSpotlightConfig {
+		public double detectionRange = 48.0;
+		public int effectRefreshTicks = 10;
+		public JesterSpotlightStageConfig stageOne = defaultStageOne();
+		public JesterSpotlightStageConfig stageTwo = defaultStageTwo();
+		public JesterSpotlightStageConfig stageThree = defaultStageThree();
+
+		private void normalize() {
+			if (stageOne == null) {
+				stageOne = defaultStageOne();
+			}
+			if (stageTwo == null) {
+				stageTwo = defaultStageTwo();
+			}
+			if (stageThree == null) {
+				stageThree = defaultStageThree();
+			}
+
+			stageOne.normalize();
+			stageTwo.normalize();
+			stageThree.normalize();
+		}
+
+		private static JesterSpotlightStageConfig defaultStageOne() {
+			JesterSpotlightStageConfig config = new JesterSpotlightStageConfig();
+			config.viewersRequired = 2;
+			config.activationWindowTicks = 200;
+			config.downgradeGraceTicks = 100;
+			config.fallbackWindowTicks = 200;
+			config.attackDamageBonus = 2.0;
+			config.movementSpeedMultiplier = 0.08;
+			config.scale = 1.15;
+			config.jumpBoostAmplifier = 0;
+			config.resistanceAmplifier = 0;
+			config.maxHealthBonusHearts = 2.0;
+			return config;
+		}
+
+		private static JesterSpotlightStageConfig defaultStageTwo() {
+			JesterSpotlightStageConfig config = new JesterSpotlightStageConfig();
+			config.viewersRequired = 5;
+			config.activationWindowTicks = 100;
+			config.downgradeGraceTicks = 100;
+			config.fallbackWindowTicks = 200;
+			config.attackDamageBonus = 4.0;
+			config.movementSpeedMultiplier = 0.16;
+			config.scale = 1.3;
+			config.jumpBoostAmplifier = 1;
+			config.resistanceAmplifier = 1;
+			config.maxHealthBonusHearts = 5.0;
+			return config;
+		}
+
+		private static JesterSpotlightStageConfig defaultStageThree() {
+			JesterSpotlightStageConfig config = new JesterSpotlightStageConfig();
+			config.viewersRequired = 8;
+			config.activationWindowTicks = 100;
+			config.downgradeGraceTicks = 100;
+			config.fallbackWindowTicks = 200;
+			config.attackDamageBonus = 6.0;
+			config.movementSpeedMultiplier = 0.24;
+			config.scale = 1.5;
+			config.jumpBoostAmplifier = 2;
+			config.resistanceAmplifier = 2;
+			config.maxHealthBonusHearts = 10.0;
+			return config;
+		}
+	}
+
+	public static final class JesterSpotlightStageConfig {
+		public int viewersRequired = 1;
+		public int activationWindowTicks = 100;
+		public int downgradeGraceTicks = 100;
+		public int fallbackWindowTicks = 200;
+		public double attackDamageBonus = 0.0;
+		public double movementSpeedMultiplier = 0.0;
+		public double scale = 1.0;
+		public int jumpBoostAmplifier = -1;
+		public int resistanceAmplifier = -1;
+		public double maxHealthBonusHearts = 0.0;
+
+		private void normalize() {
+			viewersRequired = Math.max(1, viewersRequired);
+			activationWindowTicks = Math.max(1, activationWindowTicks);
+			downgradeGraceTicks = Math.max(0, downgradeGraceTicks);
+			fallbackWindowTicks = Math.max(1, fallbackWindowTicks);
+			attackDamageBonus = Math.max(0.0, attackDamageBonus);
+			movementSpeedMultiplier = Math.max(0.0, movementSpeedMultiplier);
+			scale = Math.max(1.0, scale);
+			jumpBoostAmplifier = Math.max(-1, jumpBoostAmplifier);
+			resistanceAmplifier = Math.max(-1, resistanceAmplifier);
+			maxHealthBonusHearts = Math.max(0.0, maxHealthBonusHearts);
+		}
+	}
+
+	public static final class JesterWittyOneLinerConfig {
+		public int activationCostPercent = 50;
+		public int targetRange = 32;
+		public int overlayFadeInTicks = 4;
+		public int overlayStayTicks = 50;
+		public int overlayFadeOutTicks = 10;
+		public JesterWittyOneLinerTierConfig lowTier = defaultLowTier();
+		public JesterWittyOneLinerTierConfig midTier = defaultMidTier();
+		public JesterWittyOneLinerTierConfig highTier = defaultHighTier();
+
+		private void normalize() {
+			if (lowTier == null) {
+				lowTier = defaultLowTier();
+			}
+			if (midTier == null) {
+				midTier = defaultMidTier();
+			}
+			if (highTier == null) {
+				highTier = defaultHighTier();
+			}
+
+			activationCostPercent = Math.max(0, activationCostPercent);
+			targetRange = Math.max(1, targetRange);
+			overlayFadeInTicks = Math.max(0, overlayFadeInTicks);
+			overlayStayTicks = Math.max(0, overlayStayTicks);
+			overlayFadeOutTicks = Math.max(0, overlayFadeOutTicks);
+			lowTier.normalize(defaultLowTier());
+			midTier.normalize(defaultMidTier());
+			highTier.normalize(defaultHighTier());
+		}
+
+		private static JesterWittyOneLinerTierConfig defaultLowTier() {
+			JesterWittyOneLinerTierConfig config = new JesterWittyOneLinerTierConfig();
+			config.selectionWeight = 70;
+			config.cooldownTicks = 600;
+			config.effectDurationTicks = 600;
+			config.textColorHex = "#FFFFFF";
+			config.slownessAmplifier = 0;
+			config.weaknessAmplifier = 0;
+			config.jokes = new ArrayList<>(List.of(
+				"I'd tell a sharper joke, but safety scissors won.",
+				"That was my warm-up heckle.",
+				"I clown around professionally.",
+				"I brought jokes and poor decisions.",
+				"You're lucky that was the discount punchline."
+			));
+			return config;
+		}
+
+		private static JesterWittyOneLinerTierConfig defaultMidTier() {
+			JesterWittyOneLinerTierConfig config = new JesterWittyOneLinerTierConfig();
+			config.selectionWeight = 20;
+			config.cooldownTicks = 900;
+			config.effectDurationTicks = 900;
+			config.textColorHex = "#FFD54A";
+			config.slownessAmplifier = 2;
+			config.weaknessAmplifier = 1;
+			config.nauseaAmplifier = 1;
+			config.jokes = new ArrayList<>(List.of(
+				"You just got roasted by a part-time fool.",
+				"I've seen mannequins dodge better.",
+				"That glare says the joke landed harder than you did.",
+				"I'm billing you for emotional damage and stage lights.",
+				"Even my backup punchline hits harder than that."
+			));
+			return config;
+		}
+
+		private static JesterWittyOneLinerTierConfig defaultHighTier() {
+			JesterWittyOneLinerTierConfig config = new JesterWittyOneLinerTierConfig();
+			config.selectionWeight = 10;
+			config.cooldownTicks = 1200;
+			config.effectDurationTicks = 1200;
+			config.textColorHex = "#39B7FF";
+			config.slownessAmplifier = 4;
+			config.weaknessAmplifier = 4;
+			config.blindnessAmplifier = 1;
+			config.nauseaAmplifier = 1;
+			config.darknessAmplifier = 0;
+			config.weavingAmplifier = 0;
+			config.jokes = new ArrayList<>(List.of(
+				"The crowd gasped, the lights hit, and your confidence left the building.",
+				"I didn't steal the show. You dropped it.",
+				"That silence is your reputation filing for leave.",
+				"You're not bombed by the joke. You're bombed by the timing.",
+				"Smile for the spotlight. This is the part where you lose gracefully."
+			));
+			return config;
+		}
+	}
+
+	public static final class JesterWittyOneLinerTierConfig {
+		public int selectionWeight = 1;
+		public int cooldownTicks = 0;
+		public int effectDurationTicks = 0;
+		public String textColorHex = "#FFFFFF";
+		public int slownessAmplifier = -1;
+		public int weaknessAmplifier = -1;
+		public int blindnessAmplifier = -1;
+		public int nauseaAmplifier = -1;
+		public int darknessAmplifier = -1;
+		public int weavingAmplifier = -1;
+		public boolean applyGlowing = true;
+		public List<String> jokes = new ArrayList<>();
+
+		private void normalize(JesterWittyOneLinerTierConfig defaults) {
+			selectionWeight = Math.max(0, selectionWeight);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			effectDurationTicks = Math.max(0, effectDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			weaknessAmplifier = Math.max(-1, weaknessAmplifier);
+			blindnessAmplifier = Math.max(-1, blindnessAmplifier);
+			nauseaAmplifier = Math.max(-1, nauseaAmplifier);
+			darknessAmplifier = Math.max(-1, darknessAmplifier);
+			weavingAmplifier = Math.max(-1, weavingAmplifier);
+			if (textColorHex == null || textColorHex.isBlank()) {
+				textColorHex = defaults.textColorHex;
+			}
+			if (jokes == null) {
+				jokes = new ArrayList<>(defaults.jokes);
+			}
+			jokes.removeIf(joke -> joke == null || joke.isBlank());
+			if (jokes.isEmpty()) {
+				jokes = new ArrayList<>(defaults.jokes);
+			}
+		}
+	}
+
+	public static final class JesterComedicRewriteConfig {
+		public double baseProcChancePercent = 50.0;
+		public double severityProcBonusPercent = 0.0;
+		public double lethalProcBonusPercent = 0.0;
+		public double maxProcChancePercent = 50.0;
+		public float dangerousDamageThreshold = 8.0F;
+		public double dangerousHealthFractionThreshold = 0.45;
+		public float severityDamageCap = 20.0F;
+		public double manaCostPercent = 20.0;
+		public int cooldownTicks = 25 * 20;
+		public int postRewriteImmunityTicks = 20;
+		public int postRewriteFallProtectionTicks = 80;
+		public boolean extinguishOnRewrite = true;
+		public double minSavedHealthHearts = 1.0;
+		public double maxSavedHealthHearts = 4.0;
+		public int safeSearchRadius = 14;
+		public int safeSearchVerticalRange = 10;
+		public int unsafeYBufferBlocks = 16;
+		public JesterComedicRewriteLaunchConfig launchedThroughTheScene = defaultLaunchedThroughTheScene();
+		public JesterComedicRewriteRavagerConfig ravagerBit = defaultRavagerBit();
+		public JesterComedicRewriteParrotConfig parrotRescue = defaultParrotRescue();
+
+		private void normalize() {
+			if (launchedThroughTheScene == null) {
+				launchedThroughTheScene = defaultLaunchedThroughTheScene();
+			}
+			if (ravagerBit == null) {
+				ravagerBit = defaultRavagerBit();
+			}
+			if (parrotRescue == null) {
+				parrotRescue = defaultParrotRescue();
+			}
+
+			baseProcChancePercent = MathHelper.clamp(baseProcChancePercent, 0.0, 100.0);
+			severityProcBonusPercent = MathHelper.clamp(severityProcBonusPercent, 0.0, 100.0);
+			lethalProcBonusPercent = MathHelper.clamp(lethalProcBonusPercent, 0.0, 100.0);
+			maxProcChancePercent = MathHelper.clamp(maxProcChancePercent, 0.0, 100.0);
+			dangerousDamageThreshold = Math.max(0.0F, dangerousDamageThreshold);
+			dangerousHealthFractionThreshold = MathHelper.clamp(dangerousHealthFractionThreshold, 0.0, 1.0);
+			severityDamageCap = Math.max(dangerousDamageThreshold, severityDamageCap);
+			manaCostPercent = MathHelper.clamp(manaCostPercent, 0.0, 100.0);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			postRewriteImmunityTicks = Math.max(0, postRewriteImmunityTicks);
+			postRewriteFallProtectionTicks = Math.max(0, postRewriteFallProtectionTicks);
+			minSavedHealthHearts = Math.max(0.5, minSavedHealthHearts);
+			maxSavedHealthHearts = Math.max(minSavedHealthHearts, maxSavedHealthHearts);
+			safeSearchRadius = Math.max(1, safeSearchRadius);
+			safeSearchVerticalRange = Math.max(1, safeSearchVerticalRange);
+			unsafeYBufferBlocks = Math.max(0, unsafeYBufferBlocks);
+			launchedThroughTheScene.normalize();
+			ravagerBit.normalize();
+			parrotRescue.normalize();
+		}
+
+		private static JesterComedicRewriteLaunchConfig defaultLaunchedThroughTheScene() {
+			JesterComedicRewriteLaunchConfig config = new JesterComedicRewriteLaunchConfig();
+			config.weight = 50;
+			config.baseHorizontalVelocity = 1.35;
+			config.horizontalVelocityPerSeverity = 1.1;
+			config.baseVerticalVelocity = 0.6;
+			config.verticalVelocityPerSeverity = 0.35;
+			config.slownessDurationTicks = 40;
+			config.slownessAmplifier = 2;
+			config.smokeParticleCount = 18;
+			config.poofParticleCount = 8;
+			return config;
+		}
+
+		private static JesterComedicRewriteRavagerConfig defaultRavagerBit() {
+			JesterComedicRewriteRavagerConfig config = new JesterComedicRewriteRavagerConfig();
+			config.weight = 25;
+			config.baseHorizontalVelocity = 1.1;
+			config.horizontalVelocityPerSeverity = 0.9;
+			config.baseVerticalVelocity = 0.5;
+			config.verticalVelocityPerSeverity = 0.25;
+			config.slownessDurationTicks = 60;
+			config.slownessAmplifier = 3;
+			config.smokeParticleCount = 16;
+			config.dustParticleCount = 20;
+			config.showVisualCameo = true;
+			config.visualDurationTicks = 8;
+			config.visualSpawnDistance = 2.75;
+			config.visualVerticalOffset = 0.0;
+			config.visualChargeVelocity = 1.85;
+			return config;
+		}
+
+		private static JesterComedicRewriteParrotConfig defaultParrotRescue() {
+			JesterComedicRewriteParrotConfig config = new JesterComedicRewriteParrotConfig();
+			config.weight = 25;
+			config.carryHeight = 5.0;
+			config.carryHeightPerSeverity = 3.0;
+			config.sideVelocity = 0.35;
+			config.sideVelocityPerSeverity = 0.2;
+			config.slowFallingDurationTicks = 60;
+			config.levitationDurationTicks = 12;
+			config.featherParticleCount = 18;
+			config.showVisualCameo = true;
+			config.visualDurationTicks = 12;
+			config.visualCount = 3;
+			config.visualRadius = 0.9;
+			config.visualVerticalOffset = 0.2;
+			config.visualLiftVelocity = 0.15;
+			return config;
+		}
+	}
+
+	public static final class JesterComedicRewriteLaunchConfig {
+		public int weight = 1;
+		public double baseHorizontalVelocity = 1.0;
+		public double horizontalVelocityPerSeverity = 0.0;
+		public double baseVerticalVelocity = 0.4;
+		public double verticalVelocityPerSeverity = 0.0;
+		public int slownessDurationTicks = 20;
+		public int slownessAmplifier = 0;
+		public int smokeParticleCount = 0;
+		public int poofParticleCount = 0;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			baseHorizontalVelocity = Math.max(0.0, baseHorizontalVelocity);
+			horizontalVelocityPerSeverity = Math.max(0.0, horizontalVelocityPerSeverity);
+			baseVerticalVelocity = Math.max(0.0, baseVerticalVelocity);
+			verticalVelocityPerSeverity = Math.max(0.0, verticalVelocityPerSeverity);
+			slownessDurationTicks = Math.max(0, slownessDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			smokeParticleCount = Math.max(0, smokeParticleCount);
+			poofParticleCount = Math.max(0, poofParticleCount);
+		}
+	}
+
+	public static final class JesterComedicRewriteRavagerConfig {
+		public int weight = 1;
+		public double baseHorizontalVelocity = 1.0;
+		public double horizontalVelocityPerSeverity = 0.0;
+		public double baseVerticalVelocity = 0.4;
+		public double verticalVelocityPerSeverity = 0.0;
+		public int slownessDurationTicks = 20;
+		public int slownessAmplifier = 0;
+		public int smokeParticleCount = 0;
+		public int dustParticleCount = 0;
+		public boolean showVisualCameo = true;
+		public int visualDurationTicks = 0;
+		public double visualSpawnDistance = 0.0;
+		public double visualVerticalOffset = 0.0;
+		public double visualChargeVelocity = 0.0;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			baseHorizontalVelocity = Math.max(0.0, baseHorizontalVelocity);
+			horizontalVelocityPerSeverity = Math.max(0.0, horizontalVelocityPerSeverity);
+			baseVerticalVelocity = Math.max(0.0, baseVerticalVelocity);
+			verticalVelocityPerSeverity = Math.max(0.0, verticalVelocityPerSeverity);
+			slownessDurationTicks = Math.max(0, slownessDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			smokeParticleCount = Math.max(0, smokeParticleCount);
+			dustParticleCount = Math.max(0, dustParticleCount);
+			visualDurationTicks = Math.max(0, visualDurationTicks);
+			visualSpawnDistance = Math.max(0.0, visualSpawnDistance);
+			visualChargeVelocity = Math.max(0.0, visualChargeVelocity);
+		}
+	}
+
+	public static final class JesterComedicRewriteParrotConfig {
+		public int weight = 1;
+		public double carryHeight = 4.0;
+		public double carryHeightPerSeverity = 0.0;
+		public double sideVelocity = 0.2;
+		public double sideVelocityPerSeverity = 0.0;
+		public int slowFallingDurationTicks = 40;
+		public int levitationDurationTicks = 0;
+		public int featherParticleCount = 0;
+		public boolean showVisualCameo = true;
+		public int visualDurationTicks = 0;
+		public int visualCount = 0;
+		public double visualRadius = 0.0;
+		public double visualVerticalOffset = 0.0;
+		public double visualLiftVelocity = 0.0;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			carryHeight = Math.max(0.0, carryHeight);
+			carryHeightPerSeverity = Math.max(0.0, carryHeightPerSeverity);
+			sideVelocity = Math.max(0.0, sideVelocity);
+			sideVelocityPerSeverity = Math.max(0.0, sideVelocityPerSeverity);
+			slowFallingDurationTicks = Math.max(0, slowFallingDurationTicks);
+			levitationDurationTicks = Math.max(0, levitationDurationTicks);
+			featherParticleCount = Math.max(0, featherParticleCount);
+			visualDurationTicks = Math.max(0, visualDurationTicks);
+			visualCount = Math.max(0, visualCount);
+			visualRadius = Math.max(0.0, visualRadius);
+			visualLiftVelocity = Math.max(0.0, visualLiftVelocity);
+		}
+	}
+
+	public static final class ConstellationCassiopeiaConfig {
+		public double detectionRadius = 64.0;
+		public int outlineRefreshTicks = 10;
+
+		private void normalize() {
+			detectionRadius = Math.max(1.0, detectionRadius);
+			outlineRefreshTicks = Math.max(1, outlineRefreshTicks);
+		}
+	}
+
+	public static final class ConstellationHerculesConfig {
+		public double targetRange = 64.0;
+		public double splashRadius = 5.0;
+		public int effectDurationTicks = 15 * 20;
+		public int warningFadeInTicks = 5;
+		public int warningStayTicks = 50;
+		public int warningFadeOutTicks = 5;
+		public float warningScale = 1.35F;
+		public double activationCostPercent = 40.0;
+		public int cooldownTicks = 45 * 20;
+		public float trueDamage = 5.0F;
+		public int slownessAmplifier = 255;
+		public int particleIntervalTicks = 5;
+		public String warningColorHex = "#39B7FF";
+		public boolean disableManaRegenWhileActive = true;
+		public int activationImpactDirtParticleCount = 18;
+		public double activationImpactDirtParticleSpeed = 0.08;
+		public float activationImpactSoundVolume = 1.2F;
+		public float activationImpactSoundPitch = 0.65F;
+
+		private void normalize() {
+			targetRange = Math.max(1.0, targetRange);
+			splashRadius = Math.max(0.0, splashRadius);
+			effectDurationTicks = Math.max(1, effectDurationTicks);
+			warningFadeInTicks = Math.max(0, warningFadeInTicks);
+			warningStayTicks = Math.max(0, warningStayTicks);
+			warningFadeOutTicks = Math.max(0, warningFadeOutTicks);
+			warningScale = Math.max(0.5F, warningScale);
+			activationCostPercent = Math.max(0.0, activationCostPercent);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			trueDamage = Math.max(0.0F, trueDamage);
+			slownessAmplifier = Math.max(0, slownessAmplifier);
+			particleIntervalTicks = Math.max(1, particleIntervalTicks);
+			if (warningColorHex == null || warningColorHex.isBlank()) {
+				warningColorHex = "#39B7FF";
+			}
+			activationImpactDirtParticleCount = Math.max(0, activationImpactDirtParticleCount);
+			activationImpactDirtParticleSpeed = Math.max(0.0, activationImpactDirtParticleSpeed);
+			activationImpactSoundVolume = Math.max(0.0F, activationImpactSoundVolume);
+			activationImpactSoundPitch = Math.max(0.0F, activationImpactSoundPitch);
+		}
+	}
+
+	public static final class ConstellationSagittariusConfig {
+		public double beamRange = 32.0;
+		public double beamRadius = 1.5;
+		public int windupTicks = 3 * 20;
+		public double windupMovementSpeedMultiplier = 0.5;
+		public int chargeGlowParticleCount = 1;
+		public int chargeBeamParticleCount = 0;
+		public double activationCostPercent = 70.0;
+		public int cooldownTicks = 2 * 60 * 20;
+		public double closeRangeThreshold = 5.0;
+		public double midRangeThreshold = 10.0;
+		public float closeRangeTrueDamage = 10.0F;
+		public float midRangeTrueDamage = 6.0F;
+		public float farRangeTrueDamage = 2.0F;
+		public boolean disableManaRegenDuringWindup = true;
+
+		private void normalize() {
+			beamRange = Math.max(1.0, beamRange);
+			beamRadius = Math.max(0.1, beamRadius);
+			windupTicks = Math.max(1, windupTicks);
+			windupMovementSpeedMultiplier = Math.max(0.0, windupMovementSpeedMultiplier);
+			chargeGlowParticleCount = Math.max(0, chargeGlowParticleCount);
+			chargeBeamParticleCount = Math.max(0, chargeBeamParticleCount);
+			activationCostPercent = Math.max(0.0, activationCostPercent);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			closeRangeThreshold = Math.max(0.0, closeRangeThreshold);
+			midRangeThreshold = Math.max(closeRangeThreshold, midRangeThreshold);
+			closeRangeTrueDamage = Math.max(0.0F, closeRangeTrueDamage);
+			midRangeTrueDamage = Math.max(0.0F, midRangeTrueDamage);
+			farRangeTrueDamage = Math.max(0.0F, farRangeTrueDamage);
+		}
+	}
+
+	public static final class ConstellationOrionConfig {
+		public double targetRange = 64.0;
+		public int waitCancelCooldownTicks = 3 * 20;
+		public int linkDurationTicks = 40 * 20;
+		public double manaDrainPercentPerSecond = 10.0;
+		public boolean drainManaWhileWaitingForTarget = false;
+		public boolean disableManaRegenWhileWaitingForTarget = true;
+		public boolean disableManaRegenWhileLinked = true;
+		public int cooldownTicks = 10 * 60 * 20;
+		public int casterPenaltyRefreshTicks = 20;
+		public int casterWeaknessAmplifier = 2;
+		public int casterSlownessAmplifier = 2;
+		public double casterMaxHealthHearts = 5.0;
+		public double casterIncomingDamageMultiplier = 1.5;
+		public boolean clearTargetCooldownsOnLock = true;
+		public boolean suppressTargetManaCosts = true;
+		public boolean suppressTargetCooldowns = true;
+		public boolean resetCasterCooldownsOnEnd = true;
+		public boolean applyUsedTargetCooldownsOnEnd = true;
+		public int targetParticleIntervalTicks = 4;
+		public int targetParticleBurstCount = 12;
+		public double targetParticleSpawnRadius = 0.28;
+		public double targetParticleVerticalVelocity = 0.22;
+		public double targetParticleForwardVelocity = 0.09;
+		public double targetParticleSideVelocity = 0.05;
+
+		private void normalize() {
+			targetRange = Math.max(1.0, targetRange);
+			waitCancelCooldownTicks = Math.max(0, waitCancelCooldownTicks);
+			linkDurationTicks = Math.max(1, linkDurationTicks);
+			manaDrainPercentPerSecond = Math.max(0.0, manaDrainPercentPerSecond);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			casterPenaltyRefreshTicks = Math.max(1, casterPenaltyRefreshTicks);
+			casterWeaknessAmplifier = Math.max(0, casterWeaknessAmplifier);
+			casterSlownessAmplifier = Math.max(0, casterSlownessAmplifier);
+			casterMaxHealthHearts = Math.max(1.0, casterMaxHealthHearts);
+			casterIncomingDamageMultiplier = Math.max(1.0, casterIncomingDamageMultiplier);
+			targetParticleIntervalTicks = Math.max(1, targetParticleIntervalTicks);
+			targetParticleBurstCount = Math.max(0, targetParticleBurstCount);
+			targetParticleSpawnRadius = Math.max(0.0, targetParticleSpawnRadius);
+			targetParticleVerticalVelocity = Math.max(0.0, targetParticleVerticalVelocity);
+			targetParticleForwardVelocity = Math.max(0.0, targetParticleForwardVelocity);
+			targetParticleSideVelocity = Math.max(0.0, targetParticleSideVelocity);
+		}
+	}
+
+	public static final class ConstellationDomainConfig {
+		public int chargeDurationTicks = 30 * 20;
+		public int acquireWindowTicks = 60 * 20;
+		public int durationTicks = 2 * 60 * 20;
+		public List<Integer> expiryWarningTicks = new ArrayList<>(List.of(30 * 20, 10 * 20, 5 * 20));
+		public boolean allowMobTargets = false;
+		public double targetRange = 64.0;
+		public double beamRadius = 5.0;
+		public double beamRiseBlocksPerSecond = 2.0;
+		public double beamParticleStep = 0.5;
+		public int beamCoreParticleCount = 18;
+		public int beamOuterParticleCount = 10;
+		public int beamSparkParticleCount = 6;
+		public int beamRingPointsPerStep = 8;
+		public int beamDamageIntervalTicks = 20;
+		public float beamTrueDamagePerInterval = 4.0F;
+		public int beamHeavenlySoundIntervalTicks = 20;
+		public float beamHeavenlySoundVolume = 1.0F;
+		public float beamHeavenlySoundPitch = 1.2F;
+		public int cooldownTicks = 15 * 60 * 20;
+		public int freezeRefreshTicks = 5;
+		public boolean disableManaRegenWhileActive = true;
+		public boolean ignoreTotems = true;
+		public boolean preserveBeaconAnchor = true;
+		public String beaconAnchorBlockId = "evanpack:beacon_anchor";
+		public String beaconCoreItemId = "evanpack:beacon_core";
+		public String beaconCoreAnchorStateId = "evanpack_beacon_core_anchor";
+		public double beaconCoreProtectionRadius = 75.0;
+		public boolean cancelBeamOnProtectedBeaconCoreHolder = true;
+
+		private void normalize() {
+			chargeDurationTicks = Math.max(1, chargeDurationTicks);
+			acquireWindowTicks = Math.max(1, acquireWindowTicks);
+			durationTicks = Math.max(1, durationTicks);
+			if (expiryWarningTicks == null) {
+				expiryWarningTicks = new ArrayList<>(List.of(30 * 20, 10 * 20, 5 * 20));
+			}
+			expiryWarningTicks.removeIf(ticks -> ticks == null || ticks <= 0);
+			if (expiryWarningTicks.isEmpty()) {
+				expiryWarningTicks = new ArrayList<>(List.of(30 * 20, 10 * 20, 5 * 20));
+			}
+			targetRange = Math.max(1.0, targetRange);
+			beamRadius = Math.max(0.5, beamRadius);
+			beamRiseBlocksPerSecond = Math.max(0.0, beamRiseBlocksPerSecond);
+			beamParticleStep = Math.max(0.1, beamParticleStep);
+			beamCoreParticleCount = Math.max(0, beamCoreParticleCount);
+			beamOuterParticleCount = Math.max(0, beamOuterParticleCount);
+			beamSparkParticleCount = Math.max(0, beamSparkParticleCount);
+			beamRingPointsPerStep = Math.max(0, beamRingPointsPerStep);
+			beamDamageIntervalTicks = Math.max(1, beamDamageIntervalTicks);
+			beamTrueDamagePerInterval = Math.max(0.0F, beamTrueDamagePerInterval);
+			beamHeavenlySoundIntervalTicks = Math.max(1, beamHeavenlySoundIntervalTicks);
+			beamHeavenlySoundVolume = Math.max(0.0F, beamHeavenlySoundVolume);
+			beamHeavenlySoundPitch = Math.max(0.0F, beamHeavenlySoundPitch);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			freezeRefreshTicks = Math.max(1, freezeRefreshTicks);
+			if (beaconAnchorBlockId == null || beaconAnchorBlockId.isBlank()) {
+				beaconAnchorBlockId = "evanpack:beacon_anchor";
+			}
+			if (beaconCoreItemId == null || beaconCoreItemId.isBlank()) {
+				beaconCoreItemId = "evanpack:beacon_core";
+			}
+			if (beaconCoreAnchorStateId == null || beaconCoreAnchorStateId.isBlank()) {
+				beaconCoreAnchorStateId = "evanpack_beacon_core_anchor";
+			}
+			beaconCoreProtectionRadius = Math.max(0.0, beaconCoreProtectionRadius);
+		}
+	}
+
+	public static final class GreedConfig {
+		public ManaSicknessConfig manaSickness = new ManaSicknessConfig();
+		public AppraisersMarkConfig appraisersMark = new AppraisersMarkConfig();
+		public TollkeepersClaimConfig tollkeepersClaim = new TollkeepersClaimConfig();
+		public KingsDuesConfig kingsDues = new KingsDuesConfig();
+		public BankruptcyConfig bankruptcy = new BankruptcyConfig();
+
+		private void normalize() {
+			if (manaSickness == null) {
+				manaSickness = new ManaSicknessConfig();
+			}
+			if (appraisersMark == null) {
+				appraisersMark = new AppraisersMarkConfig();
+			}
+			if (tollkeepersClaim == null) {
+				tollkeepersClaim = new TollkeepersClaimConfig();
+			}
+			if (kingsDues == null) {
+				kingsDues = new KingsDuesConfig();
+			}
+			if (bankruptcy == null) {
+				bankruptcy = new BankruptcyConfig();
+			}
+
+			manaSickness.normalize();
+			appraisersMark.normalize();
+			tollkeepersClaim.normalize();
+			kingsDues.normalize();
+			bankruptcy.normalize();
+		}
+	}
+
+	public static final class ManaSicknessConfig {
+		public int tickIntervalTicks = 20;
+		public double levelOneDrainPercentPerSecond = 1.0;
+		public double levelTwoDrainPercentPerSecond = 2.0;
+		public double levelThreeDrainPercentPerSecond = 5.0;
+		public double levelFourDrainPercentPerSecond = 10.0;
+		public double levelFiveDrainPercentPerSecond = 15.0;
+		public double levelSixDrainPercentPerSecond = 20.0;
+		public double levelSevenDrainPercentPerSecond = 25.0;
+		public double levelEightDrainPercentPerSecond = 50.0;
+		public double levelNinePlusDrainPercentPerSecond = 100.0;
+
+		private void normalize() {
+			tickIntervalTicks = Math.max(1, tickIntervalTicks);
+			levelOneDrainPercentPerSecond = MathHelper.clamp(levelOneDrainPercentPerSecond, 0.0, 100.0);
+			levelTwoDrainPercentPerSecond = MathHelper.clamp(levelTwoDrainPercentPerSecond, 0.0, 100.0);
+			levelThreeDrainPercentPerSecond = MathHelper.clamp(levelThreeDrainPercentPerSecond, 0.0, 100.0);
+			levelFourDrainPercentPerSecond = MathHelper.clamp(levelFourDrainPercentPerSecond, 0.0, 100.0);
+			levelFiveDrainPercentPerSecond = MathHelper.clamp(levelFiveDrainPercentPerSecond, 0.0, 100.0);
+			levelSixDrainPercentPerSecond = MathHelper.clamp(levelSixDrainPercentPerSecond, 0.0, 100.0);
+			levelSevenDrainPercentPerSecond = MathHelper.clamp(levelSevenDrainPercentPerSecond, 0.0, 100.0);
+			levelEightDrainPercentPerSecond = MathHelper.clamp(levelEightDrainPercentPerSecond, 0.0, 100.0);
+			levelNinePlusDrainPercentPerSecond = MathHelper.clamp(levelNinePlusDrainPercentPerSecond, 0.0, 100.0);
+		}
+	}
+
+	public static final class AppraisersMarkConfig {
+		public double markedDrainPercentPerSecond = 1.0;
+		public int cooldownTicks = 30 * 20;
+		public double markedActionRange = 32.0;
+		public int maxTrackedPlayers = 3;
+		public int maxCoins = 18;
+		public int inactivityWipeTicks = 5 * 60 * 20;
+		public int contributionLifetimeTicks = 10 * 60 * 20;
+		public int markParticleIntervalTicks = 4;
+		public int markParticleCount = 3;
+		public double markParticleHorizontalSpread = 0.18;
+		public double markParticleVerticalSpread = 0.28;
+		public boolean playCoinGainSound = true;
+		public float coinGainSoundVolume = 0.35F;
+		public float coinGainSoundPitch = 1.45F;
+		public Map<String, Double> coinTriggers = defaultCoinTriggers();
+
+		private void normalize() {
+			markedDrainPercentPerSecond = MathHelper.clamp(markedDrainPercentPerSecond, 0.0, 100.0);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			markedActionRange = Math.max(1.0, markedActionRange);
+			maxTrackedPlayers = Math.max(1, maxTrackedPlayers);
+			maxCoins = Math.max(1, maxCoins);
+			inactivityWipeTicks = Math.max(1, inactivityWipeTicks);
+			contributionLifetimeTicks = Math.max(1, contributionLifetimeTicks);
+			markParticleIntervalTicks = Math.max(1, markParticleIntervalTicks);
+			markParticleCount = Math.max(0, markParticleCount);
+			markParticleHorizontalSpread = Math.max(0.0, markParticleHorizontalSpread);
+			markParticleVerticalSpread = Math.max(0.0, markParticleVerticalSpread);
+			coinGainSoundVolume = Math.max(0.0F, coinGainSoundVolume);
+			coinGainSoundPitch = Math.max(0.0F, coinGainSoundPitch);
+			if (coinTriggers == null) {
+				coinTriggers = defaultCoinTriggers();
+			}
+			if (coinTriggers.isEmpty()) {
+				coinTriggers = defaultCoinTriggers();
+			}
+			Map<String, Double> normalized = new LinkedHashMap<>();
+			for (Map.Entry<String, Double> entry : coinTriggers.entrySet()) {
+				String key = entry.getKey();
+				Double value = entry.getValue();
+				if (key == null || key.isBlank() || value == null) {
+					continue;
+				}
+				normalized.put(key.trim().toLowerCase(), normalizeCoinTriggerValue(value));
+			}
+			if (normalized.isEmpty()) {
+				normalized = defaultCoinTriggers();
+			}
+			coinTriggers = normalized;
+		}
+
+		private static LinkedHashMap<String, Double> defaultCoinTriggers() {
+			LinkedHashMap<String, Double> defaults = new LinkedHashMap<>();
+			defaults.put("falling_mace_attack", 2.5);
+			defaults.put("destroy_end_crystal", 3.0);
+			defaults.put("explode_respawn_anchor", 3.0);
+			defaults.put("full_charge_bow_shot", 1.5);
+			defaults.put("firework_shot", 1.0);
+			defaults.put("tipped_arrow_shot", 1.0);
+			defaults.put("ignite_tnt", 2.0);
+			defaults.put("ignite_tnt_minecart", 3.0);
+			defaults.put("attribute_swapping", 2.0);
+			defaults.put("disable_shield", 1.5);
+			defaults.put("spear_lunge", 0.5);
+			defaults.put("spear_charge_attack", 1.5);
+			defaults.put("critical_hit", 0.5);
+			return defaults;
+		}
+
+		private static double normalizeCoinTriggerValue(double value) {
+			double clamped = Math.max(0.0, value);
+			return Math.round(clamped * 2.0) / 2.0;
+		}
+	}
+
+	public static final class TollkeepersClaimConfig {
+		public int minCoins = 1;
+		public int maxCoins = 5;
+		public double placementRange = 20.0;
+		public double zoneRadius = 4.0;
+		public int baseDurationTicks = 4 * 20;
+		public int durationPerCoinTicks = 2 * 20;
+		public int burdenRefreshTicks = 10;
+		public double reducedJumpVelocityMultiplier = 0.55;
+		public int rootSlownessAmplifier = 255;
+		public int rootMiningFatigueAmplifier = 5;
+		public int markedExitBonusCoins = 1;
+		public int ringParticleIntervalTicks = 4;
+		public int ringParticlePoints = 20;
+		public int risingParticleCount = 5;
+		public int shimmerSoundIntervalTicks = 20;
+		public TollkeepersClaimStageConfig stageOne = defaultStageOne();
+		public TollkeepersClaimStageConfig stageTwo = defaultStageTwo();
+		public TollkeepersClaimStageConfig stageThree = defaultStageThree();
+		public TollkeepersClaimStageConfig stageFour = defaultStageFour();
+		public TollkeepersClaimStageConfig stageFive = defaultStageFive();
+
+		private void normalize() {
+			if (stageOne == null) {
+				stageOne = defaultStageOne();
+			}
+			if (stageTwo == null) {
+				stageTwo = defaultStageTwo();
+			}
+			if (stageThree == null) {
+				stageThree = defaultStageThree();
+			}
+			if (stageFour == null) {
+				stageFour = defaultStageFour();
+			}
+			if (stageFive == null) {
+				stageFive = defaultStageFive();
+			}
+
+			minCoins = Math.max(1, minCoins);
+			maxCoins = Math.max(minCoins, maxCoins);
+			placementRange = Math.max(1.0, placementRange);
+			zoneRadius = Math.max(0.5, zoneRadius);
+			baseDurationTicks = Math.max(1, baseDurationTicks);
+			durationPerCoinTicks = Math.max(0, durationPerCoinTicks);
+			burdenRefreshTicks = Math.max(1, burdenRefreshTicks);
+			reducedJumpVelocityMultiplier = MathHelper.clamp(reducedJumpVelocityMultiplier, 0.0, 1.0);
+			rootSlownessAmplifier = Math.max(0, rootSlownessAmplifier);
+			rootMiningFatigueAmplifier = Math.max(0, rootMiningFatigueAmplifier);
+			markedExitBonusCoins = Math.max(0, markedExitBonusCoins);
+			ringParticleIntervalTicks = Math.max(1, ringParticleIntervalTicks);
+			ringParticlePoints = Math.max(3, ringParticlePoints);
+			risingParticleCount = Math.max(0, risingParticleCount);
+			shimmerSoundIntervalTicks = Math.max(1, shimmerSoundIntervalTicks);
+			stageOne.normalize();
+			stageTwo.normalize();
+			stageThree.normalize();
+			stageFour.normalize();
+			stageFive.normalize();
+		}
+
+		private static TollkeepersClaimStageConfig defaultStageOne() {
+			TollkeepersClaimStageConfig config = new TollkeepersClaimStageConfig();
+			config.slownessAmplifier = 0;
+			config.rootDurationTicks = 20;
+			return config;
+		}
+
+		private static TollkeepersClaimStageConfig defaultStageTwo() {
+			TollkeepersClaimStageConfig config = new TollkeepersClaimStageConfig();
+			config.slownessAmplifier = 0;
+			config.reduceJumpHeight = true;
+			config.rootDurationTicks = 20;
+			return config;
+		}
+
+		private static TollkeepersClaimStageConfig defaultStageThree() {
+			TollkeepersClaimStageConfig config = new TollkeepersClaimStageConfig();
+			config.slownessAmplifier = 1;
+			config.reduceJumpHeight = true;
+			config.rootDurationTicks = 40;
+			return config;
+		}
+
+		private static TollkeepersClaimStageConfig defaultStageFour() {
+			TollkeepersClaimStageConfig config = new TollkeepersClaimStageConfig();
+			config.slownessAmplifier = 1;
+			config.reduceJumpHeight = true;
+			config.disableSprint = true;
+			config.rootDurationTicks = 40;
+			return config;
+		}
+
+		private static TollkeepersClaimStageConfig defaultStageFive() {
+			TollkeepersClaimStageConfig config = new TollkeepersClaimStageConfig();
+			config.slownessAmplifier = 1;
+			config.reduceJumpHeight = true;
+			config.disableSprint = true;
+			config.rootDurationTicks = 60;
+			return config;
+		}
+	}
+
+	public static final class TollkeepersClaimStageConfig {
+		public int slownessAmplifier = -1;
+		public boolean reduceJumpHeight = false;
+		public boolean disableSprint = false;
+		public int rootDurationTicks = 20;
+
+		private void normalize() {
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			rootDurationTicks = Math.max(1, rootDurationTicks);
+		}
+	}
+
+	public static final class KingsDuesConfig {
+		public int minCoins = 1;
+		public int maxCoins = 6;
+		public double targetRange = 20.0;
+		public boolean requireLineOfSight = true;
+		public int cooldownTicks = 40 * 20;
+		public int particleBurstCount = 12;
+		public KingsDuesStageConfig stageOne = defaultStageOne();
+		public KingsDuesStageConfig stageTwo = defaultStageTwo();
+		public KingsDuesStageConfig stageThree = defaultStageThree();
+		public KingsDuesStageConfig stageFour = defaultStageFour();
+		public KingsDuesStageConfig stageFive = defaultStageFive();
+		public KingsDuesStageConfig stageSix = defaultStageSix();
+
+		private void normalize() {
+			if (stageOne == null) {
+				stageOne = defaultStageOne();
+			}
+			if (stageTwo == null) {
+				stageTwo = defaultStageTwo();
+			}
+			if (stageThree == null) {
+				stageThree = defaultStageThree();
+			}
+			if (stageFour == null) {
+				stageFour = defaultStageFour();
+			}
+			if (stageFive == null) {
+				stageFive = defaultStageFive();
+			}
+			if (stageSix == null) {
+				stageSix = defaultStageSix();
+			}
+
+			minCoins = Math.max(1, minCoins);
+			maxCoins = Math.max(minCoins, maxCoins);
+			targetRange = Math.max(1.0, targetRange);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			particleBurstCount = Math.max(0, particleBurstCount);
+			stageOne.normalize();
+			stageTwo.normalize();
+			stageThree.normalize();
+			stageFour.normalize();
+			stageFive.normalize();
+			stageSix.normalize();
+		}
+
+		private static KingsDuesStageConfig defaultStageOne() {
+			KingsDuesStageConfig config = new KingsDuesStageConfig();
+			config.weaknessAmplifier = 0;
+			config.weaknessDurationTicks = 5 * 20;
+			return config;
+		}
+
+		private static KingsDuesStageConfig defaultStageTwo() {
+			KingsDuesStageConfig config = new KingsDuesStageConfig();
+			config.weaknessAmplifier = 0;
+			config.weaknessDurationTicks = 6 * 20;
+			config.glowingDurationTicks = 6 * 20;
+			return config;
+		}
+
+		private static KingsDuesStageConfig defaultStageThree() {
+			KingsDuesStageConfig config = new KingsDuesStageConfig();
+			config.weaknessAmplifier = 1;
+			config.weaknessDurationTicks = 7 * 20;
+			config.slownessAmplifier = 0;
+			config.slownessDurationTicks = 7 * 20;
+			config.glowingDurationTicks = 7 * 20;
+			return config;
+		}
+
+		private static KingsDuesStageConfig defaultStageFour() {
+			KingsDuesStageConfig config = new KingsDuesStageConfig();
+			config.weaknessAmplifier = 1;
+			config.weaknessDurationTicks = 10 * 20;
+			config.slownessAmplifier = 0;
+			config.slownessDurationTicks = 10 * 20;
+			config.glowingDurationTicks = 10 * 20;
+			config.shieldLockTicks = 5 * 20;
+			return config;
+		}
+
+		private static KingsDuesStageConfig defaultStageFive() {
+			KingsDuesStageConfig config = new KingsDuesStageConfig();
+			config.weaknessAmplifier = 1;
+			config.weaknessDurationTicks = 10 * 20;
+			config.slownessAmplifier = 1;
+			config.slownessDurationTicks = 10 * 20;
+			config.glowingDurationTicks = 10 * 20;
+			config.sprintLockTicks = 5 * 20;
+			config.shieldLockTicks = 5 * 20;
+			return config;
+		}
+
+		private static KingsDuesStageConfig defaultStageSix() {
+			KingsDuesStageConfig config = new KingsDuesStageConfig();
+			config.weaknessAmplifier = 2;
+			config.weaknessDurationTicks = 15 * 20;
+			config.slownessAmplifier = 2;
+			config.slownessDurationTicks = 15 * 20;
+			config.glowingDurationTicks = 15 * 20;
+			config.sprintLockTicks = 10 * 20;
+			config.shieldLockTicks = 10 * 20;
+			config.attackSpeedLockTicks = 5 * 20;
+			config.attackSpeedModifierAmount = -0.35;
+			return config;
+		}
+	}
+
+	public static final class KingsDuesStageConfig {
+		public int weaknessAmplifier = -1;
+		public int weaknessDurationTicks = 0;
+		public int slownessAmplifier = -1;
+		public int slownessDurationTicks = 0;
+		public int glowingDurationTicks = 0;
+		public int sprintLockTicks = 0;
+		public int shieldLockTicks = 0;
+		public int attackSpeedLockTicks = 0;
+		public double attackSpeedModifierAmount = 0.0;
+
+		private void normalize() {
+			weaknessAmplifier = Math.max(-1, weaknessAmplifier);
+			weaknessDurationTicks = Math.max(0, weaknessDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			slownessDurationTicks = Math.max(0, slownessDurationTicks);
+			glowingDurationTicks = Math.max(0, glowingDurationTicks);
+			sprintLockTicks = Math.max(0, sprintLockTicks);
+			shieldLockTicks = Math.max(0, shieldLockTicks);
+			attackSpeedLockTicks = Math.max(0, attackSpeedLockTicks);
+		}
+	}
+
+	public static final class BankruptcyConfig {
+		public int minCoins = 2;
+		public int maxCoins = 8;
+		public double targetRange = 20.0;
+		public boolean requireLineOfSight = true;
+		public int cooldownTicks = 90 * 20;
+		public BankruptcyStageConfig stageTwo = defaultStageTwo();
+		public BankruptcyStageConfig stageThree = defaultStageThree();
+		public BankruptcyStageConfig stageFour = defaultStageFour();
+		public BankruptcyStageConfig stageFive = defaultStageFive();
+		public BankruptcyStageConfig stageSix = defaultStageSix();
+		public BankruptcyStageConfig stageSeven = defaultStageSeven();
+		public BankruptcyStageConfig stageEight = defaultStageEight();
+
+		private void normalize() {
+			if (stageTwo == null) {
+				stageTwo = defaultStageTwo();
+			}
+			if (stageThree == null) {
+				stageThree = defaultStageThree();
+			}
+			if (stageFour == null) {
+				stageFour = defaultStageFour();
+			}
+			if (stageFive == null) {
+				stageFive = defaultStageFive();
+			}
+			if (stageSix == null) {
+				stageSix = defaultStageSix();
+			}
+			if (stageSeven == null) {
+				stageSeven = defaultStageSeven();
+			}
+			if (stageEight == null) {
+				stageEight = defaultStageEight();
+			}
+
+			minCoins = Math.max(1, minCoins);
+			maxCoins = Math.max(minCoins, maxCoins);
+			targetRange = Math.max(1.0, targetRange);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			stageTwo.normalize();
+			stageThree.normalize();
+			stageFour.normalize();
+			stageFive.normalize();
+			stageSix.normalize();
+			stageSeven.normalize();
+			stageEight.normalize();
+		}
+
+		private static BankruptcyStageConfig defaultStageTwo() {
+			BankruptcyStageConfig config = new BankruptcyStageConfig();
+			config.manaSicknessAmplifier = 0;
+			config.durationTicks = 6 * 20;
+			return config;
+		}
+
+		private static BankruptcyStageConfig defaultStageThree() {
+			BankruptcyStageConfig config = new BankruptcyStageConfig();
+			config.manaSicknessAmplifier = 1;
+			config.durationTicks = 6 * 20;
+			return config;
+		}
+
+		private static BankruptcyStageConfig defaultStageFour() {
+			BankruptcyStageConfig config = new BankruptcyStageConfig();
+			config.manaSicknessAmplifier = 2;
+			config.durationTicks = 5 * 20;
+			config.instantManaDrainPercent = 20.0;
+			return config;
+		}
+
+		private static BankruptcyStageConfig defaultStageFive() {
+			BankruptcyStageConfig config = new BankruptcyStageConfig();
+			config.manaSicknessAmplifier = 3;
+			config.durationTicks = 5 * 20;
+			config.instantManaDrainPercent = 20.0;
+			return config;
+		}
+
+		private static BankruptcyStageConfig defaultStageSix() {
+			BankruptcyStageConfig config = new BankruptcyStageConfig();
+			config.manaSicknessAmplifier = 4;
+			config.durationTicks = 4 * 20;
+			config.instantManaDrainPercent = 20.0;
+			return config;
+		}
+
+		private static BankruptcyStageConfig defaultStageSeven() {
+			BankruptcyStageConfig config = new BankruptcyStageConfig();
+			config.manaSicknessAmplifier = 5;
+			config.durationTicks = 3 * 20;
+			config.instantManaDrainPercent = 20.0;
+			config.abilityLockTicks = 3 * 20;
+			config.cancelActiveAbilities = true;
+			return config;
+		}
+
+		private static BankruptcyStageConfig defaultStageEight() {
+			BankruptcyStageConfig config = new BankruptcyStageConfig();
+			config.manaSicknessAmplifier = 6;
+			config.durationTicks = 3 * 20;
+			config.instantManaDrainPercent = 20.0;
+			config.abilityLockTicks = 10 * 20;
+			config.cancelActiveAbilities = true;
+			return config;
+		}
+	}
+
+	public static final class BankruptcyStageConfig {
+		public int manaSicknessAmplifier = -1;
+		public int durationTicks = 0;
+		public double instantManaDrainPercent = 0.0;
+		public int abilityLockTicks = 0;
+		public boolean cancelActiveAbilities = false;
+
+		private void normalize() {
+			manaSicknessAmplifier = Math.max(-1, manaSicknessAmplifier);
+			durationTicks = Math.max(0, durationTicks);
+			instantManaDrainPercent = MathHelper.clamp(instantManaDrainPercent, 0.0, 100.0);
+			abilityLockTicks = Math.max(0, abilityLockTicks);
+		}
 	}
 
 	public static final class PowderedSnowEffectConfig {
@@ -395,6 +1622,23 @@ public final class MagicConfig {
 		public boolean disableDomainEffectsDuringClash = false;
 		public boolean forceLookAtOpponent = true;
 		public boolean participantsInvincible = false;
+		public boolean pauseTimedDomainCollapseTimers = true;
+		public boolean pauseAstralCataclysmPhaseTimers = true;
+
+		private void normalize() {
+			simultaneousCastWindowTicks = Math.max(0, simultaneousCastWindowTicks);
+			minimumExteriorDistance = Math.max(0, minimumExteriorDistance);
+			titleFadeInTicks = Math.max(0, titleFadeInTicks);
+			titleStayTicks = Math.max(0, titleStayTicks);
+			titleFadeOutTicks = Math.max(0, titleFadeOutTicks);
+			instructionsDurationTicks = Math.max(0, instructionsDurationTicks);
+			instructionsFadeOutTicks = Math.max(0, instructionsFadeOutTicks);
+			damageToWin = Math.max(1.0, damageToWin);
+			loserManaDrainPercent = Math.max(0, Math.min(100, loserManaDrainPercent));
+			postClashDomainCooldownMultiplier = Math.max(0.0, Math.min(10.0, postClashDomainCooldownMultiplier));
+			particlesPerTick = Math.max(0, particlesPerTick);
+			splitPatternModulo = Math.max(2, splitPatternModulo);
+		}
 	}
 
 	public static final class AbilityAccessConfig {
