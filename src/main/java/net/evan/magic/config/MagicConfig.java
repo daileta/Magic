@@ -377,6 +377,7 @@ public final class MagicConfig {
 			}
 
 			martyrsFlame.normalize();
+			loveAtFirstSight.normalize();
 			jesterSpotlight.normalize();
 			jesterWittyOneLiner.normalize();
 			jesterComedicRewrite.normalize();
@@ -488,8 +489,14 @@ public final class MagicConfig {
 	}
 
 	public static final class LoveAtFirstSightConfig {
-		public boolean blockItemUse = true;
+		public boolean blockItemUse = false;
 		public boolean blockAttacks = true;
+		public int resistanceAmplifier = 0;
+		public boolean preventCasterDirectDamage = true;
+
+		private void normalize() {
+			resistanceAmplifier = Math.max(-1, resistanceAmplifier);
+		}
 	}
 
 	public static final class MartyrsFlameConfig {
@@ -968,14 +975,17 @@ public final class MagicConfig {
 		public int warningFadeInTicks = 5;
 		public int warningStayTicks = 50;
 		public int warningFadeOutTicks = 5;
-		public float warningScale = 1.35F;
+		public float warningScale = 2.1F;
 		public double activationCostPercent = 40.0;
 		public int cooldownTicks = 45 * 20;
 		public float trueDamage = 5.0F;
 		public int slownessAmplifier = 255;
+		public int resistanceAmplifier = 0;
 		public int particleIntervalTicks = 5;
 		public String warningColorHex = "#39B7FF";
 		public boolean disableManaRegenWhileActive = true;
+		public boolean preventCasterDirectDamage = true;
+		public boolean interruptTargetItemUse = false;
 		public int activationImpactDirtParticleCount = 18;
 		public double activationImpactDirtParticleSpeed = 0.08;
 		public float activationImpactSoundVolume = 1.2F;
@@ -993,6 +1003,7 @@ public final class MagicConfig {
 			cooldownTicks = Math.max(0, cooldownTicks);
 			trueDamage = Math.max(0.0F, trueDamage);
 			slownessAmplifier = Math.max(0, slownessAmplifier);
+			resistanceAmplifier = Math.max(-1, resistanceAmplifier);
 			particleIntervalTicks = Math.max(1, particleIntervalTicks);
 			if (warningColorHex == null || warningColorHex.isBlank()) {
 				warningColorHex = "#39B7FF";
@@ -1056,6 +1067,8 @@ public final class MagicConfig {
 		public boolean suppressTargetCooldowns = true;
 		public boolean resetCasterCooldownsOnEnd = true;
 		public boolean applyUsedTargetCooldownsOnEnd = true;
+		public double greedTargetCoinAmount = 18.0;
+		public boolean resetGreedTargetCoinsOnEnd = true;
 		public int targetParticleIntervalTicks = 4;
 		public int targetParticleBurstCount = 12;
 		public double targetParticleSpawnRadius = 0.28;
@@ -1074,6 +1087,7 @@ public final class MagicConfig {
 			casterSlownessAmplifier = Math.max(0, casterSlownessAmplifier);
 			casterMaxHealthHearts = Math.max(1.0, casterMaxHealthHearts);
 			casterIncomingDamageMultiplier = Math.max(1.0, casterIncomingDamageMultiplier);
+			greedTargetCoinAmount = normalizeCoinAmount(greedTargetCoinAmount);
 			targetParticleIntervalTicks = Math.max(1, targetParticleIntervalTicks);
 			targetParticleBurstCount = Math.max(0, targetParticleBurstCount);
 			targetParticleSpawnRadius = Math.max(0.0, targetParticleSpawnRadius);
@@ -1285,6 +1299,7 @@ public final class MagicConfig {
 	public static final class TollkeepersClaimConfig {
 		public int minCoins = 1;
 		public int maxCoins = 5;
+		public int maxActiveZonesPerCaster = 0;
 		public double placementRange = 20.0;
 		public double zoneRadius = 4.0;
 		public int baseDurationTicks = 4 * 20;
@@ -1328,6 +1343,7 @@ public final class MagicConfig {
 
 			minCoins = Math.max(1, minCoins);
 			maxCoins = Math.max(minCoins, maxCoins);
+			maxActiveZonesPerCaster = Math.max(0, maxActiveZonesPerCaster);
 			placementRange = Math.max(1.0, placementRange);
 			zoneRadius = Math.max(0.5, zoneRadius);
 			baseDurationTicks = Math.max(1, baseDurationTicks);
@@ -1381,6 +1397,8 @@ public final class MagicConfig {
 			config.slownessAmplifier = 1;
 			config.reduceJumpHeight = true;
 			config.disableSprint = true;
+			config.radiusBonusBlocks = 2.0;
+			config.casterResistanceAmplifier = 0;
 			config.rootDurationTicks = 40;
 			return config;
 		}
@@ -1390,6 +1408,8 @@ public final class MagicConfig {
 			config.slownessAmplifier = 1;
 			config.reduceJumpHeight = true;
 			config.disableSprint = true;
+			config.radiusBonusBlocks = 3.0;
+			config.casterResistanceAmplifier = 1;
 			config.rootDurationTicks = 60;
 			return config;
 		}
@@ -1399,10 +1419,14 @@ public final class MagicConfig {
 		public int slownessAmplifier = -1;
 		public boolean reduceJumpHeight = false;
 		public boolean disableSprint = false;
+		public double radiusBonusBlocks = 0.0;
+		public int casterResistanceAmplifier = -1;
 		public int rootDurationTicks = 20;
 
 		private void normalize() {
 			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			radiusBonusBlocks = Math.max(0.0, radiusBonusBlocks);
+			casterResistanceAmplifier = Math.max(-1, casterResistanceAmplifier);
 			rootDurationTicks = Math.max(1, rootDurationTicks);
 		}
 	}
@@ -1655,6 +1679,8 @@ public final class MagicConfig {
 		public double instantManaDrainPercent = 0.0;
 		public int abilityLockTicks = 0;
 		public boolean cancelActiveAbilities = false;
+		public boolean preserveMaximumAbilities = true;
+		public boolean preserveDomainAbilities = true;
 
 		private void normalize() {
 			manaSicknessAmplifier = Math.max(-1, manaSicknessAmplifier);

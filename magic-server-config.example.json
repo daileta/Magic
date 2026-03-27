@@ -83,8 +83,10 @@
     "loveAtFirstSightHappyVillagerParticles": 0
   },
   "loveAtFirstSight": {
-    "blockItemUse": true,
-    "blockAttacks": true
+    "blockItemUse": false,
+    "blockAttacks": true,
+    "resistanceAmplifier": 0,
+    "preventCasterDirectDamage": true
   },
   "martyrsFlame": {
     "applyGlowingEffect": true,
@@ -290,14 +292,17 @@
     "warningFadeInTicks": 5,
     "warningStayTicks": 50,
     "warningFadeOutTicks": 5,
-    "warningScale": 1.35,
+    "warningScale": 2.1,
     "activationCostPercent": 40.0,
     "cooldownTicks": 900,
     "trueDamage": 5.0,
     "slownessAmplifier": 255,
+    "resistanceAmplifier": 0,
     "particleIntervalTicks": 5,
     "warningColorHex": "#39B7FF",
     "disableManaRegenWhileActive": true,
+    "preventCasterDirectDamage": true,
+    "interruptTargetItemUse": false,
     "activationImpactDirtParticleCount": 18,
     "activationImpactDirtParticleSpeed": 0.08,
     "activationImpactSoundVolume": 1.2,
@@ -338,6 +343,8 @@
     "suppressTargetCooldowns": true,
     "resetCasterCooldownsOnEnd": true,
     "applyUsedTargetCooldownsOnEnd": true,
+    "greedTargetCoinAmount": 18.0,
+    "resetGreedTargetCoinsOnEnd": true,
     "targetParticleIntervalTicks": 4,
     "targetParticleBurstCount": 12,
     "targetParticleSpawnRadius": 0.28,
@@ -426,6 +433,7 @@
     "tollkeepersClaim": {
       "minCoins": 1,
       "maxCoins": 5,
+      "maxActiveZonesPerCaster": 0,
       "placementRange": 20.0,
       "zoneRadius": 4.0,
       "baseDurationTicks": 80,
@@ -466,12 +474,16 @@
         "slownessAmplifier": 1,
         "reduceJumpHeight": true,
         "disableSprint": true,
+        "radiusBonusBlocks": 2.0,
+        "casterResistanceAmplifier": 0,
         "rootDurationTicks": 40
       },
       "stageFive": {
         "slownessAmplifier": 1,
         "reduceJumpHeight": true,
         "disableSprint": true,
+        "radiusBonusBlocks": 3.0,
+        "casterResistanceAmplifier": 1,
         "rootDurationTicks": 60
       }
     },
@@ -595,14 +607,18 @@
         "durationTicks": 60,
         "instantManaDrainPercent": 20.0,
         "abilityLockTicks": 60,
-        "cancelActiveAbilities": true
+        "cancelActiveAbilities": true,
+        "preserveMaximumAbilities": true,
+        "preserveDomainAbilities": true
       },
       "stageEight": {
         "manaSicknessAmplifier": 6,
         "durationTicks": 60,
         "instantManaDrainPercent": 20.0,
         "abilityLockTicks": 200,
-        "cancelActiveAbilities": true
+        "cancelActiveAbilities": true,
+        "preserveMaximumAbilities": true,
+        "preserveDomainAbilities": true
       }
     }
   },

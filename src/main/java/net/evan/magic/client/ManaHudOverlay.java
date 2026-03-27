@@ -3,6 +3,7 @@ package net.evan.magic.client;
 import net.evan.magic.Magic;
 import net.evan.magic.magic.MagicPlayerData;
 import net.evan.magic.magic.MagicSchool;
+import net.evan.magic.magic.ability.MagicAbility;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
@@ -34,11 +35,17 @@ public final class ManaHudOverlay {
 	private static final int CLASH_BAR_WRONG_FLASH = 0xFFFF2B2B;
 	private static final int CLASH_BAR_WRONG_FLASH_TICKS = 5;
 	private static final int PROMPT_TRANSITION_TICKS = 4;
-	private static final float PROMPT_SCALE = 2.6F;
-	private static final int PROMPT_COLOR = 0xFFFF2B2B;
-	private static final float INSTRUCTION_SCALE = 1.15F;
-	private static final int INSTRUCTION_LINE_SPACING = 12;
-	private static final int INSTRUCTION_COLOR = 0xFF2EA8FF;
+	private static final float DOMAIN_TIMER_SCALE = 1.15F;
+	private static final int DOMAIN_TIMER_Y = 10;
+	private static final int DOMAIN_TIMER_LINE_SPACING = 12;
+	private static final float DOMAIN_CLASH_TITLE_SCALE = 2.35F;
+	private static final float PROMPT_SCALE = 3.35F;
+	private static final int PROMPT_COLOR = 0xFFFF3A3A;
+	private static final float INSTRUCTION_SCALE = 1.55F;
+	private static final int INSTRUCTION_LINE_SPACING = 14;
+	private static final int INSTRUCTION_COLOR = 0xFFFF3A3A;
+	private static final int OUTLINE_COLOR = 0xFF000000;
+	private static final int DOMAIN_TIMER_SECONDARY_COLOR = 0xFFF7D76E;
 	private static final int FROST_COLOR = 0x66CCFF;
 	private static final int LOVE_COLOR = 0xFF77CC;
 	private static final int BURNING_PASSION_COLOR = 0xFF8A3D;
@@ -99,6 +106,7 @@ public final class ManaHudOverlay {
 
 		int x = drawContext.getScaledWindowWidth() / 2 - 91;
 		int y = drawContext.getScaledWindowHeight() - 63;
+		renderDomainTimerOverlay(drawContext, client);
 		renderDomainClashHud(drawContext, client, x, y);
 		drawContext.drawGuiTexture(RenderPipelines.GUI_TEXTURED, WITHER_BAR_BACKGROUND, x, y, BAR_WIDTH, BAR_HEIGHT);
 
@@ -187,6 +195,52 @@ public final class ManaHudOverlay {
 		constellationWarningStartAge = client.player == null ? Integer.MIN_VALUE : client.player.age;
 	}
 
+	private static void renderDomainTimerOverlay(DrawContext drawContext, MinecraftClient client) {
+		String abilityId = MagicPlayerData.getDomainTimerAbilityId(client.player);
+		if (abilityId.isBlank()) {
+			return;
+		}
+
+		MagicAbility ability = MagicAbility.fromId(abilityId);
+		if (ability == MagicAbility.NONE) {
+			return;
+		}
+
+		int centerX = drawContext.getScaledWindowWidth() / 2;
+		int remainingSeconds = MagicPlayerData.getDomainTimerSeconds(client.player);
+		boolean paused = MagicPlayerData.isDomainClashActive(client.player);
+		Text timerLine = paused
+			? Text.translatable("overlay.magic.domain.timer.paused", ability.displayName(), remainingSeconds).formatted(Formatting.BOLD)
+			: Text.translatable("overlay.magic.domain.timer", ability.displayName(), remainingSeconds).formatted(Formatting.BOLD);
+		drawCenteredScaledOutlinedText(
+			drawContext,
+			client,
+			timerLine,
+			centerX,
+			DOMAIN_TIMER_Y,
+			DOMAIN_TIMER_SCALE,
+			colorForSchool(ability.school()),
+			OUTLINE_COLOR
+		);
+
+		int secondarySeconds = MagicPlayerData.getDomainSecondaryTimerSeconds(client.player);
+		if (secondarySeconds <= 0) {
+			return;
+		}
+
+		Text secondaryLine = Text.translatable("overlay.magic.constellation.beam_power", secondarySeconds).formatted(Formatting.BOLD);
+		drawCenteredScaledOutlinedText(
+			drawContext,
+			client,
+			secondaryLine,
+			centerX,
+			DOMAIN_TIMER_Y + DOMAIN_TIMER_LINE_SPACING,
+			DOMAIN_TIMER_SCALE,
+			DOMAIN_TIMER_SECONDARY_COLOR,
+			OUTLINE_COLOR
+		);
+	}
+
 	private static void renderDomainClashHud(DrawContext drawContext, MinecraftClient client, int x, int manaBarY) {
 		if (!MagicPlayerData.isDomainClashActive(client.player)) {
 			resetDomainClashVisualState();
@@ -210,12 +264,22 @@ public final class ManaHudOverlay {
 
 		int promptKey = MagicPlayerData.getDomainClashPromptKey(client.player);
 		int instructionVisibility = MagicPlayerData.getDomainClashInstructionVisibility(client.player);
+		int centerX = drawContext.getScaledWindowWidth() / 2;
+		int centerY = drawContext.getScaledWindowHeight() / 2 - 24;
+		drawCenteredScaledOutlinedText(
+			drawContext,
+			client,
+			Text.translatable("overlay.magic.domain_clash.title").formatted(Formatting.BOLD),
+			centerX,
+			centerY - 46,
+			DOMAIN_CLASH_TITLE_SCALE,
+			PROMPT_COLOR,
+			OUTLINE_COLOR
+		);
+
 		if (promptKey == 0 && instructionVisibility <= 0) {
 			return;
 		}
-
-		int centerX = drawContext.getScaledWindowWidth() / 2;
-		int centerY = drawContext.getScaledWindowHeight() / 2 - 24;
 
 		if (promptKey != lastPromptKey) {
 			if (lastPromptKey != 0 && promptKey != 0) {
@@ -291,15 +355,16 @@ public final class ManaHudOverlay {
 		}
 
 		Text prompt = Text.literal(promptLabel).formatted(Formatting.BOLD);
-		int promptWidth = client.textRenderer.getWidth(prompt);
-		int color = withAlpha(PROMPT_COLOR, alpha);
-		var matrices = drawContext.getMatrices();
-		matrices.pushMatrix();
-		matrices.scale(PROMPT_SCALE, PROMPT_SCALE);
-		int drawX = Math.round((centerX - (promptWidth * PROMPT_SCALE) / 2.0F) / PROMPT_SCALE);
-		int drawY = Math.round(centerY / PROMPT_SCALE);
-		drawContext.drawTextWithShadow(client.textRenderer, prompt, drawX, drawY, color);
-		matrices.popMatrix();
+		drawCenteredScaledOutlinedText(
+			drawContext,
+			client,
+			prompt,
+			centerX,
+			centerY,
+			PROMPT_SCALE,
+			withAlpha(PROMPT_COLOR, alpha),
+			withAlpha(OUTLINE_COLOR, alpha)
+		);
 	}
 
 	private static void drawScaledInstruction(
@@ -310,15 +375,56 @@ public final class ManaHudOverlay {
 		int centerY,
 		float alpha
 	) {
-		int lineWidth = client.textRenderer.getWidth(line);
-		int color = withAlpha(INSTRUCTION_COLOR, alpha);
+		drawCenteredScaledOutlinedText(
+			drawContext,
+			client,
+			line,
+			centerX,
+			centerY,
+			INSTRUCTION_SCALE,
+			withAlpha(INSTRUCTION_COLOR, alpha),
+			withAlpha(OUTLINE_COLOR, alpha)
+		);
+	}
+
+	private static void drawCenteredScaledOutlinedText(
+		DrawContext drawContext,
+		MinecraftClient client,
+		Text text,
+		int centerX,
+		int y,
+		float scale,
+		int textColor,
+		int outlineColor
+	) {
+		int lineWidth = client.textRenderer.getWidth(text);
 		var matrices = drawContext.getMatrices();
 		matrices.pushMatrix();
-		matrices.scale(INSTRUCTION_SCALE, INSTRUCTION_SCALE);
-		int drawX = Math.round((centerX - (lineWidth * INSTRUCTION_SCALE) / 2.0F) / INSTRUCTION_SCALE);
-		int drawY = Math.round(centerY / INSTRUCTION_SCALE);
-		drawContext.drawTextWithShadow(client.textRenderer, line, drawX, drawY, color);
+		matrices.scale(scale, scale);
+		int drawX = Math.round((centerX - (lineWidth * scale) / 2.0F) / scale);
+		int drawY = Math.round(y / scale);
+		drawOutlinedText(drawContext, client, text, drawX, drawY, textColor, outlineColor);
 		matrices.popMatrix();
+	}
+
+	private static void drawOutlinedText(
+		DrawContext drawContext,
+		MinecraftClient client,
+		Text text,
+		int x,
+		int y,
+		int textColor,
+		int outlineColor
+	) {
+		drawContext.drawText(client.textRenderer, text, x - 1, y, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x + 1, y, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x, y - 1, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x, y + 1, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x - 1, y - 1, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x - 1, y + 1, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x + 1, y - 1, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x + 1, y + 1, outlineColor, false);
+		drawContext.drawText(client.textRenderer, text, x, y, textColor, false);
 	}
 
 	private static void renderJesterJokeOverlay(DrawContext drawContext, MinecraftClient client) {

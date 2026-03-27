@@ -121,7 +121,7 @@ public final class GreedRuntime {
 
 	public static void cancelActiveAbilities(ServerPlayerEntity player, int currentTick) {
 		endAppraisersMark(player, currentTick, true);
-		TOLLKEEPER_ZONES.remove(player.getUuid());
+		removeTollkeeperZones(player.getUuid());
 	}
 
 	public static void onAttackEntity(ServerPlayerEntity attacker, Entity entity) {
@@ -274,7 +274,7 @@ public final class GreedRuntime {
 		APPRAISERS_MARK_COOLDOWN_END_TICK.remove(player.getUuid());
 		GREED_COIN_STORAGES.remove(player.getUuid());
 		MagicPlayerData.setGreedCoinUnits(player, 0);
-		TOLLKEEPER_ZONES.remove(player.getUuid());
+		removeTollkeeperZones(player.getUuid());
 		ROOTED_PLAYERS.remove(player.getUuid());
 		SPRINT_LOCK_END_TICK.remove(player.getUuid());
 		SHIELD_LOCK_END_TICK.remove(player.getUuid());
@@ -289,6 +289,10 @@ public final class GreedRuntime {
 	}
 
 	public static int cooldownRemaining(ServerPlayerEntity player, MagicAbility ability, int currentTick) {
+		if (MagicAbilityManager.areOrionsGambitTargetCooldownsSuppressed(player)) {
+			return 0;
+		}
+
 		UUID playerId = player.getUuid();
 		if (ability == MagicAbility.APPRAISERS_MARK) {
 			return Math.max(0, APPRAISERS_MARK_COOLDOWN_END_TICK.getOrDefault(playerId, 0) - currentTick);
@@ -310,7 +314,7 @@ public final class GreedRuntime {
 			return changed ? 1 : 0;
 		}
 		if (ability == MagicAbility.TOLLKEEPERS_CLAIM) {
-			return TOLLKEEPER_ZONES.remove(playerId) != null ? 1 : 0;
+			return removeTollkeeperZones(playerId);
 		}
 		if (ability == MagicAbility.KINGS_DUES) {
 			return KINGS_DUES_COOLDOWN_END_TICK.remove(playerId) != null ? 1 : 0;
@@ -459,17 +463,22 @@ public final class GreedRuntime {
 		double centerY = blockPos.getY() + 0.05;
 		double centerZ = blockPos.getZ() + 0.5;
 		int durationTicks = Math.max(1, config.baseDurationTicks + spend * config.durationPerCoinTicks);
+		double zoneRadius = tollkeepersZoneRadius(spend);
+		if (config.maxActiveZonesPerCaster > 0) {
+			trimOldestTollkeeperZones(player.getUuid(), config.maxActiveZonesPerCaster - 1);
+		}
 		TollkeepersClaimZoneState zone = new TollkeepersClaimZoneState(
 			player.getUuid(),
 			player.getEntityWorld().getRegistryKey(),
 			centerX,
 			centerY,
 			centerZ,
-			config.zoneRadius,
+			zoneRadius,
 			spend,
+			currentTick,
 			currentTick + durationTicks
 		);
-		TOLLKEEPER_ZONES.put(player.getUuid(), zone);
+		TOLLKEEPER_ZONES.put(UUID.randomUUID(), zone);
 		removeCoins(player, spend);
 		if (player.getEntityWorld() instanceof ServerWorld serverWorld) {
 			spawnZoneParticles(serverWorld, zone, currentTick);
@@ -578,7 +587,12 @@ public final class GreedRuntime {
 			ABILITY_LOCK_END_TICK.put(target.getUuid(), Math.max(ABILITY_LOCK_END_TICK.getOrDefault(target.getUuid(), 0), currentTick + stage.abilityLockTicks));
 		}
 		if (stage.cancelActiveAbilities) {
-			MagicAbilityManager.cancelOwnedNonDomainMagicOnTarget(target, currentTick);
+			MagicAbilityManager.cancelOwnedMagicOnTargetForBankruptcy(
+				target,
+				currentTick,
+				stage.preserveMaximumAbilities,
+				stage.preserveDomainAbilities
+			);
 		}
 		BANKRUPTCY_COOLDOWN_END_TICK.put(player.getUuid(), currentTick + config.cooldownTicks);
 		applyBankruptcyVisuals(target);
@@ -710,6 +724,10 @@ public final class GreedRuntime {
 					1.45F
 				);
 				zone.nextSoundTick = currentTick + MagicConfig.get().greed.tollkeepersClaim.shimmerSoundIntervalTicks;
+			}
+
+			if (isInsideZone(zone, caster)) {
+				applyCasterZoneBuff(caster, zone.coinsSpent);
 			}
 
 			Set<UUID> newInsidePlayerIds = new HashSet<>();
@@ -875,6 +893,24 @@ public final class GreedRuntime {
 			)
 		);
 		applyStageEffect(player, StatusEffects.SLOWNESS, refreshTicks, stage.slownessAmplifier);
+	}
+
+	private static void applyCasterZoneBuff(ServerPlayerEntity caster, int coinsSpent) {
+		TollkeepersClaimStageConfig stage = tollkeepersStage(coinsSpent);
+		if (stage.casterResistanceAmplifier < 0) {
+			return;
+		}
+
+		caster.addStatusEffect(
+			new StatusEffectInstance(
+				StatusEffects.RESISTANCE,
+				Math.max(1, MagicConfig.get().greed.tollkeepersClaim.burdenRefreshTicks),
+				stage.casterResistanceAmplifier,
+				true,
+				false,
+				true
+			)
+		);
 	}
 
 	private static void applyRoot(ServerPlayerEntity target, TollkeepersClaimZoneState zone, int currentTick) {
@@ -1314,6 +1350,12 @@ public final class GreedRuntime {
 		return dx * dx + dz * dz <= zone.radius * zone.radius && Math.abs(player.getY() - zone.centerY) <= 3.0;
 	}
 
+	private static double tollkeepersZoneRadius(int coinsSpent) {
+		MagicConfig.TollkeepersClaimConfig config = MagicConfig.get().greed.tollkeepersClaim;
+		TollkeepersClaimStageConfig stage = tollkeepersStage(coinsSpent);
+		return Math.max(0.5, config.zoneRadius + Math.max(0.0, stage.radiusBonusBlocks));
+	}
+
 	private static boolean isMarkedTarget(ServerPlayerEntity caster, ServerPlayerEntity target) {
 		AppraisersMarkState state = APPRAISERS_MARK_STATES.get(caster.getUuid());
 		return state != null && state.stage == AppraisersMarkStage.MARKED && target.getUuid().equals(state.markedTargetId);
@@ -1417,6 +1459,67 @@ public final class GreedRuntime {
 		}
 	}
 
+	static void startAbilityCooldownFromNow(UUID playerId, MagicAbility ability, int currentTick) {
+		if (ability == MagicAbility.APPRAISERS_MARK) {
+			startCooldown(playerId, APPRAISERS_MARK_COOLDOWN_END_TICK, MagicConfig.get().greed.appraisersMark.cooldownTicks, currentTick);
+			return;
+		}
+		if (ability == MagicAbility.KINGS_DUES) {
+			startCooldown(playerId, KINGS_DUES_COOLDOWN_END_TICK, MagicConfig.get().greed.kingsDues.cooldownTicks, currentTick);
+			return;
+		}
+		if (ability == MagicAbility.BANKRUPTCY) {
+			startCooldown(playerId, BANKRUPTCY_COOLDOWN_END_TICK, MagicConfig.get().greed.bankruptcy.cooldownTicks, currentTick);
+		}
+	}
+
+	private static int removeTollkeeperZones(UUID casterId) {
+		int removed = 0;
+		Iterator<Map.Entry<UUID, TollkeepersClaimZoneState>> iterator = TOLLKEEPER_ZONES.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, TollkeepersClaimZoneState> entry = iterator.next();
+			if (!casterId.equals(entry.getValue().casterId)) {
+				continue;
+			}
+
+			iterator.remove();
+			removed++;
+		}
+		return removed;
+	}
+
+	private static void trimOldestTollkeeperZones(UUID casterId, int maxRemainingZones) {
+		int allowedZones = Math.max(0, maxRemainingZones);
+		while (countTollkeeperZones(casterId) > allowedZones) {
+			UUID oldestZoneId = null;
+			int oldestCreatedTick = Integer.MAX_VALUE;
+			for (Map.Entry<UUID, TollkeepersClaimZoneState> entry : TOLLKEEPER_ZONES.entrySet()) {
+				TollkeepersClaimZoneState zone = entry.getValue();
+				if (!casterId.equals(zone.casterId) || zone.createdTick >= oldestCreatedTick) {
+					continue;
+				}
+
+				oldestZoneId = entry.getKey();
+				oldestCreatedTick = zone.createdTick;
+			}
+
+			if (oldestZoneId == null) {
+				return;
+			}
+			TOLLKEEPER_ZONES.remove(oldestZoneId);
+		}
+	}
+
+	private static int countTollkeeperZones(UUID casterId) {
+		int count = 0;
+		for (TollkeepersClaimZoneState zone : TOLLKEEPER_ZONES.values()) {
+			if (casterId.equals(zone.casterId)) {
+				count++;
+			}
+		}
+		return count;
+	}
+
 	private static int currentTick(PlayerEntity player) {
 		MinecraftServer server = player.getEntityWorld().getServer();
 		return server == null ? Integer.MIN_VALUE : server.getTicks();
@@ -1466,6 +1569,7 @@ public final class GreedRuntime {
 		private final double centerZ;
 		private final double radius;
 		private final int coinsSpent;
+		private final int createdTick;
 		private final int expiresTick;
 		private int nextParticleTick;
 		private int nextSoundTick;
@@ -1479,6 +1583,7 @@ public final class GreedRuntime {
 			double centerZ,
 			double radius,
 			int coinsSpent,
+			int createdTick,
 			int expiresTick
 		) {
 			this.casterId = casterId;
@@ -1488,6 +1593,7 @@ public final class GreedRuntime {
 			this.centerZ = centerZ;
 			this.radius = radius;
 			this.coinsSpent = coinsSpent;
+			this.createdTick = createdTick;
 			this.expiresTick = expiresTick;
 			this.nextParticleTick = Integer.MIN_VALUE;
 			this.nextSoundTick = Integer.MIN_VALUE;

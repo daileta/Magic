@@ -47,6 +47,7 @@ import net.minecraft.entity.MovementType;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.decoration.BlockAttachedEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.data.DataTracker;
@@ -212,9 +213,12 @@ public final class MagicAbilityManager {
 	private static int HERCULES_COOLDOWN_TICKS = 45 * TICKS_PER_SECOND;
 	private static float HERCULES_TRUE_DAMAGE = 5.0F;
 	private static int HERCULES_SLOWNESS_AMPLIFIER = 255;
+	private static int HERCULES_RESISTANCE_AMPLIFIER = 0;
 	private static int HERCULES_PARTICLE_INTERVAL_TICKS = 5;
 	private static int HERCULES_WARNING_COLOR_RGB = 0x39B7FF;
 	private static boolean HERCULES_DISABLE_MANA_REGEN_WHILE_ACTIVE = true;
+	private static boolean HERCULES_PREVENT_CASTER_DIRECT_DAMAGE = true;
+	private static boolean HERCULES_INTERRUPT_TARGET_ITEM_USE = false;
 	private static int HERCULES_ACTIVATION_IMPACT_DIRT_PARTICLE_COUNT = 18;
 	private static double HERCULES_ACTIVATION_IMPACT_DIRT_PARTICLE_SPEED = 0.08;
 	private static float HERCULES_ACTIVATION_IMPACT_SOUND_VOLUME = 1.2F;
@@ -257,6 +261,8 @@ public final class MagicAbilityManager {
 	private static double ORIONS_GAMBIT_TARGET_PARTICLE_VERTICAL_VELOCITY = 0.22;
 	private static double ORIONS_GAMBIT_TARGET_PARTICLE_FORWARD_VELOCITY = 0.09;
 	private static double ORIONS_GAMBIT_TARGET_PARTICLE_SIDE_VELOCITY = 0.05;
+	private static int ORIONS_GAMBIT_GREED_TARGET_COIN_UNITS = 18 * MagicPlayerData.GREED_COIN_UNITS_PER_COIN;
+	private static boolean ORIONS_GAMBIT_RESET_GREED_TARGET_COINS_ON_END = true;
 	private static int ASTRAL_CATACLYSM_CHARGE_DURATION_TICKS = 30 * TICKS_PER_SECOND;
 	private static int ASTRAL_CATACLYSM_ACQUIRE_WINDOW_TICKS = 60 * TICKS_PER_SECOND;
 	private static int ASTRAL_CATACLYSM_DURATION_TICKS = 2 * 60 * TICKS_PER_SECOND;
@@ -389,8 +395,10 @@ public final class MagicAbilityManager {
 	private static int LOVE_LOCK_EFFECT_TICKS = 5;
 	private static int LOVE_LOCK_SLOWNESS_AMPLIFIER = 255;
 	private static int LOVE_LOCK_MINING_FATIGUE_AMPLIFIER = 255;
-	private static boolean LOVE_AT_FIRST_SIGHT_BLOCK_ITEM_USE = true;
+	private static int LOVE_AT_FIRST_SIGHT_RESISTANCE_AMPLIFIER = 0;
+	private static boolean LOVE_AT_FIRST_SIGHT_BLOCK_ITEM_USE = false;
 	private static boolean LOVE_AT_FIRST_SIGHT_BLOCK_ATTACKS = true;
+	private static boolean LOVE_AT_FIRST_SIGHT_PREVENT_CASTER_DIRECT_DAMAGE = true;
 	private static boolean MARTYRS_FLAME_APPLY_GLOWING_EFFECT = true;
 	private static boolean MARTYRS_FLAME_DISABLE_MANA_REGEN_WHILE_ACTIVE = true;
 	private static boolean MARTYRS_FLAME_FIRE_IGNORES_NORMAL_EXTINGUISH = true;
@@ -677,8 +685,10 @@ public final class MagicAbilityManager {
 		LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS = Math.max(1, config.particles.loveAtFirstSightParticleIntervalTicks);
 		LOVE_AT_FIRST_SIGHT_HEART_PARTICLES = Math.max(0, config.particles.loveAtFirstSightHeartParticles);
 		LOVE_AT_FIRST_SIGHT_HAPPY_VILLAGER_PARTICLES = Math.max(0, config.particles.loveAtFirstSightHappyVillagerParticles);
+		LOVE_AT_FIRST_SIGHT_RESISTANCE_AMPLIFIER = Math.max(-1, config.loveAtFirstSight.resistanceAmplifier);
 		LOVE_AT_FIRST_SIGHT_BLOCK_ITEM_USE = config.loveAtFirstSight.blockItemUse;
 		LOVE_AT_FIRST_SIGHT_BLOCK_ATTACKS = config.loveAtFirstSight.blockAttacks;
+		LOVE_AT_FIRST_SIGHT_PREVENT_CASTER_DIRECT_DAMAGE = config.loveAtFirstSight.preventCasterDirectDamage;
 		MARTYRS_FLAME_APPLY_GLOWING_EFFECT = config.martyrsFlame.applyGlowingEffect;
 		MARTYRS_FLAME_DISABLE_MANA_REGEN_WHILE_ACTIVE = config.martyrsFlame.disableManaRegenWhileActive;
 		MARTYRS_FLAME_FIRE_IGNORES_NORMAL_EXTINGUISH = config.martyrsFlame.fireIgnoresNormalExtinguish;
@@ -741,14 +751,17 @@ public final class MagicAbilityManager {
 		HERCULES_WARNING_FADE_IN_TICKS = Math.max(0, config.constellationHercules.warningFadeInTicks);
 		HERCULES_WARNING_STAY_TICKS = Math.max(0, config.constellationHercules.warningStayTicks);
 		HERCULES_WARNING_FADE_OUT_TICKS = Math.max(0, config.constellationHercules.warningFadeOutTicks);
-		HERCULES_WARNING_SCALE = MathHelper.clamp(config.constellationHercules.warningScale, 0.5F, 2.0F);
+		HERCULES_WARNING_SCALE = MathHelper.clamp(config.constellationHercules.warningScale, 0.5F, 3.0F);
 		HERCULES_ACTIVATION_COST_PERCENT = MathHelper.clamp(config.constellationHercules.activationCostPercent, 0.0, 100.0);
 		HERCULES_COOLDOWN_TICKS = Math.max(0, config.constellationHercules.cooldownTicks);
 		HERCULES_TRUE_DAMAGE = Math.max(0.0F, config.constellationHercules.trueDamage);
 		HERCULES_SLOWNESS_AMPLIFIER = Math.max(0, config.constellationHercules.slownessAmplifier);
+		HERCULES_RESISTANCE_AMPLIFIER = Math.max(-1, config.constellationHercules.resistanceAmplifier);
 		HERCULES_PARTICLE_INTERVAL_TICKS = Math.max(1, config.constellationHercules.particleIntervalTicks);
 		HERCULES_WARNING_COLOR_RGB = parseColorRgb(config.constellationHercules.warningColorHex, 0x39B7FF);
 		HERCULES_DISABLE_MANA_REGEN_WHILE_ACTIVE = config.constellationHercules.disableManaRegenWhileActive;
+		HERCULES_PREVENT_CASTER_DIRECT_DAMAGE = config.constellationHercules.preventCasterDirectDamage;
+		HERCULES_INTERRUPT_TARGET_ITEM_USE = config.constellationHercules.interruptTargetItemUse;
 		HERCULES_ACTIVATION_IMPACT_DIRT_PARTICLE_COUNT = Math.max(0, config.constellationHercules.activationImpactDirtParticleCount);
 		HERCULES_ACTIVATION_IMPACT_DIRT_PARTICLE_SPEED = Math.max(0.0, config.constellationHercules.activationImpactDirtParticleSpeed);
 		HERCULES_ACTIVATION_IMPACT_SOUND_VOLUME = Math.max(0.0F, config.constellationHercules.activationImpactSoundVolume);
@@ -785,6 +798,11 @@ public final class MagicAbilityManager {
 		ORIONS_GAMBIT_SUPPRESS_TARGET_COOLDOWNS = config.constellationOrion.suppressTargetCooldowns;
 		ORIONS_GAMBIT_RESET_CASTER_COOLDOWNS_ON_END = config.constellationOrion.resetCasterCooldownsOnEnd;
 		ORIONS_GAMBIT_APPLY_USED_TARGET_COOLDOWNS_ON_END = config.constellationOrion.applyUsedTargetCooldownsOnEnd;
+		ORIONS_GAMBIT_GREED_TARGET_COIN_UNITS = Math.max(
+			0,
+			(int) Math.round(config.constellationOrion.greedTargetCoinAmount * MagicPlayerData.GREED_COIN_UNITS_PER_COIN)
+		);
+		ORIONS_GAMBIT_RESET_GREED_TARGET_COINS_ON_END = config.constellationOrion.resetGreedTargetCoinsOnEnd;
 		ORIONS_GAMBIT_TARGET_PARTICLE_INTERVAL_TICKS = Math.max(1, config.constellationOrion.targetParticleIntervalTicks);
 		ORIONS_GAMBIT_TARGET_PARTICLE_BURST_COUNT = Math.max(0, config.constellationOrion.targetParticleBurstCount);
 		ORIONS_GAMBIT_TARGET_PARTICLE_SPAWN_RADIUS = Math.max(0.0, config.constellationOrion.targetParticleSpawnRadius);
@@ -889,7 +907,7 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		if (isLockedByForeignLoveDomain(player)) {
+		if (isLockedByForeignLoveDomain(player) && !isDomainExpansion(requestedAbility)) {
 			player.sendMessage(Text.translatable("message.magic.love_domain.abilities_locked"), true);
 			return;
 		}
@@ -938,6 +956,7 @@ public final class MagicAbilityManager {
 		}
 
 		if (GreedRuntime.handleAbilityRequest(player, requestedAbility)) {
+			recordOrionsGambitAbilityUse(player, requestedAbility);
 			return;
 		}
 
@@ -1579,6 +1598,71 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	static void cancelOwnedMagicOnTargetForBankruptcy(
+		ServerPlayerEntity target,
+		int currentTick,
+		boolean preserveMaximumAbilities,
+		boolean preserveDomainAbilities
+	) {
+		UUID targetId = target.getUuid();
+		MagicAbility targetAbility = activeAbility(target);
+		boolean protectedActiveAbility = isBankruptcyProtectedAbility(targetAbility, preserveMaximumAbilities, preserveDomainAbilities);
+
+		if (!isBankruptcyProtectedAbility(MagicAbility.MARTYRS_FLAME, preserveMaximumAbilities, preserveDomainAbilities)) {
+			MARTYRS_FLAME_PASSIVE_ENABLED.remove(targetId);
+			MARTYRS_FLAME_DRAIN_BUFFER.remove(targetId);
+		}
+		if (!isBankruptcyProtectedAbility(MagicAbility.SPOTLIGHT, preserveMaximumAbilities, preserveDomainAbilities)) {
+			deactivateSpotlight(target, true);
+		}
+		if (!isBankruptcyProtectedAbility(MagicAbility.CASSIOPEIA, preserveMaximumAbilities, preserveDomainAbilities)) {
+			deactivateCassiopeia(target, true);
+		}
+		if (!isBankruptcyProtectedAbility(MagicAbility.COMEDIC_REWRITE, preserveMaximumAbilities, preserveDomainAbilities)) {
+			deactivateComedicRewrite(target);
+		}
+		if (!isBankruptcyProtectedAbility(MagicAbility.TILL_DEATH_DO_US_PART, preserveMaximumAbilities, preserveDomainAbilities)) {
+			if (targetAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
+				deactivateTillDeathDoUsPart(target, TillDeathDoUsPartEndReason.MANUAL_CANCEL, true);
+			} else {
+				TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.remove(targetId);
+			}
+		}
+
+		if (!protectedActiveAbility) {
+			if (targetAbility == MagicAbility.ABSOLUTE_ZERO) {
+				deactivateAbsoluteZero(target);
+			}
+			if (targetAbility == MagicAbility.PLANCK_HEAT) {
+				deactivatePlanckHeat(target);
+			}
+			if (targetAbility == MagicAbility.LOVE_AT_FIRST_SIGHT) {
+				deactivateLoveAtFirstSight(target);
+			}
+			if (targetAbility == MagicAbility.MANIPULATION) {
+				deactivateManipulation(target, true, "suppressed by bankruptcy");
+			}
+			if (targetAbility == MagicAbility.HERCULES_BURDEN_OF_THE_SKY) {
+				deactivateHerculesBurden(target, true, false);
+			}
+			if (targetAbility == MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
+				clearSagittariusWindup(target);
+			}
+			if (targetAbility == MagicAbility.ORIONS_GAMBIT) {
+				endOrionsGambit(target, OrionGambitEndReason.MANUAL_CANCEL, currentTick, false);
+			}
+			if (isDomainExpansion(targetAbility) && !preserveDomainAbilities) {
+				deactivateDomainExpansion(target);
+			}
+		}
+
+		GreedRuntime.cancelActiveAbilities(target, currentTick);
+
+		if (!protectedActiveAbility && targetAbility != MagicAbility.NONE) {
+			setActiveAbility(target, MagicAbility.NONE);
+		}
+	}
+
 	private static void handleDomainExpansionRequest(ServerPlayerEntity player, MagicAbility requestedAbility, int currentTick) {
 		MagicAbility activeAbility = activeAbility(player);
 		if (isDomainExpansion(activeAbility)) {
@@ -1833,11 +1917,18 @@ public final class MagicAbilityManager {
 							continue;
 						}
 
+						if (hasProtectedDecorationEntity(world, immutablePos)) {
+							if (shell || targetState.isOf(Blocks.LIGHT)) {
+								protectedShellStates.put(immutablePos, currentState);
+							}
+							continue;
+						}
+
 						if (currentState.equals(targetState)) {
 							continue;
 						}
 
-						if (!world.setBlockState(mutablePos, targetState, DOMAIN_BLOCK_PLACE_FLAGS)) {
+						if (!setDomainBlockState(world, immutablePos, targetState, DOMAIN_BLOCK_PLACE_FLAGS)) {
 							continue;
 						}
 					}
@@ -1912,7 +2003,7 @@ public final class MagicAbilityManager {
 				continue;
 			}
 
-			if (!world.setBlockState(pos, saved.blockState, DOMAIN_BLOCK_RESTORE_FLAGS)) {
+			if (!setDomainBlockState(world, pos, saved.blockState, DOMAIN_BLOCK_RESTORE_FLAGS)) {
 				continue;
 			}
 
@@ -1976,6 +2067,34 @@ public final class MagicAbilityManager {
 
 		if (changed) {
 			persistDomainRuntimeState(server);
+		}
+	}
+
+	private static void syncDomainTimerOverlays(MinecraftServer server, int currentTick) {
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			DomainExpansionState domain = DOMAIN_EXPANSIONS.get(player.getUuid());
+			if (domain == null || domain.ability == MagicAbility.LOVE_DOMAIN_EXPANSION) {
+				MagicPlayerData.clearDomainTimer(player);
+				continue;
+			}
+
+			int remainingTicks = Math.max(0, domain.expiresTick - currentTick);
+			int remainingSeconds = Math.max(0, MathHelper.ceil(remainingTicks / (float) TICKS_PER_SECOND));
+			int secondarySeconds = 0;
+			if (domain.ability == MagicAbility.ASTRAL_CATACLYSM) {
+				ConstellationDomainState state = ASTRAL_CATACLYSM_DOMAIN_STATES.get(player.getUuid());
+				if (state != null && state.phase == ConstellationDomainPhase.CHARGING) {
+					int chargeTicksRemaining = Math.max(0, state.chargeCompleteTick - currentTick);
+					secondarySeconds = Math.max(0, MathHelper.ceil(chargeTicksRemaining / (float) TICKS_PER_SECOND));
+				}
+			}
+
+			if (remainingSeconds <= 0 && secondarySeconds <= 0) {
+				MagicPlayerData.clearDomainTimer(player);
+				continue;
+			}
+
+			MagicPlayerData.setDomainTimer(player, domain.ability.id(), remainingSeconds, secondarySeconds);
 		}
 	}
 
@@ -2477,7 +2596,7 @@ public final class MagicAbilityManager {
 		player.networkHandler.sendPacket(
 			new TitleFadeS2CPacket(DOMAIN_CLASH_TITLE_FADE_IN_TICKS, DOMAIN_CLASH_TITLE_STAY_TICKS, DOMAIN_CLASH_TITLE_FADE_OUT_TICKS)
 		);
-		player.networkHandler.sendPacket(new TitleS2CPacket(Text.translatable("title.magic.domain_clash").formatted(Formatting.BOLD)));
+		player.networkHandler.sendPacket(new TitleS2CPacket(Text.translatable("title.magic.domain_clash").formatted(Formatting.BOLD, Formatting.RED)));
 	}
 
 	private static void applySplitDomainInteriorVisuals(
@@ -2529,7 +2648,10 @@ public final class MagicAbilityManager {
 				pos
 			);
 
-			world.setBlockState(pos, targetState, DOMAIN_BLOCK_PLACE_FLAGS);
+			if (hasProtectedDecorationEntity(world, pos)) {
+				continue;
+			}
+			setDomainBlockState(world, pos, targetState, DOMAIN_BLOCK_PLACE_FLAGS);
 		}
 	}
 
@@ -2551,7 +2673,7 @@ public final class MagicAbilityManager {
 
 			if (shouldPreserveBeaconAnchor(savedEntry.getValue().blockState)) {
 				refreshedShell.put(pos, savedEntry.getValue().blockState);
-				world.setBlockState(pos, savedEntry.getValue().blockState, DOMAIN_BLOCK_PLACE_FLAGS);
+				setDomainBlockState(world, pos, savedEntry.getValue().blockState, DOMAIN_BLOCK_PLACE_FLAGS);
 				continue;
 			}
 
@@ -2568,10 +2690,16 @@ public final class MagicAbilityManager {
 				state.innerHeight,
 				pos
 			);
+			if (hasProtectedDecorationEntity(world, pos)) {
+				if (shell || targetState.isOf(Blocks.LIGHT)) {
+					refreshedShell.put(pos, savedEntry.getValue().blockState);
+				}
+				continue;
+			}
 			if (shell || targetState.isOf(Blocks.LIGHT)) {
 				refreshedShell.put(pos, targetState);
 			}
-			world.setBlockState(pos, targetState, DOMAIN_BLOCK_PLACE_FLAGS);
+			setDomainBlockState(world, pos, targetState, DOMAIN_BLOCK_PLACE_FLAGS);
 		}
 
 		state.protectedShellStates.clear();
@@ -2591,7 +2719,7 @@ public final class MagicAbilityManager {
 			}
 
 			if (!world.getBlockState(pos).equals(expectedState)) {
-				world.setBlockState(pos, expectedState, DOMAIN_BLOCK_PLACE_FLAGS);
+				setDomainBlockState(world, pos, expectedState, DOMAIN_BLOCK_PLACE_FLAGS);
 			}
 		}
 	}
@@ -2930,6 +3058,7 @@ public final class MagicAbilityManager {
 	private static void onServerStopping(MinecraftServer server) {
 		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
 			MagicPlayerData.clearDomainClashUi(player);
+			MagicPlayerData.clearDomainTimer(player);
 		}
 
 		DOMAIN_CLASHES_BY_OWNER.clear();
@@ -3347,17 +3476,16 @@ public final class MagicAbilityManager {
 		updateMartyrsFlameBurningTargets(server, currentTick);
 		updateDomainClashes(server, currentTick);
 		updateDomainExpansions(server, currentTick);
+		syncDomainTimerOverlays(server, currentTick);
 		updateComedicRewriteVisualCameos(server, currentTick);
 
-		if (currentTick % TICKS_PER_SECOND != 0) {
-			GreedRuntime.onEndServerTick(server, currentTick);
-			return;
-		}
-
-		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-			updateManaOncePerSecond(player);
+		if (currentTick % TICKS_PER_SECOND == 0) {
+			for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+				updateManaOncePerSecond(player);
+			}
 		}
 		GreedRuntime.onEndServerTick(server, currentTick);
+		enforceOrionsGambitGreedTargetCoins(server);
 	}
 
 	private static void updateComedicRewriteVisualCameos(MinecraftServer server, int currentTick) {
@@ -3497,6 +3625,7 @@ public final class MagicAbilityManager {
 		UUID playerId = player.getUuid();
 		MARTYRS_FLAME_BURNING_TARGETS.remove(playerId);
 		clearDeathAbilityState(player);
+		MagicPlayerData.clearDomainTimer(player);
 		deactivateCassiopeia(player, true);
 		resetSpotlightTracking(player);
 		COMEDIC_REWRITE_IMMUNITY_END_TICK.remove(playerId);
@@ -3550,6 +3679,13 @@ public final class MagicAbilityManager {
 		int mana = MagicPlayerData.getMana(player);
 		UUID playerId = player.getUuid();
 		boolean orionsGambitManaSuppressed = isOrionsGambitManaDrainSuppressed(player);
+		if (isDomainExpansion(activeAbility)) {
+			DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.get(playerId);
+			if (ownedDomain == null || ownedDomain.ability != activeAbility) {
+				setActiveAbility(player, MagicAbility.NONE);
+				activeAbility = MagicAbility.NONE;
+			}
+		}
 
 		if (activeAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
 			LOVE_POWER_ACTIVE_THIS_SECOND.put(playerId, false);
@@ -4042,11 +4178,21 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean onAllowLivingEntityDamage(LivingEntity entity, DamageSource source, float amount) {
-		if (!(entity instanceof ServerPlayerEntity player) || amount <= 0.0F) {
+		if (amount <= 0.0F) {
 			return true;
 		}
 
-		int currentTick = player.getEntityWorld().getServer().getTicks();
+		int currentTick = entity.getEntityWorld().getServer().getTicks();
+		ServerPlayerEntity directAttacker = attackingPlayerFrom(source);
+		if (directAttacker != null && isDirectCasterDamageBlocked(directAttacker, entity, currentTick)) {
+			DOMAIN_CLASH_PENDING_DAMAGE.remove(entity.getUuid());
+			return false;
+		}
+
+		if (!(entity instanceof ServerPlayerEntity player)) {
+			return true;
+		}
+
 		UUID playerId = player.getUuid();
 		if (hasActiveComedicRewriteImmunity(playerId, currentTick)) {
 			DOMAIN_CLASH_PENDING_DAMAGE.remove(playerId);
@@ -5804,13 +5950,16 @@ public final class MagicAbilityManager {
 	private static void applyHerculesInitialImpact(ServerPlayerEntity caster, LivingEntity target) {
 		target.setVelocity(0.0, 0.0, 0.0);
 		target.setOnGround(true);
-		target.stopUsingItem();
+		if (HERCULES_INTERRUPT_TARGET_ITEM_USE) {
+			target.stopUsingItem();
+		}
 		if (target instanceof MobEntity mob) {
 			mob.getNavigation().stop();
 		}
 		target.addStatusEffect(
 			new StatusEffectInstance(StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, HERCULES_SLOWNESS_AMPLIFIER, true, false, false)
 		);
+		refreshStatusEffect(target, StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, HERCULES_RESISTANCE_AMPLIFIER, true, false, false);
 		spawnHerculesImpactBurst(target);
 		spawnHerculesBurdenParticles(target);
 		if (HERCULES_TRUE_DAMAGE > 0.0F && target.getEntityWorld() instanceof ServerWorld world) {
@@ -5894,8 +6043,11 @@ public final class MagicAbilityManager {
 			}
 
 			teleportDomainEntity(target, state.lockedX, state.lockedY, state.lockedZ, target.getYaw(), target.getPitch());
-			target.stopUsingItem();
+			if (HERCULES_INTERRUPT_TARGET_ITEM_USE) {
+				target.stopUsingItem();
+			}
 			refreshStatusEffect(target, StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, HERCULES_SLOWNESS_AMPLIFIER, true, false, false);
+			refreshStatusEffect(target, StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, HERCULES_RESISTANCE_AMPLIFIER, true, false, false);
 			if (target instanceof MobEntity mob) {
 				mob.getNavigation().stop();
 			}
@@ -5957,15 +6109,13 @@ public final class MagicAbilityManager {
 
 	private static void updateSagittariusWindups(MinecraftServer server, int currentTick) {
 		List<UUID> readyToFire = new ArrayList<>();
+		List<UUID> staleWindups = new ArrayList<>();
 		Iterator<Map.Entry<UUID, SagittariusWindupState>> iterator = SAGITTARIUS_STATES.entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<UUID, SagittariusWindupState> entry = iterator.next();
 			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(entry.getKey());
 			if (caster == null || !caster.isAlive() || activeAbility(caster) != MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
-				if (caster != null) {
-					clearSagittariusWindup(caster);
-				}
-				iterator.remove();
+				staleWindups.add(entry.getKey());
 				continue;
 			}
 
@@ -5981,6 +6131,16 @@ public final class MagicAbilityManager {
 			if (caster != null && caster.isAlive()) {
 				fireSagittariusAstralArrow(caster, currentTick);
 			}
+		}
+
+		for (UUID casterId : staleWindups) {
+			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(casterId);
+			if (caster != null) {
+				clearSagittariusWindup(caster);
+				continue;
+			}
+
+			SAGITTARIUS_STATES.remove(casterId);
 		}
 	}
 
@@ -6101,25 +6261,34 @@ public final class MagicAbilityManager {
 	}
 
 	private static void updateOrionsGambitStates(MinecraftServer server, int currentTick) {
+		List<OrionPendingEndState> pendingEnds = new ArrayList<>();
 		Iterator<Map.Entry<UUID, OrionGambitState>> iterator = ORIONS_GAMBIT_STATES.entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<UUID, OrionGambitState> entry = iterator.next();
 			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(entry.getKey());
-			if (caster == null || !caster.isAlive()) {
+			if (caster == null) {
+				clearOrionsGambitTargetEffects(entry.getValue(), server);
 				releaseOrionsGambitTarget(entry.getValue());
 				iterator.remove();
+				continue;
+			}
+			if (!caster.isAlive()) {
+				pendingEnds.add(new OrionPendingEndState(caster, OrionGambitEndReason.CASTER_DIED, false));
 				continue;
 			}
 
 			if (activeAbility(caster) != MagicAbility.ORIONS_GAMBIT) {
-				releaseOrionsGambitTarget(entry.getValue());
-				iterator.remove();
+				pendingEnds.add(new OrionPendingEndState(caster, OrionGambitEndReason.MANUAL_CANCEL, false));
 				continue;
 			}
 
 			if (entry.getValue().stage == OrionGambitStage.LINKED && currentTick >= entry.getValue().benefitEndTick) {
-				endOrionsGambit(caster, OrionGambitEndReason.EXPIRED, currentTick, true);
+				pendingEnds.add(new OrionPendingEndState(caster, OrionGambitEndReason.EXPIRED, true));
 			}
+		}
+
+		for (OrionPendingEndState pendingEnd : pendingEnds) {
+			endOrionsGambit(pendingEnd.caster, pendingEnd.reason, currentTick, pendingEnd.sendFeedback);
 		}
 	}
 
@@ -6181,12 +6350,13 @@ public final class MagicAbilityManager {
 		}
 
 		boolean linked = state.stage == OrionGambitStage.LINKED;
+		if (linked && ORIONS_GAMBIT_APPLY_USED_TARGET_COOLDOWNS_ON_END) {
+			applyOrionsGambitTargetCooldowns(state, caster.getEntityWorld().getServer(), currentTick);
+		}
+		clearOrionsGambitTargetEffects(state, caster.getEntityWorld().getServer());
 		releaseOrionsGambitTarget(state);
 		if (linked && ORIONS_GAMBIT_RESET_CASTER_COOLDOWNS_ON_END) {
 			applyOrionsGambitCasterCooldownReset(casterId, currentTick);
-		}
-		if (linked && ORIONS_GAMBIT_APPLY_USED_TARGET_COOLDOWNS_ON_END) {
-			applyOrionsGambitTargetCooldowns(state, caster.getEntityWorld().getServer(), currentTick);
 		}
 
 		int cooldownTicks = reason == OrionGambitEndReason.WAITING_CANCEL
@@ -6214,6 +6384,40 @@ public final class MagicAbilityManager {
 	private static void releaseOrionsGambitTarget(OrionGambitState state) {
 		if (state != null && state.targetId != null) {
 			ORIONS_GAMBIT_CASTER_BY_TARGET.remove(state.targetId);
+		}
+	}
+
+	private static void clearOrionsGambitTargetEffects(OrionGambitState state, MinecraftServer server) {
+		if (
+			state == null
+			|| server == null
+			|| !ORIONS_GAMBIT_RESET_GREED_TARGET_COINS_ON_END
+			|| state.targetId == null
+			|| state.targetDimension == null
+		) {
+			return;
+		}
+
+		ServerPlayerEntity target = resolveOrionsGambitTarget(server, state);
+		if (target != null && MagicPlayerData.getSchool(target) == MagicSchool.GREED) {
+			MagicPlayerData.setGreedCoinUnits(target, 0);
+		}
+	}
+
+	private static void enforceOrionsGambitGreedTargetCoins(MinecraftServer server) {
+		if (server == null || ORIONS_GAMBIT_GREED_TARGET_COIN_UNITS <= 0) {
+			return;
+		}
+
+		for (OrionGambitState state : ORIONS_GAMBIT_STATES.values()) {
+			if (state.stage != OrionGambitStage.LINKED) {
+				continue;
+			}
+
+			ServerPlayerEntity target = resolveOrionsGambitTarget(server, state);
+			if (target != null && MagicPlayerData.getSchool(target) == MagicSchool.GREED) {
+				MagicPlayerData.setGreedCoinUnits(target, ORIONS_GAMBIT_GREED_TARGET_COIN_UNITS);
+			}
 		}
 	}
 
@@ -6318,6 +6522,10 @@ public final class MagicAbilityManager {
 
 	private static boolean isOrionsGambitCooldownSuppressed(ServerPlayerEntity player) {
 		return ORIONS_GAMBIT_SUPPRESS_TARGET_COOLDOWNS && ORIONS_GAMBIT_CASTER_BY_TARGET.containsKey(player.getUuid());
+	}
+
+	static boolean areOrionsGambitTargetCooldownsSuppressed(ServerPlayerEntity player) {
+		return isOrionsGambitCooldownSuppressed(player);
 	}
 
 	private static boolean hasActiveOrionsGambitPenalty(ServerPlayerEntity player) {
@@ -6893,7 +7101,9 @@ public final class MagicAbilityManager {
 	private static void enforceLoveLock(ServerPlayerEntity caster, LivingEntity target, LoveLockState state, int currentTick) {
 		float[] forcedAngles = computeFacingAngles(target, caster.getEyePos());
 		teleportDomainEntity(target, state.lockedX, state.lockedY, state.lockedZ, forcedAngles[0], forcedAngles[1]);
-		target.stopUsingItem();
+		if (LOVE_AT_FIRST_SIGHT_BLOCK_ITEM_USE) {
+			target.stopUsingItem();
+		}
 		refreshStatusEffect(target, StatusEffects.SLOWNESS, LOVE_LOCK_EFFECT_TICKS, LOVE_LOCK_SLOWNESS_AMPLIFIER, true, false, false);
 		refreshStatusEffect(
 			target,
@@ -6904,6 +7114,7 @@ public final class MagicAbilityManager {
 			false,
 			false
 		);
+		refreshStatusEffect(target, StatusEffects.RESISTANCE, LOVE_LOCK_EFFECT_TICKS, LOVE_AT_FIRST_SIGHT_RESISTANCE_AMPLIFIER, true, false, false);
 		if (currentTick - state.lastParticleTick >= LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS) {
 			spawnLoveAtFirstSightTargetParticles(target);
 			state.lastParticleTick = currentTick;
@@ -7010,6 +7221,10 @@ public final class MagicAbilityManager {
 		if (shouldBlockArtifactUse(player, hand)) {
 			return ActionResult.FAIL;
 		}
+		if (isProtectedDomainDecoration(entity)) {
+			sendDomainProtectedMessage(player);
+			return ActionResult.FAIL;
+		}
 		return isItemUseBlocked(player) ? ActionResult.FAIL : ActionResult.PASS;
 	}
 
@@ -7066,7 +7281,15 @@ public final class MagicAbilityManager {
 		}
 
 		if (!(entity instanceof LivingEntity target) || !target.isAlive() || target == player) {
+			if (isProtectedDomainDecoration(entity)) {
+				sendDomainProtectedMessage(serverPlayer);
+				return ActionResult.FAIL;
+			}
 			return ActionResult.PASS;
+		}
+
+		if (isDirectCasterDamageBlocked(serverPlayer, target, serverPlayer.getEntityWorld().getServer().getTicks())) {
+			return ActionResult.FAIL;
 		}
 
 		GreedRuntime.onAttackEntity(serverPlayer, entity);
@@ -7953,6 +8176,16 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		if (
+			ability == MagicAbility.APPRAISERS_MARK
+			|| ability == MagicAbility.TOLLKEEPERS_CLAIM
+			|| ability == MagicAbility.KINGS_DUES
+			|| ability == MagicAbility.BANKRUPTCY
+		) {
+			GreedRuntime.startAbilityCooldownFromNow(playerId, ability, currentTick);
+			return;
+		}
+
 		if (ability == MagicAbility.FROST_DOMAIN_EXPANSION || ability == MagicAbility.LOVE_DOMAIN_EXPANSION || ability == MagicAbility.ASTRAL_CATACLYSM) {
 			if (isCooldownDeferredByOrionsGambit(playerId, ability)) {
 				if (ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
@@ -8091,6 +8324,28 @@ public final class MagicAbilityManager {
 			|| ability == MagicAbility.ASTRAL_CATACLYSM;
 	}
 
+	private static boolean isMaximumAbility(MagicAbility ability) {
+		return ability == MagicAbility.PLANCK_HEAT
+			|| ability == MagicAbility.MANIPULATION
+			|| ability == MagicAbility.COMEDIC_REWRITE
+			|| ability == MagicAbility.ORIONS_GAMBIT
+			|| ability == MagicAbility.BANKRUPTCY;
+	}
+
+	private static boolean isBankruptcyProtectedAbility(
+		MagicAbility ability,
+		boolean preserveMaximumAbilities,
+		boolean preserveDomainAbilities
+	) {
+		if (ability == MagicAbility.NONE) {
+			return false;
+		}
+		if (preserveDomainAbilities && isDomainExpansion(ability)) {
+			return true;
+		}
+		return preserveMaximumAbilities && isMaximumAbility(ability);
+	}
+
 	public static boolean isEntityCapturedByDomain(Entity entity) {
 		RegistryKey<World> dimension = entity.getEntityWorld().getRegistryKey();
 		UUID entityId = entity.getUuid();
@@ -8142,6 +8397,48 @@ public final class MagicAbilityManager {
 		}
 
 		return false;
+	}
+
+	private static boolean hasProtectedDecorationEntity(ServerWorld world, BlockPos pos) {
+		Box searchBox = new Box(
+			pos.getX(),
+			pos.getY(),
+			pos.getZ(),
+			pos.getX() + 1.0,
+			pos.getY() + 1.0,
+			pos.getZ() + 1.0
+		).expand(0.75);
+		return !world.getEntitiesByClass(
+			BlockAttachedEntity.class,
+			searchBox,
+			decoration -> decoration.getAttachedBlockPos().equals(pos)
+		).isEmpty();
+	}
+
+	private static boolean isProtectedDomainDecoration(Entity entity) {
+		if (!(entity instanceof BlockAttachedEntity decoration)) {
+			return false;
+		}
+
+		RegistryKey<World> dimension = entity.getEntityWorld().getRegistryKey();
+		return isDomainBlockProtected(dimension, decoration.getAttachedBlockPos())
+			|| isPositionInsideAnyDomain(dimension, entity.getX(), entity.getY(), entity.getZ());
+	}
+
+	private static void sendDomainProtectedMessage(PlayerEntity player) {
+		if (player instanceof ServerPlayerEntity serverPlayer) {
+			serverPlayer.sendMessage(Text.translatable("message.magic.domain.unbreakable"), true);
+		}
+	}
+
+	private static boolean setDomainBlockState(ServerWorld world, BlockPos pos, BlockState targetState, int flags) {
+		BlockState previousState = world.getBlockState(pos);
+		boolean changed = world.setBlockState(pos, targetState, flags);
+		if (changed && (previousState.isOf(Blocks.LIGHT) || targetState.isOf(Blocks.LIGHT))) {
+			world.getLightingProvider().checkBlock(pos);
+			world.getChunkManager().markForUpdate(pos);
+		}
+		return changed;
 	}
 
 	private static boolean isInsideDomainDome(int horizontalDistanceSq, int y, int radius, int height) {
@@ -8510,6 +8807,32 @@ public final class MagicAbilityManager {
 
 	private static boolean isAstralExecutionTarget(PlayerEntity player) {
 		return ASTRAL_EXECUTION_BEAMS.containsKey(player.getUuid());
+	}
+
+	private static boolean isDirectCasterDamageBlocked(ServerPlayerEntity attacker, LivingEntity target, int currentTick) {
+		return isLoveCasterDamageBlocked(attacker, target, currentTick) || isHerculesCasterDamageBlocked(attacker, target, currentTick);
+	}
+
+	private static boolean isLoveCasterDamageBlocked(ServerPlayerEntity attacker, LivingEntity target, int currentTick) {
+		if (!LOVE_AT_FIRST_SIGHT_PREVENT_CASTER_DIRECT_DAMAGE) {
+			return false;
+		}
+
+		LoveLockState state = LOVE_LOCKED_TARGETS.get(target.getUuid());
+		if (state == null || !attacker.getUuid().equals(state.casterId) || state.lastSeenTick != currentTick) {
+			return false;
+		}
+
+		return activeAbility(attacker) == MagicAbility.LOVE_AT_FIRST_SIGHT;
+	}
+
+	private static boolean isHerculesCasterDamageBlocked(ServerPlayerEntity attacker, LivingEntity target, int currentTick) {
+		if (!HERCULES_PREVENT_CASTER_DIRECT_DAMAGE) {
+			return false;
+		}
+
+		AstralBurdenTargetState state = HERCULES_TARGETS.get(target.getUuid());
+		return state != null && attacker.getUuid().equals(state.casterId) && currentTick < state.endTick;
 	}
 
 	private static boolean isLoveItemUseBlocked(PlayerEntity player) {
@@ -9296,6 +9619,18 @@ public final class MagicAbilityManager {
 
 		private OrionPenaltyState(int endTick) {
 			this.endTick = endTick;
+		}
+	}
+
+	private static final class OrionPendingEndState {
+		private final ServerPlayerEntity caster;
+		private final OrionGambitEndReason reason;
+		private final boolean sendFeedback;
+
+		private OrionPendingEndState(ServerPlayerEntity caster, OrionGambitEndReason reason, boolean sendFeedback) {
+			this.caster = caster;
+			this.reason = reason;
+			this.sendFeedback = sendFeedback;
 		}
 	}
 

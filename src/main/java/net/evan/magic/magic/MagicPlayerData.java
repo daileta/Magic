@@ -76,6 +76,27 @@ public final class MagicPlayerData {
 			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
 	);
 
+	private static final AttachmentType<String> DOMAIN_TIMER_ABILITY_ID = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "domain_timer_ability_id"),
+		builder -> builder
+			.initializer(() -> "")
+			.syncWith(PacketCodecs.STRING, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> DOMAIN_TIMER_SECONDS = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "domain_timer_seconds"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> DOMAIN_SECONDARY_TIMER_SECONDS = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "domain_secondary_timer_seconds"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
 	private static final AttachmentType<Integer> GREED_COINS = AttachmentRegistry.create(
 		Identifier.of(Magic.MOD_ID, "greed_coins"),
 		builder -> builder
@@ -118,6 +139,9 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROGRESS, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROMPT_KEY, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0, 0);
+		setAttachedIfChanged(target, DOMAIN_TIMER_ABILITY_ID, "", "");
+		setAttachedIfChanged(target, DOMAIN_TIMER_SECONDS, 0, 0);
+		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, GREED_COINS, 0, 0);
 	}
 
@@ -131,6 +155,9 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROGRESS, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROMPT_KEY, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0, 0);
+		setAttachedIfChanged(target, DOMAIN_TIMER_ABILITY_ID, "", "");
+		setAttachedIfChanged(target, DOMAIN_TIMER_SECONDS, 0, 0);
+		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, GREED_COINS, 0, 0);
 	}
 
@@ -208,6 +235,33 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROGRESS, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROMPT_KEY, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_INSTRUCTION_VISIBILITY, 0, 0);
+	}
+
+	public static String getDomainTimerAbilityId(PlayerEntity player) {
+		return target(player).getAttachedOrElse(DOMAIN_TIMER_ABILITY_ID, "");
+	}
+
+	public static int getDomainTimerSeconds(PlayerEntity player) {
+		return Math.max(0, target(player).getAttachedOrElse(DOMAIN_TIMER_SECONDS, 0));
+	}
+
+	public static int getDomainSecondaryTimerSeconds(PlayerEntity player) {
+		return Math.max(0, target(player).getAttachedOrElse(DOMAIN_SECONDARY_TIMER_SECONDS, 0));
+	}
+
+	public static void setDomainTimer(PlayerEntity player, String abilityId, int primarySeconds, int secondarySeconds) {
+		AttachmentTarget target = target(player);
+		String resolvedAbilityId = abilityId == null ? "" : abilityId;
+		setAttachedIfChanged(target, DOMAIN_TIMER_ABILITY_ID, resolvedAbilityId, "");
+		setAttachedIfChanged(target, DOMAIN_TIMER_SECONDS, Math.max(0, primarySeconds), 0);
+		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, Math.max(0, secondarySeconds), 0);
+	}
+
+	public static void clearDomainTimer(PlayerEntity player) {
+		AttachmentTarget target = target(player);
+		setAttachedIfChanged(target, DOMAIN_TIMER_ABILITY_ID, "", "");
+		setAttachedIfChanged(target, DOMAIN_TIMER_SECONDS, 0, 0);
+		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, 0, 0);
 	}
 
 	public static int getGreedCoinUnits(PlayerEntity player) {
