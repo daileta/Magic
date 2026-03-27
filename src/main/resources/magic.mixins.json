@@ -3,6 +3,8 @@
 	"package": "net.evan.magic.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
+		"BlockDisplayEntityAccessorMixin",
+		"DisplayEntityAccessorMixin",
 		"EndCrystalEntityMixin",
 		"EntityTeleportMixin",
 		"EnderPearlEntityMixin",

@@ -53,6 +53,7 @@ public final class MagicCommands {
 									.then(cooldownAbilityLiteral(MagicAbility.SPOTLIGHT, "spotlight"))
 									.then(cooldownAbilityLiteral(MagicAbility.WITTY_ONE_LINER, "witty_one_liner"))
 									.then(cooldownAbilityLiteral(MagicAbility.COMEDIC_REWRITE, "comedic_rewrite"))
+									.then(cooldownAbilityLiteral(MagicAbility.COMEDIC_ASSISTANT, "comedic_assistant"))
 									.then(cooldownAbilityLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky"))
 									.then(cooldownAbilityLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow"))
 									.then(cooldownAbilityLiteral(MagicAbility.ORIONS_GAMBIT, "orions_gambit"))
@@ -146,6 +147,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.SPOTLIGHT, "spotlight", true))
 									.then(abilityAccessLiteral(MagicAbility.WITTY_ONE_LINER, "witty_one_liner", true))
 									.then(abilityAccessLiteral(MagicAbility.COMEDIC_REWRITE, "comedic_rewrite", true))
+									.then(abilityAccessLiteral(MagicAbility.COMEDIC_ASSISTANT, "comedic_assistant", true))
 									.then(abilityAccessLiteral(MagicAbility.CASSIOPEIA, "cassiopeia", true))
 									.then(abilityAccessLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky", true))
 									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow", true))
@@ -170,6 +172,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.SPOTLIGHT, "spotlight", false))
 									.then(abilityAccessLiteral(MagicAbility.WITTY_ONE_LINER, "witty_one_liner", false))
 									.then(abilityAccessLiteral(MagicAbility.COMEDIC_REWRITE, "comedic_rewrite", false))
+									.then(abilityAccessLiteral(MagicAbility.COMEDIC_ASSISTANT, "comedic_assistant", false))
 									.then(abilityAccessLiteral(MagicAbility.CASSIOPEIA, "cassiopeia", false))
 									.then(abilityAccessLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky", false))
 									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow", false))
@@ -326,6 +329,12 @@ public final class MagicCommands {
 		if (!persisted) {
 			source.sendError(Text.translatable("command.magic.ability.access.failure", MagicConfig.path().toString()));
 			return 0;
+		}
+
+		if (locked) {
+			for (ServerPlayerEntity target : targets) {
+				MagicAbilityManager.clearLockedAbilityState(target, ability);
+			}
 		}
 
 		sendAbilityAccessFeedback(source, targets, ability, locked);

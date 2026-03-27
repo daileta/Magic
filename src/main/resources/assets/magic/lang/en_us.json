@@ -18,6 +18,7 @@
 	"magic.ability.spotlight": "Spotlight",
 	"magic.ability.witty_one_liner": "Witty One Liner",
 	"magic.ability.comedic_rewrite": "Comedic Rewrite",
+	"magic.ability.comedic_assistant": "Comedic Assistant",
 	"magic.ability.below_freezing": "Below Freezing",
 	"magic.ability.absolute_zero": "Absolute Zero",
 	"magic.ability.planck_heat": "Planck Heat",
@@ -111,6 +112,11 @@
 	"message.magic.constellation.astral_cataclysm.beacon_core_blocked.caster": "%s was shielded by the Beacon Core.",
 	"message.magic.constellation.astral_cataclysm.beacon_core_blocked.target": "The Beacon Core extinguished Astral Cataclysm before it could finish you.",
 	"message.magic.constellation.still_charging": "%s is still charging.",
+	"message.magic.jester.comedic_assistant.ready": "Comedic Assistant loaded. Your next melee hit is primed.",
+	"message.magic.jester.comedic_assistant.cancelled": "Comedic Assistant was canceled.",
+	"message.magic.jester.comedic_assistant.expired": "Comedic Assistant expired before you landed a hit.",
+	"message.magic.jester.comedic_assistant.proc": "%s!",
+	"message.magic.jester.comedic_assistant.no_outcomes": "Comedic Assistant has no enabled gags in config.",
 	"message.magic.ability.not_implemented": "Ability %s is not implemented yet.",
 	"message.magic.ability.wrong_school": "You are not attuned to %s magic.",
 	"message.magic.unlocked": "You awakened %s magic.",
@@ -143,5 +149,12 @@
 	"command.magic.config.reload.failure": "Failed to reload magic config from %s. Check the server log for details.",
 	"command.magic.config.astral_cataclysm_mob_targeting.enabled": "Astral Cataclysm mob targeting is now enabled.",
 	"command.magic.config.astral_cataclysm_mob_targeting.disabled": "Astral Cataclysm mob targeting is now disabled.",
-	"command.magic.config.astral_cataclysm_mob_targeting.failure": "Failed to update Astral Cataclysm mob targeting in %s. Check the server log for details."
+	"command.magic.config.astral_cataclysm_mob_targeting.failure": "Failed to update Astral Cataclysm mob targeting in %s. Check the server log for details.",
+	"magic.jester_gag.giant_slime_slam": "Giant Slime Slam",
+	"magic.jester_gag.panda_bowling_ball": "Panda Bowling Ball",
+	"magic.jester_gag.parrot_kidnapping": "Parrot Kidnapping",
+	"magic.jester_gag.divine_overreaction": "Divine Overreaction",
+	"magic.jester_gag.acme_drop": "Acme Drop",
+	"magic.jester_gag.pie_to_the_face": "Pie to the Face",
+	"magic.jester_gag.giant_cane_yank": "Giant Cane Yank"
 }

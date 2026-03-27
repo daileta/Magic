@@ -15,6 +15,8 @@ import net.evan.magic.Magic;
 import net.evan.magic.config.MagicConfig;
 import net.evan.magic.magic.MagicPlayerData;
 import net.evan.magic.magic.MagicSchool;
+import net.evan.magic.mixin.BlockDisplayEntityAccessorMixin;
+import net.evan.magic.mixin.DisplayEntityAccessorMixin;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
 import net.evan.magic.network.payload.JesterJokeOverlayPayload;
@@ -48,6 +50,7 @@ import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.decoration.BlockAttachedEntity;
+import net.minecraft.entity.decoration.DisplayEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.data.DataTracker;
@@ -58,6 +61,9 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.mob.RavagerEntity;
+import net.minecraft.entity.mob.SlimeEntity;
+import net.minecraft.entity.LightningEntity;
+import net.minecraft.entity.passive.PandaEntity;
 import net.minecraft.entity.passive.ParrotEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
@@ -91,6 +97,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -199,6 +206,132 @@ public final class MagicAbilityManager {
 		0.2,
 		true,
 		0.15
+	);
+	private static double COMEDIC_ASSISTANT_ACTIVATION_COST_PERCENT = 25.0;
+	private static int COMEDIC_ASSISTANT_ARMED_DURATION_TICKS = 15 * TICKS_PER_SECOND;
+	private static int COMEDIC_ASSISTANT_PROC_COOLDOWN_TICKS = 15 * TICKS_PER_SECOND;
+	private static int COMEDIC_ASSISTANT_CANCEL_COOLDOWN_TICKS = 3 * TICKS_PER_SECOND;
+	private static boolean COMEDIC_ASSISTANT_ALLOW_PLAYER_TARGETS = true;
+	private static boolean COMEDIC_ASSISTANT_ALLOW_MOB_TARGETS = true;
+	private static int COMEDIC_ASSISTANT_ARMED_INDICATOR_REFRESH_TICKS = TICKS_PER_SECOND;
+	private static int COMEDIC_ASSISTANT_ARMED_PARTICLE_COUNT = 4;
+	private static int COMEDIC_ASSISTANT_OVERLAY_FADE_IN_TICKS = 4;
+	private static int COMEDIC_ASSISTANT_OVERLAY_STAY_TICKS = 30;
+	private static int COMEDIC_ASSISTANT_OVERLAY_FADE_OUT_TICKS = 8;
+	private static final int COMEDIC_ASSISTANT_OVERLAY_COLOR_RGB = 0xFFD54A;
+	private static ComedicAssistantSlimeSettings COMEDIC_ASSISTANT_GIANT_SLIME_SLAM = ComedicAssistantSlimeSettings.defaults(
+		true,
+		1,
+		4.0F,
+		60,
+		1,
+		30 * TICKS_PER_SECOND,
+		0,
+		30,
+		6.0,
+		1.3,
+		6,
+		24,
+		0.85F,
+		0.8F,
+		1.15F,
+		0.85F
+	);
+	private static ComedicAssistantPandaSettings COMEDIC_ASSISTANT_PANDA_BOWLING_BALL = ComedicAssistantPandaSettings.defaults(
+		true,
+		1,
+		5.0F,
+		3.3,
+		0.8,
+		30,
+		0,
+		18,
+		3.0,
+		2.6,
+		18,
+		1.0F,
+		0.95F,
+		1.0F,
+		0.8F
+	);
+	private static ComedicAssistantParrotSettings COMEDIC_ASSISTANT_PARROT_KIDNAPPING = ComedicAssistantParrotSettings.defaults(
+		true,
+		1,
+		2.0F,
+		35.0,
+		1.55,
+		30,
+		1.2,
+		true,
+		30,
+		28,
+		10,
+		1.35,
+		0.35,
+		28,
+		6,
+		0.8F,
+		1.25F
+	);
+	private static ComedicAssistantDivineSettings COMEDIC_ASSISTANT_DIVINE_OVERREACTION = ComedicAssistantDivineSettings.defaults(
+		true,
+		1,
+		10.0F,
+		20,
+		1.5,
+		20,
+		20,
+		0,
+		40,
+		0,
+		40,
+		0.8F,
+		1.0F
+	);
+	private static ComedicAssistantAcmeSettings COMEDIC_ASSISTANT_ACME_DROP = ComedicAssistantAcmeSettings.defaults(
+		true,
+		1,
+		6.0F,
+		30,
+		5,
+		60,
+		0,
+		18,
+		10.0,
+		20,
+		1.25F,
+		0.75F
+	);
+	private static ComedicAssistantPieSettings COMEDIC_ASSISTANT_PIE_TO_THE_FACE = ComedicAssistantPieSettings.defaults(
+		true,
+		1,
+		2.0F,
+		5 * TICKS_PER_SECOND,
+		0,
+		60,
+		0,
+		24,
+		0.9F,
+		1.15F
+	);
+	private static ComedicAssistantCaneSettings COMEDIC_ASSISTANT_GIANT_CANE_YANK = ComedicAssistantCaneSettings.defaults(
+		true,
+		1,
+		3.0F,
+		15.2,
+		0.9,
+		45,
+		0.75,
+		3.5,
+		24.0,
+		40,
+		0,
+		14,
+		4.75,
+		11.2,
+		12,
+		0.95F,
+		0.95F
 	);
 	private static double CASSIOPEIA_DETECTION_RADIUS = 64.0;
 	private static int CASSIOPEIA_OUTLINE_REFRESH_TICKS = 10;
@@ -515,6 +648,11 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, Integer> COMEDIC_REWRITE_FALL_PROTECTION_END_TICK = new HashMap<>();
 	private static final Map<UUID, PendingComedicRewriteState> COMEDIC_REWRITE_PENDING_STATES = new HashMap<>();
 	private static final List<ComedicRewriteVisualCameo> COMEDIC_REWRITE_VISUAL_CAMEOS = new ArrayList<>();
+	private static final Map<UUID, ComedicAssistantArmedState> COMEDIC_ASSISTANT_ARMED_STATES = new HashMap<>();
+	private static final Map<UUID, Integer> COMEDIC_ASSISTANT_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, ComedicAssistantParrotCarryState> COMEDIC_ASSISTANT_PARROT_CARRY_STATES = new HashMap<>();
+	private static final Map<UUID, ComedicAssistantAcmeVisualState> COMEDIC_ASSISTANT_ACME_VISUALS = new HashMap<>();
+	private static final Map<UUID, ComedicAssistantCaneImpactState> COMEDIC_ASSISTANT_CANE_IMPACT_STATES = new HashMap<>();
 	private static final Map<UUID, Double> MARTYRS_FLAME_DRAIN_BUFFER = new HashMap<>();
 	private static final Map<UUID, MartyrsFlameBurnState> MARTYRS_FLAME_BURNING_TARGETS = new HashMap<>();
 	private static final Set<UUID> TILL_DEATH_DO_US_PART_PASSIVE_ENABLED = new HashSet<>();
@@ -589,6 +727,7 @@ public final class MagicAbilityManager {
 			}
 		});
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, damageSource, baseDamageTaken, damageTaken, blocked) -> {
+			onLivingEntityAfterDamage(entity, damageSource, damageTaken);
 			if (entity instanceof ServerPlayerEntity player) {
 				onPlayerAfterDamage(player, damageSource, damageTaken);
 			}
@@ -743,6 +882,24 @@ public final class MagicAbilityManager {
 		COMEDIC_REWRITE_LAUNCHED_THROUGH_THE_SCENE = comedicRewriteLaunchSettings(config.jesterComedicRewrite.launchedThroughTheScene);
 		COMEDIC_REWRITE_RAVAGER_BIT = comedicRewriteRavagerSettings(config.jesterComedicRewrite.ravagerBit);
 		COMEDIC_REWRITE_PARROT_RESCUE = comedicRewriteParrotSettings(config.jesterComedicRewrite.parrotRescue);
+		COMEDIC_ASSISTANT_ACTIVATION_COST_PERCENT = MathHelper.clamp(config.jesterComedicAssistant.activationCostPercent, 0.0, 100.0);
+		COMEDIC_ASSISTANT_ARMED_DURATION_TICKS = Math.max(1, config.jesterComedicAssistant.armedDurationTicks);
+		COMEDIC_ASSISTANT_PROC_COOLDOWN_TICKS = Math.max(0, config.jesterComedicAssistant.procCooldownTicks);
+		COMEDIC_ASSISTANT_CANCEL_COOLDOWN_TICKS = Math.max(0, config.jesterComedicAssistant.cancelCooldownTicks);
+		COMEDIC_ASSISTANT_ALLOW_PLAYER_TARGETS = config.jesterComedicAssistant.allowPlayerTargets;
+		COMEDIC_ASSISTANT_ALLOW_MOB_TARGETS = config.jesterComedicAssistant.allowMobTargets;
+		COMEDIC_ASSISTANT_ARMED_INDICATOR_REFRESH_TICKS = Math.max(1, config.jesterComedicAssistant.armedIndicatorRefreshTicks);
+		COMEDIC_ASSISTANT_ARMED_PARTICLE_COUNT = Math.max(0, config.jesterComedicAssistant.armedParticleCount);
+		COMEDIC_ASSISTANT_OVERLAY_FADE_IN_TICKS = Math.max(0, config.jesterComedicAssistant.overlayFadeInTicks);
+		COMEDIC_ASSISTANT_OVERLAY_STAY_TICKS = Math.max(0, config.jesterComedicAssistant.overlayStayTicks);
+		COMEDIC_ASSISTANT_OVERLAY_FADE_OUT_TICKS = Math.max(0, config.jesterComedicAssistant.overlayFadeOutTicks);
+		COMEDIC_ASSISTANT_GIANT_SLIME_SLAM = comedicAssistantSlimeSettings(config.jesterComedicAssistant.giantSlimeSlam);
+		COMEDIC_ASSISTANT_PANDA_BOWLING_BALL = comedicAssistantPandaSettings(config.jesterComedicAssistant.pandaBowlingBall);
+		COMEDIC_ASSISTANT_PARROT_KIDNAPPING = comedicAssistantParrotSettings(config.jesterComedicAssistant.parrotKidnapping);
+		COMEDIC_ASSISTANT_DIVINE_OVERREACTION = comedicAssistantDivineSettings(config.jesterComedicAssistant.divineOverreaction);
+		COMEDIC_ASSISTANT_ACME_DROP = comedicAssistantAcmeSettings(config.jesterComedicAssistant.acmeDrop);
+		COMEDIC_ASSISTANT_PIE_TO_THE_FACE = comedicAssistantPieSettings(config.jesterComedicAssistant.pieToTheFace);
+		COMEDIC_ASSISTANT_GIANT_CANE_YANK = comedicAssistantCaneSettings(config.jesterComedicAssistant.giantCaneYank);
 		CASSIOPEIA_DETECTION_RADIUS = Math.max(1.0, config.constellationCassiopeia.detectionRadius);
 		CASSIOPEIA_OUTLINE_REFRESH_TICKS = Math.max(1, config.constellationCassiopeia.outlineRefreshTicks);
 		HERCULES_TARGET_RANGE = Math.max(1.0, config.constellationHercules.targetRange);
@@ -1005,6 +1162,11 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		if (requestedAbility == MagicAbility.COMEDIC_ASSISTANT) {
+			handleComedicAssistantRequest(player);
+			return;
+		}
+
 		if (requestedAbility == MagicAbility.BELOW_FREEZING) {
 			handleBelowFreezingRequest(player);
 			return;
@@ -1104,6 +1266,45 @@ public final class MagicAbilityManager {
 		COMEDIC_REWRITE_PASSIVE_ENABLED.add(playerId);
 		player.sendMessage(Text.translatable("message.magic.ability.passive_enabled", MagicAbility.COMEDIC_REWRITE.displayName()), false);
 		recordOrionsGambitAbilityUse(player, MagicAbility.COMEDIC_REWRITE);
+	}
+
+	private static void handleComedicAssistantRequest(ServerPlayerEntity player) {
+		int currentTick = player.getEntityWorld().getServer().getTicks();
+		ComedicAssistantArmedState existingState = COMEDIC_ASSISTANT_ARMED_STATES.get(player.getUuid());
+		if (existingState != null) {
+			deactivateComedicAssistant(player, currentTick, COMEDIC_ASSISTANT_CANCEL_COOLDOWN_TICKS, true, false);
+			return;
+		}
+
+		int remainingTicks = comedicAssistantCooldownRemaining(player, currentTick);
+		if (remainingTicks > 0) {
+			sendAbilityCooldownMessage(player, MagicAbility.COMEDIC_ASSISTANT, remainingTicks, false);
+			return;
+		}
+
+		if (!hasEnabledComedicAssistantOutcomes()) {
+			player.sendMessage(Text.translatable("message.magic.jester.comedic_assistant.no_outcomes"), true);
+			return;
+		}
+
+		int manaCost = (int) Math.ceil(manaFromPercentExact(COMEDIC_ASSISTANT_ACTIVATION_COST_PERCENT));
+		if (!canSpendAbilityCost(player, manaCost)) {
+			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
+			return;
+		}
+
+		spendAbilityCost(player, manaCost);
+		COMEDIC_ASSISTANT_ARMED_STATES.put(
+			player.getUuid(),
+			new ComedicAssistantArmedState(
+				player.getEntityWorld().getRegistryKey(),
+				currentTick + COMEDIC_ASSISTANT_ARMED_DURATION_TICKS,
+				currentTick + COMEDIC_ASSISTANT_ARMED_INDICATOR_REFRESH_TICKS
+			)
+		);
+		sendComedicAssistantArmedIndicator(player);
+		spawnComedicAssistantArmedParticles(player);
+		recordOrionsGambitAbilityUse(player, MagicAbility.COMEDIC_ASSISTANT);
 	}
 
 	private static void handleHerculesBurdenRequest(ServerPlayerEntity player) {
@@ -1591,6 +1792,7 @@ public final class MagicAbilityManager {
 		if (targetAbility == MagicAbility.ORIONS_GAMBIT) {
 			endOrionsGambit(target, OrionGambitEndReason.MANUAL_CANCEL, currentTick, false);
 		}
+		clearComedicAssistantState(target.getUuid());
 		GreedRuntime.cancelActiveAbilities(target, currentTick);
 
 		if (!targetOwnsDomain) {
@@ -1620,6 +1822,9 @@ public final class MagicAbilityManager {
 		}
 		if (!isBankruptcyProtectedAbility(MagicAbility.COMEDIC_REWRITE, preserveMaximumAbilities, preserveDomainAbilities)) {
 			deactivateComedicRewrite(target);
+		}
+		if (!isBankruptcyProtectedAbility(MagicAbility.COMEDIC_ASSISTANT, preserveMaximumAbilities, preserveDomainAbilities)) {
+			clearComedicAssistantState(targetId);
 		}
 		if (!isBankruptcyProtectedAbility(MagicAbility.TILL_DEATH_DO_US_PART, preserveMaximumAbilities, preserveDomainAbilities)) {
 			if (targetAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
@@ -2524,6 +2729,35 @@ public final class MagicAbilityManager {
 		}
 
 		addDomainClashDamage(clash, attackerId, clashDamage, server, server.getTicks());
+	}
+
+	private static void onLivingEntityAfterDamage(LivingEntity entity, DamageSource source, float damageTaken) {
+		if (entity == null || source == null || damageTaken <= 0.0F || entity.getEntityWorld().isClient()) {
+			return;
+		}
+
+		ServerPlayerEntity attacker = directMeleePlayerAttackerFrom(source);
+		if (attacker == null || attacker == entity || !attacker.isAlive() || attacker.isSpectator()) {
+			return;
+		}
+
+		if (!isValidComedicAssistantTarget(entity)) {
+			return;
+		}
+
+		tryTriggerComedicAssistant(attacker, entity, damageTaken);
+	}
+
+	private static ServerPlayerEntity directMeleePlayerAttackerFrom(DamageSource source) {
+		Entity attacker = source.getAttacker();
+		Entity directSource = source.getSource();
+		if (attacker instanceof ServerPlayerEntity attackerPlayer && directSource == attackerPlayer && attackerPlayer.isAlive() && !attackerPlayer.isSpectator()) {
+			return attackerPlayer;
+		}
+		if (directSource instanceof ServerPlayerEntity sourcePlayer && (attacker == null || attacker == sourcePlayer) && sourcePlayer.isAlive() && !sourcePlayer.isSpectator()) {
+			return sourcePlayer;
+		}
+		return null;
 	}
 
 	private static UUID resolveDomainClashAttackerId(
@@ -3474,10 +3708,13 @@ public final class MagicAbilityManager {
 		updateFrostbittenTargets(server, currentTick);
 		updateEnhancedFireTargets(server, currentTick);
 		updateMartyrsFlameBurningTargets(server, currentTick);
+		updateComedicAssistantCarries(server, currentTick);
 		updateDomainClashes(server, currentTick);
 		updateDomainExpansions(server, currentTick);
 		syncDomainTimerOverlays(server, currentTick);
 		updateComedicRewriteVisualCameos(server, currentTick);
+		updateComedicAssistantAcmeVisuals(server, currentTick);
+		updateComedicAssistantCaneImpactStates(server, currentTick);
 
 		if (currentTick % TICKS_PER_SECOND == 0) {
 			for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
@@ -3496,7 +3733,7 @@ public final class MagicAbilityManager {
 		Iterator<ComedicRewriteVisualCameo> iterator = COMEDIC_REWRITE_VISUAL_CAMEOS.iterator();
 		while (iterator.hasNext()) {
 			ComedicRewriteVisualCameo cameo = iterator.next();
-			syncComedicRewriteVisualCameoFollow(server, cameo);
+			syncComedicRewriteVisualCameo(server, cameo);
 			if (!cameo.chargeStopped() && cameo.chargeEndTick() > 0 && cameo.chargeEndTick() <= currentTick) {
 				stopComedicRewriteVisualCameoCharge(server, cameo);
 			}
@@ -3515,14 +3752,8 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private static void syncComedicRewriteVisualCameoFollow(MinecraftServer server, ComedicRewriteVisualCameo cameo) {
-		ComedicRewriteVisualFollowState followState = cameo.followState();
-		if (followState == null) {
-			return;
-		}
-
-		ServerPlayerEntity anchor = server.getPlayerManager().getPlayer(followState.anchorPlayerId());
-		if (anchor == null || anchor.isDead()) {
+	private static void syncComedicRewriteVisualCameo(MinecraftServer server, ComedicRewriteVisualCameo cameo) {
+		if (cameo.followState() == null && cameo.rotationState() == null) {
 			return;
 		}
 
@@ -3531,21 +3762,86 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		Vec3d anchorBase = new Vec3d(anchor.getX(), anchor.getY() + anchor.getHeight(), anchor.getZ());
-		Vec3d[] headOffsets = followState.headOffsets();
+		ComedicRewriteVisualFollowState followState = cameo.followState();
+		Entity anchor = null;
+		Vec3d anchorTop = null;
+		if (followState != null) {
+			ServerWorld anchorWorld = server.getWorld(followState.dimension());
+			if (anchorWorld != null) {
+				anchor = anchorWorld.getEntity(followState.anchorEntityId());
+			}
+			if (anchor != null && anchor.isAlive()) {
+				anchorTop = new Vec3d(anchor.getX(), anchor.getY() + anchor.getHeight(), anchor.getZ());
+			} else {
+				followState = null;
+			}
+		}
+
 		Entity[] entities = cameo.entities();
-		int count = Math.min(entities.length, headOffsets.length);
-		for (int index = 0; index < count; index++) {
+		for (int index = 0; index < entities.length; index++) {
 			Entity entity = entities[index];
-			Vec3d targetPos = anchorBase.add(headOffsets[index]);
-			entity.refreshPositionAndAngles(targetPos.x, targetPos.y, targetPos.z, entity.getYaw(), entity.getPitch());
-			entity.setVelocity(Vec3d.ZERO);
+			boolean changed = false;
+			if (followState != null && index < followState.offsets().length) {
+				Vec3d offset = followState.offsets()[index];
+				Vec3d targetPos = followState.mode() == ComedicRewriteVisualFollowMode.DROP_TO_ENTITY_TOP
+					? comedicRewriteDropVisualTargetPosition(entity, anchorTop, offset, followState.verticalSpeed())
+					: anchorTop.add(offset);
+				entity.refreshPositionAndAngles(targetPos.x, targetPos.y, targetPos.z, entity.getYaw(), entity.getPitch());
+				entity.setVelocity(Vec3d.ZERO);
+				changed = true;
+			} else if (cameo.rotationState() != null && !cameo.chargeStopped() && entity.getVelocity().lengthSquared() > 1.0E-5) {
+				entity.refreshPositionAndAngles(
+					entity.getX() + entity.getVelocity().x,
+					entity.getY() + entity.getVelocity().y,
+					entity.getZ() + entity.getVelocity().z,
+					entity.getYaw(),
+					entity.getPitch()
+				);
+				changed = true;
+			}
+			if (cameo.rotationState() != null) {
+				applyComedicRewriteVisualRotation(entity, cameo.rotationState());
+				changed = true;
+			}
+			if (!changed) {
+				continue;
+			}
 			EntityPositionSyncS2CPacket positionPacket = EntityPositionSyncS2CPacket.create(entity);
-			EntityVelocityUpdateS2CPacket velocityPacket = new EntityVelocityUpdateS2CPacket(entity.getId(), entity.getVelocity());
+			EntityVelocityUpdateS2CPacket velocityPacket = entity.getVelocity().lengthSquared() <= 1.0E-5
+				? null
+				: new EntityVelocityUpdateS2CPacket(entity.getId(), entity.getVelocity());
 			for (ServerPlayerEntity viewer : viewers) {
 				viewer.networkHandler.sendPacket(positionPacket);
-				viewer.networkHandler.sendPacket(velocityPacket);
+				if (velocityPacket != null) {
+					viewer.networkHandler.sendPacket(velocityPacket);
+				}
 			}
+		}
+	}
+
+	private static Vec3d comedicRewriteDropVisualTargetPosition(Entity entity, Vec3d anchorTop, Vec3d offset, double verticalSpeed) {
+		double targetY = anchorTop.y + offset.y;
+		double nextY = entity.getY();
+		if (nextY > targetY) {
+			nextY = Math.max(targetY, nextY - Math.max(0.01, verticalSpeed));
+		} else {
+			nextY = targetY;
+		}
+		return new Vec3d(anchorTop.x + offset.x, nextY, anchorTop.z + offset.z);
+	}
+
+	private static void applyComedicRewriteVisualRotation(Entity entity, ComedicRewriteVisualRotationState rotationState) {
+		if (rotationState.alignYawToVelocity()) {
+			Vec3d horizontalVelocity = new Vec3d(entity.getVelocity().x, 0.0, entity.getVelocity().z);
+			if (horizontalVelocity.lengthSquared() > 1.0E-5) {
+				float yaw = horizontalYawFromDirection(horizontalVelocity) + rotationState.yawOffsetDegrees();
+				entity.setYaw(yaw);
+				entity.setBodyYaw(yaw);
+				entity.setHeadYaw(yaw);
+			}
+		}
+		if (rotationState.pitchPerTick() != 0.0F) {
+			entity.setPitch(MathHelper.wrapDegrees(entity.getPitch() + rotationState.pitchPerTick()));
 		}
 	}
 
@@ -3588,6 +3884,7 @@ public final class MagicAbilityManager {
 		if (COMEDIC_REWRITE_PASSIVE_ENABLED.contains(playerId) && !shouldKeepComedicRewriteEnabled(player)) {
 			deactivateComedicRewrite(player);
 		}
+		updateComedicAssistantState(player, currentTick);
 
 		if (COMEDIC_REWRITE_IMMUNITY_END_TICK.getOrDefault(playerId, Integer.MIN_VALUE) <= currentTick) {
 			COMEDIC_REWRITE_IMMUNITY_END_TICK.remove(playerId);
@@ -3631,6 +3928,9 @@ public final class MagicAbilityManager {
 		COMEDIC_REWRITE_IMMUNITY_END_TICK.remove(playerId);
 		COMEDIC_REWRITE_FALL_PROTECTION_END_TICK.remove(playerId);
 		COMEDIC_REWRITE_PENDING_STATES.remove(playerId);
+		COMEDIC_ASSISTANT_ARMED_STATES.remove(playerId);
+		COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(playerId);
+		clearComedicAssistantCaneImpactState(playerId);
 		DOMAIN_CLASH_PENDING_DAMAGE.remove(playerId);
 		MAGIC_DAMAGE_PENDING_ATTACKER.remove(playerId);
 		MAGIC_DAMAGE_PENDING_ATTACKER.entrySet().removeIf(entry -> entry.getValue().equals(playerId));
@@ -4658,10 +4958,871 @@ public final class MagicAbilityManager {
 			viewers,
 			0,
 			COMEDIC_REWRITE_PARROT_RESCUE.visualFollowPlayerHead()
-				? new ComedicRewriteVisualFollowState(player.getUuid(), headOffsets)
+				? new ComedicRewriteVisualFollowState(
+					world.getRegistryKey(),
+					player.getUuid(),
+					headOffsets,
+					ComedicRewriteVisualFollowMode.ENTITY_TOP,
+					0.0
+				)
 				: null,
 			parrots.toArray(Entity[]::new)
 		);
+	}
+
+	private static boolean hasEnabledComedicAssistantOutcomes() {
+		return COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.enabled()
+			|| COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.enabled()
+			|| COMEDIC_ASSISTANT_PARROT_KIDNAPPING.enabled()
+			|| COMEDIC_ASSISTANT_DIVINE_OVERREACTION.enabled()
+			|| COMEDIC_ASSISTANT_ACME_DROP.enabled()
+			|| COMEDIC_ASSISTANT_PIE_TO_THE_FACE.enabled()
+			|| COMEDIC_ASSISTANT_GIANT_CANE_YANK.enabled();
+	}
+
+	private static boolean isValidComedicAssistantTarget(LivingEntity target) {
+		if (target == null || !target.isAlive()) {
+			return false;
+		}
+		if (target instanceof ServerPlayerEntity playerTarget) {
+			return COMEDIC_ASSISTANT_ALLOW_PLAYER_TARGETS && !playerTarget.isSpectator();
+		}
+		return COMEDIC_ASSISTANT_ALLOW_MOB_TARGETS && target instanceof MobEntity;
+	}
+
+	private static void tryTriggerComedicAssistant(ServerPlayerEntity attacker, LivingEntity target, float damageTaken) {
+		ComedicAssistantArmedState state = COMEDIC_ASSISTANT_ARMED_STATES.get(attacker.getUuid());
+		if (state == null || !(target.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+
+		int currentTick = world.getServer().getTicks();
+		if (!shouldKeepComedicAssistantEnabled(attacker) || attacker.getEntityWorld().getRegistryKey() != state.dimension()) {
+			clearComedicAssistantState(attacker.getUuid());
+			return;
+		}
+		if (currentTick >= state.expiresTick()) {
+			deactivateComedicAssistant(attacker, currentTick, COMEDIC_ASSISTANT_CANCEL_COOLDOWN_TICKS, false, true);
+			return;
+		}
+
+		ComedicAssistantOutcome outcome = selectComedicAssistantOutcome(attacker);
+		if (outcome == null) {
+			clearComedicAssistantState(attacker.getUuid());
+			attacker.sendMessage(Text.translatable("message.magic.jester.comedic_assistant.no_outcomes"), true);
+			return;
+		}
+
+		clearComedicAssistantState(attacker.getUuid());
+		startComedicAssistantCooldown(attacker.getUuid(), currentTick, COMEDIC_ASSISTANT_PROC_COOLDOWN_TICKS);
+		attacker.sendMessage(Text.translatable("message.magic.jester.comedic_assistant.proc", outcome.displayName()), true);
+		sendComedicAssistantProcOverlay(attacker, target, outcome);
+		applyComedicAssistantOutcome(outcome, attacker, target, world, currentTick, damageTaken);
+	}
+
+	private static void deactivateComedicAssistant(
+		ServerPlayerEntity player,
+		int currentTick,
+		int cooldownTicks,
+		boolean manualCancel,
+		boolean expired
+	) {
+		if (COMEDIC_ASSISTANT_ARMED_STATES.remove(player.getUuid()) == null) {
+			return;
+		}
+
+		startComedicAssistantCooldown(player.getUuid(), currentTick, cooldownTicks);
+		if (manualCancel) {
+			player.sendMessage(Text.translatable("message.magic.jester.comedic_assistant.cancelled"), true);
+			return;
+		}
+		if (expired) {
+			player.sendMessage(Text.translatable("message.magic.jester.comedic_assistant.expired"), true);
+		}
+	}
+
+	private static void clearComedicAssistantState(UUID playerId) {
+		COMEDIC_ASSISTANT_ARMED_STATES.remove(playerId);
+	}
+
+	private static boolean clearComedicAssistantCaneImpactState(UUID playerId) {
+		boolean removed = COMEDIC_ASSISTANT_CANE_IMPACT_STATES.remove(playerId) != null;
+		removed |= COMEDIC_ASSISTANT_CANE_IMPACT_STATES.entrySet().removeIf(entry -> entry.getValue().casterId().equals(playerId));
+		return removed;
+	}
+
+	private static ComedicAssistantOutcome selectComedicAssistantOutcome(ServerPlayerEntity player) {
+		int slimeWeight = COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.enabled() ? Math.max(0, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.weight()) : 0;
+		int pandaWeight = COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.enabled() ? Math.max(0, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.weight()) : 0;
+		int parrotWeight = COMEDIC_ASSISTANT_PARROT_KIDNAPPING.enabled() ? Math.max(0, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.weight()) : 0;
+		int divineWeight = COMEDIC_ASSISTANT_DIVINE_OVERREACTION.enabled() ? Math.max(0, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.weight()) : 0;
+		int acmeWeight = COMEDIC_ASSISTANT_ACME_DROP.enabled() ? Math.max(0, COMEDIC_ASSISTANT_ACME_DROP.weight()) : 0;
+		int pieWeight = COMEDIC_ASSISTANT_PIE_TO_THE_FACE.enabled() ? Math.max(0, COMEDIC_ASSISTANT_PIE_TO_THE_FACE.weight()) : 0;
+		int caneWeight = COMEDIC_ASSISTANT_GIANT_CANE_YANK.enabled() ? Math.max(0, COMEDIC_ASSISTANT_GIANT_CANE_YANK.weight()) : 0;
+		int totalWeight = slimeWeight + pandaWeight + parrotWeight + divineWeight + acmeWeight + pieWeight + caneWeight;
+		if (totalWeight <= 0) {
+			return null;
+		}
+
+		int roll = player.getRandom().nextInt(totalWeight);
+		if (roll < slimeWeight) {
+			return ComedicAssistantOutcome.GIANT_SLIME_SLAM;
+		}
+		roll -= slimeWeight;
+		if (roll < pandaWeight) {
+			return ComedicAssistantOutcome.PANDA_BOWLING_BALL;
+		}
+		roll -= pandaWeight;
+		if (roll < parrotWeight) {
+			return ComedicAssistantOutcome.PARROT_KIDNAPPING;
+		}
+		roll -= parrotWeight;
+		if (roll < divineWeight) {
+			return ComedicAssistantOutcome.DIVINE_OVERREACTION;
+		}
+		roll -= divineWeight;
+		if (roll < acmeWeight) {
+			return ComedicAssistantOutcome.ACME_DROP;
+		}
+		roll -= acmeWeight;
+		if (roll < pieWeight) {
+			return ComedicAssistantOutcome.PIE_TO_THE_FACE;
+		}
+		return ComedicAssistantOutcome.GIANT_CANE_YANK;
+	}
+
+	private static void sendComedicAssistantProcOverlay(ServerPlayerEntity attacker, LivingEntity target, ComedicAssistantOutcome outcome) {
+		JesterJokeOverlayPayload payload = new JesterJokeOverlayPayload(
+			outcome.displayName().getString(),
+			COMEDIC_ASSISTANT_OVERLAY_COLOR_RGB,
+			COMEDIC_ASSISTANT_OVERLAY_FADE_IN_TICKS,
+			COMEDIC_ASSISTANT_OVERLAY_STAY_TICKS,
+			COMEDIC_ASSISTANT_OVERLAY_FADE_OUT_TICKS
+		);
+		ServerPlayNetworking.send(attacker, payload);
+		if (target instanceof ServerPlayerEntity targetPlayer && targetPlayer != attacker) {
+			ServerPlayNetworking.send(targetPlayer, payload);
+		}
+	}
+
+	private static void applyComedicAssistantOutcome(
+		ComedicAssistantOutcome outcome,
+		ServerPlayerEntity attacker,
+		LivingEntity target,
+		ServerWorld world,
+		int currentTick,
+		float damageTaken
+	) {
+		switch (outcome) {
+			case GIANT_SLIME_SLAM -> applyComedicAssistantSlimeSlam(attacker, target, world);
+			case PANDA_BOWLING_BALL -> applyComedicAssistantPandaBowlingBall(attacker, target, world);
+			case PARROT_KIDNAPPING -> applyComedicAssistantParrotKidnapping(attacker, target, world, currentTick);
+			case DIVINE_OVERREACTION -> applyComedicAssistantDivineOverreaction(attacker, target, world, damageTaken);
+			case ACME_DROP -> applyComedicAssistantAcmeDrop(attacker, target, world);
+			case PIE_TO_THE_FACE -> applyComedicAssistantPieToTheFace(attacker, target, world);
+			case GIANT_CANE_YANK -> applyComedicAssistantGiantCaneYank(attacker, target, world);
+		}
+	}
+
+	private static void applyComedicAssistantSlimeSlam(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world) {
+		Vec3d impactPos = new Vec3d(target.getX(), target.getY() + target.getHeight(), target.getZ());
+		playConfiguredSound(world, impactPos.add(0.0, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.visualSpawnHeight(), 0.0), SoundEvents.ENTITY_SLIME_JUMP, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.spawnSoundVolume(), COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.spawnSoundPitch());
+		playConfiguredSound(world, impactPos, SoundEvents.ENTITY_SLIME_SQUISH, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.impactSoundVolume(), COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.impactSoundPitch());
+		spawnComedicAssistantBlockParticles(world, Blocks.SLIME_BLOCK.getDefaultState(), impactPos, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.particleCount(), 0.45, 0.1);
+		spawnComedicAssistantSlimeVisual(target, world);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		applyComedicAssistantBonusDamage(attacker, target, world, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.bonusDamage());
+		addConfiguredStatusEffect(target, StatusEffects.SLOWNESS, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.slownessDurationTicks(), COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.slownessAmplifier());
+		addConfiguredStatusEffect(target, StatusEffects.OOZING, COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.oozingDurationTicks(), COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.oozingAmplifier());
+	}
+
+	private static void applyComedicAssistantPandaBowlingBall(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world) {
+		Vec3d launchDirection = directionFromAttackerToTarget(attacker, target);
+		Vec3d impactPos = new Vec3d(target.getX(), target.getY() + target.getHeight() * 0.45, target.getZ());
+		playConfiguredSound(world, impactPos, SoundEvents.ENTITY_PANDA_BITE, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.rollSoundVolume(), COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.rollSoundPitch());
+		playConfiguredSound(world, impactPos, SoundEvents.ENTITY_PANDA_HURT, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.impactSoundVolume(), COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.impactSoundPitch());
+		spawnComedicAssistantItemParticles(world, new ItemStack(Items.BAMBOO), impactPos, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.particleCount(), 0.35, 0.14);
+		spawnComedicAssistantPandaVisual(target, world, launchDirection);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		applyComedicAssistantBonusDamage(attacker, target, world, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.bonusDamage());
+		launchTarget(target, launchDirection, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.horizontalLaunch(), COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.verticalLaunch());
+		addConfiguredStatusEffect(target, StatusEffects.SLOWNESS, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.slownessDurationTicks(), COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.slownessAmplifier());
+	}
+
+	private static void applyComedicAssistantParrotKidnapping(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world, int currentTick) {
+		Vec3d impactPos = new Vec3d(target.getX(), target.getY() + target.getHeight(), target.getZ());
+		playConfiguredSound(world, impactPos, SoundEvents.ENTITY_PARROT_FLY, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.soundVolume(), COMEDIC_ASSISTANT_PARROT_KIDNAPPING.soundPitch());
+		spawnComedicAssistantItemParticles(world, new ItemStack(Items.FEATHER), impactPos, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.particleCount(), 0.55, 0.12);
+		spawnComedicAssistantParrotVisual(target, world);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		applyComedicAssistantBonusDamage(attacker, target, world, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.bonusDamage());
+		double targetY = resolveComedicAssistantCarryTargetY(target, world, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.liftHeight());
+		if (targetY > target.getY() + 1.0 && COMEDIC_ASSISTANT_PARROT_KIDNAPPING.maxCarryTicks() > 0) {
+			COMEDIC_ASSISTANT_PARROT_CARRY_STATES.put(
+				target.getUuid(),
+				new ComedicAssistantParrotCarryState(
+					world.getRegistryKey(),
+					targetY,
+					currentTick + COMEDIC_ASSISTANT_PARROT_KIDNAPPING.maxCarryTicks(),
+					currentTick,
+					currentTick,
+					COMEDIC_ASSISTANT_PARROT_KIDNAPPING
+				)
+			);
+			target.fallDistance = 0.0F;
+		} else {
+			launchTarget(target, new Vec3d(0.0, 1.0, 0.0), 0.0, Math.max(0.6, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.upwardVelocity()));
+		}
+		if (COMEDIC_ASSISTANT_PARROT_KIDNAPPING.applyGlowing()) {
+			addConfiguredStatusEffect(target, StatusEffects.GLOWING, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.glowingDurationTicks(), 0);
+		}
+	}
+
+	private static void applyComedicAssistantDivineOverreaction(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world, float damageTaken) {
+		Vec3d targetPos = new Vec3d(target.getX(), target.getY() + target.getHeight() * 0.5, target.getZ());
+		playConfiguredSound(world, targetPos, SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.soundVolume(), COMEDIC_ASSISTANT_DIVINE_OVERREACTION.soundPitch());
+		playConfiguredSound(world, targetPos, SoundEvents.ENTITY_LIGHTNING_BOLT_IMPACT, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.soundVolume() * 0.85F, Math.max(0.1F, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.soundPitch() + 0.15F));
+		int strikeCount = Math.max(1, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.strikeCount());
+		spawnComedicAssistantDivineLightningVisual(target, world, strikeCount);
+		for (int index = 0; index < strikeCount; index++) {
+			double angle = (Math.PI * 2.0 * index) / strikeCount;
+			double radius = target.getRandom().nextDouble() * COMEDIC_ASSISTANT_DIVINE_OVERREACTION.strikeRadius();
+			double x = targetPos.x + Math.cos(angle) * radius;
+			double z = targetPos.z + Math.sin(angle) * radius;
+			world.spawnParticles(
+				ParticleTypes.ELECTRIC_SPARK,
+				x,
+				targetPos.y + target.getRandom().nextDouble() * Math.max(1.0, target.getHeight()),
+				z,
+				Math.max(1, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.particleCount() / Math.max(1, strikeCount / 2)),
+				0.08,
+				0.5,
+				0.08,
+				0.25
+			);
+			world.spawnParticles(ParticleTypes.GLOW, x, targetPos.y + 0.2, z, 2, 0.02, 0.2, 0.02, 0.01);
+		}
+		world.spawnParticles(
+			ParticleTypes.POOF,
+			targetPos.x,
+			targetPos.y,
+			targetPos.z,
+			Math.max(6, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.particleCount() / 2),
+			0.45,
+			0.4,
+			0.45,
+			0.06
+		);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		applyComedicAssistantBonusDamage(attacker, target, world, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.bonusDamage());
+		addConfiguredStatusEffect(target, StatusEffects.GLOWING, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.glowingDurationTicks(), 0);
+		addConfiguredStatusEffect(target, StatusEffects.BLINDNESS, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.blindnessDurationTicks(), COMEDIC_ASSISTANT_DIVINE_OVERREACTION.blindnessAmplifier());
+		addConfiguredStatusEffect(target, StatusEffects.NAUSEA, COMEDIC_ASSISTANT_DIVINE_OVERREACTION.nauseaDurationTicks(), COMEDIC_ASSISTANT_DIVINE_OVERREACTION.nauseaAmplifier());
+	}
+
+	private static void applyComedicAssistantAcmeDrop(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world) {
+		Vec3d targetPos = new Vec3d(target.getX(), target.getY() + target.getHeight(), target.getZ());
+		playConfiguredSound(world, targetPos, SoundEvents.BLOCK_ANVIL_LAND, COMEDIC_ASSISTANT_ACME_DROP.soundVolume(), COMEDIC_ASSISTANT_ACME_DROP.soundPitch());
+		spawnComedicAssistantBlockParticles(world, Blocks.ANVIL.getDefaultState(), targetPos, COMEDIC_ASSISTANT_ACME_DROP.particleCount(), 0.35, 0.12);
+		world.spawnParticles(
+			ParticleTypes.CAMPFIRE_COSY_SMOKE,
+			targetPos.x,
+			target.getY() + 0.05,
+			targetPos.z,
+			Math.max(4, COMEDIC_ASSISTANT_ACME_DROP.particleCount() / 2),
+			0.35,
+			0.05,
+			0.35,
+			0.02
+		);
+		spawnComedicAssistantAcmeVisual(target, world);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		target.setVelocity(0.0, Math.min(0.0, target.getVelocity().y), 0.0);
+		applyComedicAssistantBonusDamage(attacker, target, world, COMEDIC_ASSISTANT_ACME_DROP.bonusDamage());
+		addConfiguredStatusEffect(target, StatusEffects.SLOWNESS, COMEDIC_ASSISTANT_ACME_DROP.slownessDurationTicks(), COMEDIC_ASSISTANT_ACME_DROP.slownessAmplifier());
+		addConfiguredStatusEffect(target, StatusEffects.WEAKNESS, COMEDIC_ASSISTANT_ACME_DROP.weaknessDurationTicks(), COMEDIC_ASSISTANT_ACME_DROP.weaknessAmplifier());
+	}
+
+	private static void applyComedicAssistantPieToTheFace(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world) {
+		Vec3d facePos = new Vec3d(target.getX(), target.getEyeY(), target.getZ());
+		playConfiguredSound(world, facePos, SoundEvents.ENTITY_GENERIC_SPLASH, COMEDIC_ASSISTANT_PIE_TO_THE_FACE.soundVolume(), COMEDIC_ASSISTANT_PIE_TO_THE_FACE.soundPitch());
+		spawnComedicAssistantItemParticles(world, new ItemStack(Items.PUMPKIN_PIE), facePos, COMEDIC_ASSISTANT_PIE_TO_THE_FACE.particleCount(), 0.16, 0.08);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		applyComedicAssistantBonusDamage(attacker, target, world, COMEDIC_ASSISTANT_PIE_TO_THE_FACE.bonusDamage());
+		addConfiguredStatusEffect(target, StatusEffects.BLINDNESS, COMEDIC_ASSISTANT_PIE_TO_THE_FACE.blindnessDurationTicks(), COMEDIC_ASSISTANT_PIE_TO_THE_FACE.blindnessAmplifier());
+		addConfiguredStatusEffect(target, StatusEffects.NAUSEA, COMEDIC_ASSISTANT_PIE_TO_THE_FACE.nauseaDurationTicks(), COMEDIC_ASSISTANT_PIE_TO_THE_FACE.nauseaAmplifier());
+	}
+
+	private static void applyComedicAssistantGiantCaneYank(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world) {
+		Vec3d yankDirection = sidewaysDirectionFromAttackerToTarget(attacker, target);
+		Vec3d targetPos = new Vec3d(target.getX(), target.getY() + target.getHeight() * 0.4, target.getZ());
+		playConfiguredSound(world, targetPos, SoundEvents.ENTITY_FISHING_BOBBER_RETRIEVE, COMEDIC_ASSISTANT_GIANT_CANE_YANK.soundVolume(), COMEDIC_ASSISTANT_GIANT_CANE_YANK.soundPitch());
+		spawnComedicAssistantItemParticles(world, new ItemStack(Items.STICK), targetPos, COMEDIC_ASSISTANT_GIANT_CANE_YANK.particleCount(), 0.28, 0.12);
+		world.spawnParticles(
+			ParticleTypes.CLOUD,
+			targetPos.x,
+			targetPos.y,
+			targetPos.z,
+			Math.max(2, COMEDIC_ASSISTANT_GIANT_CANE_YANK.particleCount() / 2),
+			0.25,
+			0.2,
+			0.25,
+			0.03
+		);
+		spawnComedicAssistantCaneVisual(target, world, yankDirection);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		applyComedicAssistantBonusDamage(attacker, target, world, COMEDIC_ASSISTANT_GIANT_CANE_YANK.bonusDamage());
+		launchTarget(target, yankDirection, COMEDIC_ASSISTANT_GIANT_CANE_YANK.horizontalLaunch(), COMEDIC_ASSISTANT_GIANT_CANE_YANK.verticalLaunch());
+		trackComedicAssistantCaneImpact(attacker, target, world);
+		addConfiguredStatusEffect(target, StatusEffects.SLOWNESS, COMEDIC_ASSISTANT_GIANT_CANE_YANK.slownessDurationTicks(), COMEDIC_ASSISTANT_GIANT_CANE_YANK.slownessAmplifier());
+	}
+
+	private static void applyComedicAssistantBonusDamage(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world, float bonusDamage) {
+		if (bonusDamage <= 0.0F || !target.isAlive()) {
+			return;
+		}
+		dealTrackedMagicDamage(target, attacker.getUuid(), world.getDamageSources().genericKill(), bonusDamage);
+	}
+
+	private static void launchTarget(LivingEntity target, Vec3d direction, double horizontalVelocity, double verticalVelocity) {
+		Vec3d launchDirection = normalizedHorizontalDirection(direction, target instanceof ServerPlayerEntity player ? player : null);
+		target.setVelocity(launchDirection.x * horizontalVelocity, verticalVelocity, launchDirection.z * horizontalVelocity);
+	}
+
+	private static Vec3d entityPosition(Entity entity) {
+		return new Vec3d(entity.getX(), entity.getY(), entity.getZ());
+	}
+
+	private static void trackComedicAssistantCaneImpact(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world) {
+		MinecraftServer server = world.getServer();
+		if (server == null || COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageTrackingTicks() <= 0 || COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageMax() <= 0.0) {
+			return;
+		}
+
+		int currentTick = server.getTicks();
+		COMEDIC_ASSISTANT_CANE_IMPACT_STATES.put(
+			target.getUuid(),
+			new ComedicAssistantCaneImpactState(
+				world.getRegistryKey(),
+				attacker.getUuid(),
+				currentTick,
+				currentTick + COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageTrackingTicks(),
+				entityPosition(target),
+				target.getVelocity(),
+				target.getVelocity().length()
+			)
+		);
+	}
+
+	private static Vec3d directionFromAttackerToTarget(ServerPlayerEntity attacker, LivingEntity target) {
+		Vec3d direction = new Vec3d(target.getX() - attacker.getX(), 0.0, target.getZ() - attacker.getZ());
+		if (direction.lengthSquared() > 1.0E-5) {
+			return direction.normalize();
+		}
+		Vec3d facing = attacker.getRotationVector();
+		return normalizedHorizontalDirection(new Vec3d(facing.x, 0.0, facing.z), attacker);
+	}
+
+	private static Vec3d sidewaysDirectionFromAttackerToTarget(ServerPlayerEntity attacker, LivingEntity target) {
+		Vec3d baseDirection = directionFromAttackerToTarget(attacker, target);
+		Vec3d sideways = new Vec3d(-baseDirection.z, 0.0, baseDirection.x);
+		if (target.getRandom().nextBoolean()) {
+			sideways = sideways.multiply(-1.0);
+		}
+		return sideways.normalize();
+	}
+
+	private static void spawnComedicAssistantBlockParticles(
+		ServerWorld world,
+		BlockState state,
+		Vec3d center,
+		int count,
+		double spread,
+		double speed
+	) {
+		if (count <= 0) {
+			return;
+		}
+		world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, state), center.x, center.y, center.z, count, spread, spread, spread, speed);
+	}
+
+	private static void spawnComedicAssistantItemParticles(
+		ServerWorld world,
+		ItemStack stack,
+		Vec3d center,
+		int count,
+		double spread,
+		double speed
+	) {
+		if (count <= 0) {
+			return;
+		}
+		world.spawnParticles(new ItemStackParticleEffect(ParticleTypes.ITEM, stack), center.x, center.y, center.z, count, spread, spread, spread, speed);
+	}
+
+	private static void playConfiguredSound(ServerWorld world, Vec3d pos, SoundEvent sound, float volume, float pitch) {
+		if (world == null || sound == null || volume <= 0.0F || pitch <= 0.0F) {
+			return;
+		}
+		world.playSound(null, pos.x, pos.y, pos.z, sound, SoundCategory.PLAYERS, volume, pitch);
+	}
+
+	private static void spawnComedicAssistantSlimeVisual(LivingEntity target, ServerWorld world) {
+		if (COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.visualDurationTicks() <= 0 || COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.visualSpawnHeight() <= 0.0) {
+			return;
+		}
+
+		Vec3d basePos = new Vec3d(target.getX(), target.getY(), target.getZ());
+		List<ServerPlayerEntity> viewers = comedicRewriteVisualViewers(world, basePos);
+		if (viewers.isEmpty()) {
+			return;
+		}
+
+		SlimeEntity slime = new SlimeEntity(EntityType.SLIME, world);
+		double startY = target.getY() + target.getHeight() + COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.visualSpawnHeight();
+		slime.refreshPositionAndAngles(target.getX(), startY, target.getZ(), target.getYaw(), 0.0F);
+		slime.setBodyYaw(target.getYaw());
+		slime.setHeadYaw(target.getYaw());
+		slime.setAiDisabled(true);
+		slime.setSilent(true);
+		slime.setNoGravity(true);
+		slime.setSize(COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.visualSize(), false);
+		slime.setVelocity(Vec3d.ZERO);
+		queueComedicRewriteVisualCameo(
+			world.getServer(),
+			COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.visualDurationTicks(),
+			viewers,
+			0,
+			new ComedicRewriteVisualFollowState(
+				world.getRegistryKey(),
+				target.getUuid(),
+				new Vec3d[] { Vec3d.ZERO },
+				ComedicRewriteVisualFollowMode.DROP_TO_ENTITY_TOP,
+				COMEDIC_ASSISTANT_GIANT_SLIME_SLAM.visualFallSpeed()
+			),
+			slime
+		);
+	}
+
+	private static void spawnComedicAssistantPandaVisual(LivingEntity target, ServerWorld world, Vec3d direction) {
+		if (COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualDurationTicks() <= 0) {
+			return;
+		}
+
+		Vec3d basePos = new Vec3d(target.getX(), target.getY(), target.getZ());
+		List<ServerPlayerEntity> viewers = comedicRewriteVisualViewers(world, basePos);
+		if (viewers.isEmpty()) {
+			return;
+		}
+
+		Vec3d travelDirection = normalizedHorizontalDirection(direction, null);
+		Vec3d spawnPos = basePos.add(0.0, 0.1, 0.0).subtract(travelDirection.multiply(COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualSpawnDistance()));
+		float yaw = horizontalYawFromDirection(travelDirection);
+		PandaEntity panda = new PandaEntity(EntityType.PANDA, world);
+		panda.refreshPositionAndAngles(spawnPos.x, spawnPos.y, spawnPos.z, yaw, 0.0F);
+		panda.setBodyYaw(yaw);
+		panda.setHeadYaw(yaw);
+		panda.setAiDisabled(true);
+		panda.setSilent(true);
+		panda.setNoGravity(true);
+		panda.setVelocity(travelDirection.multiply(COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualChargeVelocity()));
+		int chargeTicks = COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualChargeVelocity() <= 0.0
+			? Math.max(1, COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualDurationTicks() / 2)
+			: Math.max(1, Math.min(COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualDurationTicks(), (int) Math.ceil((COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualSpawnDistance() * 2.0 + 1.0) / COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualChargeVelocity())));
+		panda.setMainGene(PandaEntity.Gene.PLAYFUL);
+		panda.setHiddenGene(PandaEntity.Gene.PLAYFUL);
+		panda.setPlaying(true);
+		panda.playingTicks = chargeTicks;
+		queueComedicRewriteVisualCameo(world.getServer(), COMEDIC_ASSISTANT_PANDA_BOWLING_BALL.visualDurationTicks(), viewers, chargeTicks, null, panda);
+	}
+
+	private static void spawnComedicAssistantParrotVisual(LivingEntity target, ServerWorld world) {
+		if (COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualDurationTicks() <= 0 || COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualCount() <= 0) {
+			return;
+		}
+
+		Vec3d basePos = new Vec3d(target.getX(), target.getY() + target.getHeight(), target.getZ());
+		List<ServerPlayerEntity> viewers = comedicRewriteVisualViewers(world, basePos);
+		if (viewers.isEmpty()) {
+			return;
+		}
+
+		List<Entity> parrots = new ArrayList<>();
+		Vec3d[] offsets = new Vec3d[COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualCount()];
+		for (int index = 0; index < COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualCount(); index++) {
+			double angle = (Math.PI * 2.0 * index) / COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualCount();
+			double offsetX = Math.cos(angle) * COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualRadius();
+			double offsetZ = Math.sin(angle) * COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualRadius();
+			Vec3d offset = new Vec3d(offsetX, COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualVerticalOffset() + (index % 2 == 0 ? 0.12 : 0.0), offsetZ);
+			offsets[index] = offset;
+			Vec3d spawnPos = basePos.add(offset);
+			ParrotEntity parrot = new ParrotEntity(EntityType.PARROT, world);
+			parrot.refreshPositionAndAngles(spawnPos.x, spawnPos.y, spawnPos.z, target.getYaw(), 0.0F);
+			parrot.setBodyYaw(target.getYaw());
+			parrot.setHeadYaw(target.getYaw());
+			parrot.setAiDisabled(true);
+			parrot.setSilent(true);
+			parrot.setNoGravity(true);
+			parrot.setVelocity(Vec3d.ZERO);
+			parrot.setComponent(
+				DataComponentTypes.PARROT_VARIANT,
+				ParrotEntity.Variant.byIndex(target.getRandom().nextInt(ParrotEntity.Variant.values().length))
+			);
+			parrots.add(parrot);
+		}
+		queueComedicRewriteVisualCameo(
+			world.getServer(),
+			Math.max(COMEDIC_ASSISTANT_PARROT_KIDNAPPING.visualDurationTicks(), COMEDIC_ASSISTANT_PARROT_KIDNAPPING.maxCarryTicks()),
+			viewers,
+			0,
+			new ComedicRewriteVisualFollowState(
+				world.getRegistryKey(),
+				target.getUuid(),
+				offsets,
+				ComedicRewriteVisualFollowMode.ENTITY_TOP,
+				0.0
+			),
+			parrots.toArray(Entity[]::new)
+		);
+	}
+
+	private static void spawnComedicAssistantAcmeVisual(LivingEntity target, ServerWorld world) {
+		if (COMEDIC_ASSISTANT_ACME_DROP.visualDurationTicks() <= 0 || COMEDIC_ASSISTANT_ACME_DROP.visualDropHeight() <= 0.0) {
+			return;
+		}
+
+		MinecraftServer server = world.getServer();
+		if (server == null) {
+			return;
+		}
+
+		DisplayEntity.BlockDisplayEntity anvil = new DisplayEntity.BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
+		double startY = target.getY() + target.getHeight() + COMEDIC_ASSISTANT_ACME_DROP.visualDropHeight();
+		anvil.refreshPositionAndAngles(target.getX(), startY, target.getZ(), 0.0F, 0.0F);
+		((BlockDisplayEntityAccessorMixin) anvil).magic$setBlockState(Blocks.ANVIL.getDefaultState());
+		((DisplayEntityAccessorMixin) anvil).magic$setTeleportDuration(1);
+		((DisplayEntityAccessorMixin) anvil).magic$setInterpolationDuration(1);
+		((DisplayEntityAccessorMixin) anvil).magic$setDisplayWidth(1.25F);
+		((DisplayEntityAccessorMixin) anvil).magic$setDisplayHeight(1.25F);
+		((DisplayEntityAccessorMixin) anvil).magic$setViewRange(1.0F);
+		anvil.setNoGravity(true);
+		anvil.setSilent(true);
+		if (!world.spawnEntity(anvil)) {
+			return;
+		}
+		COMEDIC_ASSISTANT_ACME_VISUALS.put(
+			anvil.getUuid(),
+			new ComedicAssistantAcmeVisualState(
+				world.getRegistryKey(),
+				anvil.getUuid(),
+				target.getUuid(),
+				server.getTicks() + COMEDIC_ASSISTANT_ACME_DROP.visualDurationTicks(),
+				comedicAssistantAcmeDropSpeed()
+			)
+		);
+	}
+
+	private static void spawnComedicAssistantCaneVisual(LivingEntity target, ServerWorld world, Vec3d direction) {
+		if (COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualDurationTicks() <= 0) {
+			return;
+		}
+
+		Vec3d basePos = new Vec3d(target.getX(), target.getY(), target.getZ());
+		List<ServerPlayerEntity> viewers = comedicRewriteVisualViewers(world, basePos);
+		if (viewers.isEmpty()) {
+			return;
+		}
+
+		Vec3d travelDirection = normalizedHorizontalDirection(direction, null);
+		Vec3d spawnPos = basePos.add(0.0, target.getHeight() * 0.45, 0.0).subtract(travelDirection.multiply(COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualSpawnDistance()));
+		float yaw = horizontalYawFromDirection(travelDirection);
+		ItemEntity cane = new ItemEntity(world, spawnPos.x, spawnPos.y, spawnPos.z, new ItemStack(Items.STICK));
+		cane.setYaw(yaw);
+		cane.setBodyYaw(yaw);
+		cane.setHeadYaw(yaw);
+		cane.setPitch(90.0F);
+		cane.setNoGravity(true);
+		cane.setSilent(true);
+		cane.setVelocity(travelDirection.multiply(COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualChargeVelocity()));
+		int chargeTicks = COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualChargeVelocity() <= 0.0
+			? Math.max(1, COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualDurationTicks() / 2)
+			: Math.max(1, Math.min(COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualDurationTicks(), (int) Math.ceil((COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualSpawnDistance() * 2.0 + 0.5) / COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualChargeVelocity())));
+		queueComedicRewriteVisualCameo(
+			world.getServer(),
+			COMEDIC_ASSISTANT_GIANT_CANE_YANK.visualDurationTicks(),
+			viewers,
+			chargeTicks,
+			null,
+			new ComedicRewriteVisualRotationState(true, 0.0F, 30.0F),
+			cane
+		);
+	}
+
+	private static void spawnComedicAssistantDivineLightningVisual(LivingEntity target, ServerWorld world, int strikeCount) {
+		int visibleStrikeCount = Math.max(1, Math.min(4, strikeCount));
+		for (int index = 0; index < visibleStrikeCount; index++) {
+			double angle = (Math.PI * 2.0 * index) / visibleStrikeCount;
+			double radius = target.getRandom().nextDouble() * COMEDIC_ASSISTANT_DIVINE_OVERREACTION.strikeRadius();
+			double x = target.getX() + Math.cos(angle) * radius;
+			double z = target.getZ() + Math.sin(angle) * radius;
+			LightningEntity lightning = new LightningEntity(EntityType.LIGHTNING_BOLT, world);
+			lightning.setCosmetic(true);
+			lightning.refreshPositionAfterTeleport(x, target.getY(), z);
+			world.spawnEntity(lightning);
+		}
+	}
+
+	private static double comedicAssistantAcmeDropSpeed() {
+		if (COMEDIC_ASSISTANT_ACME_DROP.visualDropHeight() <= 0.0) {
+			return 0.0;
+		}
+		double durationBasedSpeed = COMEDIC_ASSISTANT_ACME_DROP.visualDurationTicks() <= 1
+			? COMEDIC_ASSISTANT_ACME_DROP.visualDropHeight()
+			: COMEDIC_ASSISTANT_ACME_DROP.visualDropHeight() / Math.max(1.0, COMEDIC_ASSISTANT_ACME_DROP.visualDurationTicks() * 0.45);
+		return Math.max(1.35, durationBasedSpeed);
+	}
+
+	private static void updateComedicAssistantAcmeVisuals(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, ComedicAssistantAcmeVisualState>> iterator = COMEDIC_ASSISTANT_ACME_VISUALS.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, ComedicAssistantAcmeVisualState> entry = iterator.next();
+			ComedicAssistantAcmeVisualState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension());
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			Entity visualEntity = world.getEntity(state.visualEntityId());
+			if (!(visualEntity instanceof DisplayEntity.BlockDisplayEntity anvil) || !anvil.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (currentTick >= state.endTick()) {
+				anvil.discard();
+				iterator.remove();
+				continue;
+			}
+
+			Entity targetEntity = world.getEntity(state.targetEntityId());
+			if (!(targetEntity instanceof LivingEntity target) || !target.isAlive()) {
+				anvil.discard();
+				iterator.remove();
+				continue;
+			}
+
+			double targetY = target.getY() + target.getHeight();
+			double nextY = Math.max(targetY, anvil.getY() - state.dropSpeed());
+			anvil.refreshPositionAfterTeleport(target.getX(), nextY, target.getZ());
+		}
+	}
+
+	private static void updateComedicAssistantCaneImpactStates(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, ComedicAssistantCaneImpactState>> iterator = COMEDIC_ASSISTANT_CANE_IMPACT_STATES.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, ComedicAssistantCaneImpactState> entry = iterator.next();
+			ComedicAssistantCaneImpactState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension());
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			Entity entity = world.getEntity(entry.getKey());
+			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (currentTick > state.endTick()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (currentTick <= state.startTick()) {
+				state.lastPosition(entityPosition(target));
+				state.lastVelocity(target.getVelocity());
+				state.lastSpeed(target.getVelocity().length());
+				continue;
+			}
+
+			boolean collidedWithBlock = hasComedicAssistantCaneBlockImpact(target, world, state);
+			if (collidedWithBlock) {
+				Vec3d targetPosition = entityPosition(target);
+				double impactSpeed = Math.max(
+					Math.max(state.lastSpeed(), state.lastVelocity().length()),
+					Math.max(target.getVelocity().length(), targetPosition.subtract(state.lastPosition()).length())
+				);
+				double damageAmount = Math.min(
+					COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageMax(),
+					Math.max(0.0, impactSpeed - COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageThreshold()) * COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageMultiplier()
+				);
+				if (damageAmount > 0.0) {
+					dealTrackedMagicDamage(target, state.casterId(), world.getDamageSources().flyIntoWall(), (float) damageAmount);
+				}
+				iterator.remove();
+				continue;
+			}
+
+			state.lastPosition(entityPosition(target));
+			state.lastVelocity(target.getVelocity());
+			state.lastSpeed(target.getVelocity().length());
+		}
+	}
+
+	private static boolean hasComedicAssistantCaneBlockImpact(LivingEntity target, ServerWorld world, ComedicAssistantCaneImpactState state) {
+		if (target.isInsideWall() || target.horizontalCollision || target.verticalCollision || target.groundCollision) {
+			return true;
+		}
+
+		Vec3d targetPosition = entityPosition(target);
+		Vec3d movement = targetPosition.subtract(state.lastPosition());
+		Vec3d sweepVector = movement.lengthSquared() > 1.0E-4 ? movement : state.lastVelocity();
+		if (sweepVector.lengthSquared() <= 1.0E-4) {
+			return false;
+		}
+
+		Box previousBox = target.getBoundingBox().offset(state.lastPosition().subtract(targetPosition));
+		Box sweptBox = previousBox.stretch(sweepVector).expand(0.15);
+		if (world.getBlockCollisions(target, sweptBox).iterator().hasNext()) {
+			return true;
+		}
+
+		double lowerSampleY = 0.1;
+		double middleSampleY = MathHelper.clamp(target.getHeight() * 0.5, 0.2, Math.max(0.2, target.getHeight() - 0.15));
+		double upperSampleY = Math.max(middleSampleY, target.getHeight() - 0.15);
+		Vec3d horizontalSweep = new Vec3d(sweepVector.x, 0.0, sweepVector.z);
+		Vec3d sideOffset = horizontalSweep.lengthSquared() > 1.0E-4
+			? new Vec3d(-horizontalSweep.z, 0.0, horizontalSweep.x).normalize().multiply(Math.max(0.2, target.getWidth() * 0.45))
+			: Vec3d.ZERO;
+		return comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, lowerSampleY, Vec3d.ZERO)
+			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, middleSampleY, Vec3d.ZERO)
+			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, middleSampleY, sideOffset)
+			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, middleSampleY, sideOffset.multiply(-1.0))
+			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, upperSampleY, Vec3d.ZERO);
+	}
+
+	private static boolean comedicAssistantCaneRaycastHitsBlock(ServerWorld world, Entity entity, Vec3d startPos, Vec3d endPos, double yOffset, Vec3d lateralOffset) {
+		Vec3d start = startPos.add(lateralOffset).add(0.0, yOffset, 0.0);
+		Vec3d end = endPos.add(lateralOffset).add(0.0, yOffset, 0.0);
+		if (start.squaredDistanceTo(end) <= 1.0E-6) {
+			return false;
+		}
+
+		BlockHitResult hitResult = world.raycast(
+			new RaycastContext(start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity)
+		);
+		return hitResult.getType() == HitResult.Type.BLOCK;
+	}
+
+	private static void updateComedicAssistantCarries(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, ComedicAssistantParrotCarryState>> iterator = COMEDIC_ASSISTANT_PARROT_CARRY_STATES.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, ComedicAssistantParrotCarryState> entry = iterator.next();
+			ComedicAssistantParrotCarryState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension());
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			Entity entity = world.getEntity(entry.getKey());
+			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (
+				currentTick >= state.endTick()
+				|| target.getY() >= state.targetY() - 0.75
+				|| !world.isSpaceEmpty(target, target.getBoundingBox().offset(0.0, Math.min(1.5, Math.max(0.2, state.settings().upwardVelocity())), 0.0))
+			) {
+				releaseComedicAssistantCarry(target, state.settings());
+				iterator.remove();
+				continue;
+			}
+
+			double remainingLift = Math.max(0.0, state.targetY() - target.getY());
+			double upwardVelocity = Math.min(state.settings().upwardVelocity(), Math.max(0.45, remainingLift));
+			target.setVelocity(target.getVelocity().x * 0.18, upwardVelocity, target.getVelocity().z * 0.18);
+			target.fallDistance = 0.0F;
+			if (state.settings().applyGlowing()) {
+				refreshStatusEffect(target, StatusEffects.GLOWING, Math.max(2, state.settings().glowingDurationTicks()), 0, true, false, true);
+			}
+			if (currentTick >= state.nextParticleTick()) {
+				spawnComedicAssistantItemParticles(
+					world,
+					new ItemStack(Items.FEATHER),
+					new Vec3d(target.getX(), target.getY() + target.getHeight(), target.getZ()),
+					state.settings().particleCount(),
+					0.45,
+					0.08
+				);
+				state.nextParticleTick(currentTick + 4);
+			}
+			if (currentTick >= state.nextSoundTick()) {
+				playConfiguredSound(
+					world,
+					new Vec3d(target.getX(), target.getY() + target.getHeight(), target.getZ()),
+					SoundEvents.ENTITY_PARROT_FLY,
+					state.settings().soundVolume(),
+					state.settings().soundPitch()
+				);
+				state.nextSoundTick(currentTick + state.settings().flapSoundIntervalTicks());
+			}
+		}
+	}
+
+	private static void releaseComedicAssistantCarry(LivingEntity target, ComedicAssistantParrotSettings settings) {
+		double downwardVelocity = Math.max(0.0, settings.releaseDownwardVelocity());
+		if (downwardVelocity <= 0.0) {
+			return;
+		}
+		target.setVelocity(target.getVelocity().x * 0.12, -downwardVelocity, target.getVelocity().z * 0.12);
+	}
+
+	private static double resolveComedicAssistantCarryTargetY(LivingEntity target, ServerWorld world, double liftHeight) {
+		double maxLiftHeight = Math.max(0.0, liftHeight);
+		double topLimit = world.getTopYInclusive() - 1.0;
+		double startingY = target.getY();
+		double bestY = startingY;
+		Box box = target.getBoundingBox();
+		for (double offset = 1.0; offset <= maxLiftHeight; offset += 1.0) {
+			double candidateY = Math.min(topLimit, startingY + offset);
+			if (candidateY <= bestY) {
+				break;
+			}
+			if (!world.isSpaceEmpty(target, box.offset(0.0, candidateY - startingY, 0.0))) {
+				break;
+			}
+			bestY = candidateY;
+			if (candidateY >= topLimit) {
+				break;
+			}
+		}
+		return bestY;
 	}
 
 	private static List<ServerPlayerEntity> comedicRewriteVisualViewers(ServerWorld world, Vec3d origin) {
@@ -4694,6 +5855,18 @@ public final class MagicAbilityManager {
 		ComedicRewriteVisualFollowState followState,
 		Entity... entities
 	) {
+		queueComedicRewriteVisualCameo(server, durationTicks, viewers, chargeDurationTicks, followState, null, entities);
+	}
+
+	private static void queueComedicRewriteVisualCameo(
+		MinecraftServer server,
+		int durationTicks,
+		List<ServerPlayerEntity> viewers,
+		int chargeDurationTicks,
+		ComedicRewriteVisualFollowState followState,
+		ComedicRewriteVisualRotationState rotationState,
+		Entity... entities
+	) {
 		if (server == null || durationTicks <= 0 || viewers.isEmpty() || entities.length == 0) {
 			return;
 		}
@@ -4715,6 +5888,7 @@ public final class MagicAbilityManager {
 				entityIds,
 				List.copyOf(viewerIds),
 				followState,
+				rotationState,
 				entities
 			)
 		);
@@ -5023,7 +6197,10 @@ public final class MagicAbilityManager {
 				return horizontal.normalize();
 			}
 		}
-		return randomHorizontalDirection(player);
+		if (player != null) {
+			return randomHorizontalDirection(player);
+		}
+		return new Vec3d(1.0, 0.0, 0.0);
 	}
 
 	private static Vec3d randomHorizontalDirection(ServerPlayerEntity player) {
@@ -5225,6 +6402,141 @@ public final class MagicAbilityManager {
 		);
 	}
 
+	private static ComedicAssistantSlimeSettings comedicAssistantSlimeSettings(MagicConfig.JesterComedicAssistantSlimeConfig config) {
+		return ComedicAssistantSlimeSettings.defaults(
+			config.enabled,
+			Math.max(0, config.weight),
+			Math.max(0.0F, config.bonusDamage),
+			Math.max(0, config.slownessDurationTicks),
+			Math.max(-1, config.slownessAmplifier),
+			Math.max(0, config.oozingDurationTicks),
+			Math.max(-1, config.oozingAmplifier),
+			Math.max(0, config.visualDurationTicks),
+			Math.max(0.0, config.visualSpawnHeight),
+			Math.max(0.0, config.visualFallSpeed),
+			MathHelper.clamp(config.visualSize, 1, 127),
+			Math.max(0, config.particleCount),
+			Math.max(0.0F, config.spawnSoundVolume),
+			Math.max(0.0F, config.spawnSoundPitch),
+			Math.max(0.0F, config.impactSoundVolume),
+			Math.max(0.0F, config.impactSoundPitch)
+		);
+	}
+
+	private static ComedicAssistantPandaSettings comedicAssistantPandaSettings(MagicConfig.JesterComedicAssistantPandaConfig config) {
+		return ComedicAssistantPandaSettings.defaults(
+			config.enabled,
+			Math.max(0, config.weight),
+			Math.max(0.0F, config.bonusDamage),
+			Math.max(0.0, config.horizontalLaunch),
+			Math.max(0.0, config.verticalLaunch),
+			Math.max(0, config.slownessDurationTicks),
+			Math.max(-1, config.slownessAmplifier),
+			Math.max(0, config.visualDurationTicks),
+			Math.max(0.0, config.visualSpawnDistance),
+			Math.max(0.0, config.visualChargeVelocity),
+			Math.max(0, config.particleCount),
+			Math.max(0.0F, config.rollSoundVolume),
+			Math.max(0.0F, config.rollSoundPitch),
+			Math.max(0.0F, config.impactSoundVolume),
+			Math.max(0.0F, config.impactSoundPitch)
+		);
+	}
+
+	private static ComedicAssistantParrotSettings comedicAssistantParrotSettings(MagicConfig.JesterComedicAssistantParrotConfig config) {
+		return ComedicAssistantParrotSettings.defaults(
+			config.enabled,
+			Math.max(0, config.weight),
+			Math.max(0.0F, config.bonusDamage),
+			Math.max(0.0, config.liftHeight),
+			Math.max(0.0, config.upwardVelocity),
+			Math.max(0, config.maxCarryTicks),
+			Math.max(0.0, config.releaseDownwardVelocity),
+			config.applyGlowing,
+			Math.max(0, config.glowingDurationTicks),
+			Math.max(0, config.visualDurationTicks),
+			Math.max(0, config.visualCount),
+			Math.max(0.0, config.visualRadius),
+			config.visualVerticalOffset,
+			Math.max(0, config.particleCount),
+			Math.max(1, config.flapSoundIntervalTicks),
+			Math.max(0.0F, config.soundVolume),
+			Math.max(0.0F, config.soundPitch)
+		);
+	}
+
+	private static ComedicAssistantDivineSettings comedicAssistantDivineSettings(MagicConfig.JesterComedicAssistantDivineConfig config) {
+		return ComedicAssistantDivineSettings.defaults(
+			config.enabled,
+			Math.max(0, config.weight),
+			Math.max(0.0F, config.bonusDamage),
+			Math.max(0, config.strikeCount),
+			Math.max(0.0, config.strikeRadius),
+			Math.max(0, config.glowingDurationTicks),
+			Math.max(0, config.blindnessDurationTicks),
+			Math.max(-1, config.blindnessAmplifier),
+			Math.max(0, config.nauseaDurationTicks),
+			Math.max(-1, config.nauseaAmplifier),
+			Math.max(0, config.particleCount),
+			Math.max(0.0F, config.soundVolume),
+			Math.max(0.0F, config.soundPitch)
+		);
+	}
+
+	private static ComedicAssistantAcmeSettings comedicAssistantAcmeSettings(MagicConfig.JesterComedicAssistantAcmeConfig config) {
+		return ComedicAssistantAcmeSettings.defaults(
+			config.enabled,
+			Math.max(0, config.weight),
+			Math.max(0.0F, config.bonusDamage),
+			Math.max(0, config.slownessDurationTicks),
+			Math.max(-1, config.slownessAmplifier),
+			Math.max(0, config.weaknessDurationTicks),
+			Math.max(-1, config.weaknessAmplifier),
+			Math.max(0, config.visualDurationTicks),
+			Math.max(0.0, config.visualDropHeight),
+			Math.max(0, config.particleCount),
+			Math.max(0.0F, config.soundVolume),
+			Math.max(0.0F, config.soundPitch)
+		);
+	}
+
+	private static ComedicAssistantPieSettings comedicAssistantPieSettings(MagicConfig.JesterComedicAssistantPieConfig config) {
+		return ComedicAssistantPieSettings.defaults(
+			config.enabled,
+			Math.max(0, config.weight),
+			Math.max(0.0F, config.bonusDamage),
+			Math.max(0, config.blindnessDurationTicks),
+			Math.max(-1, config.blindnessAmplifier),
+			Math.max(0, config.nauseaDurationTicks),
+			Math.max(-1, config.nauseaAmplifier),
+			Math.max(0, config.particleCount),
+			Math.max(0.0F, config.soundVolume),
+			Math.max(0.0F, config.soundPitch)
+		);
+	}
+
+	private static ComedicAssistantCaneSettings comedicAssistantCaneSettings(MagicConfig.JesterComedicAssistantCaneConfig config) {
+		return ComedicAssistantCaneSettings.defaults(
+			config.enabled,
+			Math.max(0, config.weight),
+			Math.max(0.0F, config.bonusDamage),
+			Math.max(0.0, config.horizontalLaunch),
+			Math.max(0.0, config.verticalLaunch),
+			Math.max(0, config.velocityDamageTrackingTicks),
+			Math.max(0.0, config.velocityDamageThreshold),
+			Math.max(0.0, config.velocityDamageMultiplier),
+			Math.max(0.0, config.velocityDamageMax),
+			Math.max(0, config.slownessDurationTicks),
+			Math.max(-1, config.slownessAmplifier),
+			Math.max(0, config.visualDurationTicks),
+			Math.max(0.0, config.visualSpawnDistance),
+			Math.max(0.0, config.visualChargeVelocity),
+			Math.max(0, config.particleCount),
+			Math.max(0.0F, config.soundVolume),
+			Math.max(0.0F, config.soundPitch)
+		);
+	}
+
 	private static int parseColorRgb(String rawColor, int fallbackColor) {
 		if (rawColor == null || rawColor.isBlank()) {
 			return fallbackColor;
@@ -5270,6 +6582,67 @@ public final class MagicAbilityManager {
 		return MagicPlayerData.hasMagic(player)
 			&& MagicPlayerData.getSchool(player) == MagicSchool.JESTER
 			&& MagicConfig.get().abilityAccess.isAbilityUnlocked(player.getUuid(), MagicAbility.COMEDIC_REWRITE);
+	}
+
+	private static boolean shouldKeepComedicAssistantEnabled(ServerPlayerEntity player) {
+		return MagicPlayerData.hasMagic(player)
+			&& MagicPlayerData.getSchool(player) == MagicSchool.JESTER
+			&& MagicConfig.get().abilityAccess.isAbilityUnlocked(player.getUuid(), MagicAbility.COMEDIC_ASSISTANT);
+	}
+
+	private static void updateComedicAssistantState(ServerPlayerEntity player, int currentTick) {
+		ComedicAssistantArmedState state = COMEDIC_ASSISTANT_ARMED_STATES.get(player.getUuid());
+		if (state == null) {
+			if (COMEDIC_ASSISTANT_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), Integer.MIN_VALUE) <= currentTick) {
+				COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(player.getUuid());
+			}
+			return;
+		}
+
+		if (!player.isAlive() || !shouldKeepComedicAssistantEnabled(player) || player.getEntityWorld().getRegistryKey() != state.dimension()) {
+			clearComedicAssistantState(player.getUuid());
+			return;
+		}
+
+		if (currentTick >= state.expiresTick()) {
+			deactivateComedicAssistant(player, currentTick, COMEDIC_ASSISTANT_CANCEL_COOLDOWN_TICKS, false, true);
+			return;
+		}
+
+		if (currentTick >= state.nextIndicatorTick()) {
+			sendComedicAssistantArmedIndicator(player);
+			spawnComedicAssistantArmedParticles(player);
+			COMEDIC_ASSISTANT_ARMED_STATES.put(
+				player.getUuid(),
+				new ComedicAssistantArmedState(state.dimension(), state.expiresTick(), currentTick + COMEDIC_ASSISTANT_ARMED_INDICATOR_REFRESH_TICKS)
+			);
+		}
+
+		if (COMEDIC_ASSISTANT_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), Integer.MIN_VALUE) <= currentTick) {
+			COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(player.getUuid());
+		}
+	}
+
+	private static void sendComedicAssistantArmedIndicator(ServerPlayerEntity player) {
+		player.sendMessage(Text.translatable("message.magic.jester.comedic_assistant.ready"), true);
+	}
+
+	private static void spawnComedicAssistantArmedParticles(ServerPlayerEntity player) {
+		if (!(player.getEntityWorld() instanceof ServerWorld world) || COMEDIC_ASSISTANT_ARMED_PARTICLE_COUNT <= 0) {
+			return;
+		}
+
+		world.spawnParticles(
+			ParticleTypes.GLOW,
+			player.getX(),
+			player.getBodyY(0.75),
+			player.getZ(),
+			COMEDIC_ASSISTANT_ARMED_PARTICLE_COUNT,
+			0.3,
+			0.25,
+			0.3,
+			0.02
+		);
 	}
 
 	private static void applySpotlight(ServerPlayerEntity player, int currentTick) {
@@ -5562,12 +6935,36 @@ public final class MagicAbilityManager {
 		return Math.max(0, COMEDIC_REWRITE_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
 	}
 
+	private static int comedicAssistantCooldownRemaining(ServerPlayerEntity player, int currentTick) {
+		if (isTestingMode(player)) {
+			return 0;
+		}
+		if (isOrionsGambitCooldownSuppressed(player)) {
+			return 0;
+		}
+		return Math.max(0, COMEDIC_ASSISTANT_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
+	}
+
 	private static void startComedicRewriteCooldown(UUID playerId, int currentTick) {
 		if (isCooldownDeferredByOrionsGambit(playerId, MagicAbility.COMEDIC_REWRITE) || COMEDIC_REWRITE_COOLDOWN_TICKS <= 0) {
 			COMEDIC_REWRITE_COOLDOWN_END_TICK.remove(playerId);
 			return;
 		}
 		COMEDIC_REWRITE_COOLDOWN_END_TICK.put(playerId, currentTick + COMEDIC_REWRITE_COOLDOWN_TICKS);
+	}
+
+	private static void startComedicAssistantCooldown(UUID playerId, int currentTick, int cooldownTicks) {
+		int safeCooldownTicks = Math.max(0, cooldownTicks);
+		if (isCooldownDeferredByOrionsGambit(playerId, MagicAbility.COMEDIC_ASSISTANT)) {
+			trackOrionsGambitCooldownOverride(playerId, MagicAbility.COMEDIC_ASSISTANT, safeCooldownTicks);
+			COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(playerId);
+			return;
+		}
+		if (safeCooldownTicks <= 0) {
+			COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(playerId);
+			return;
+		}
+		COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(playerId, currentTick + safeCooldownTicks);
 	}
 
 	private static boolean hasActiveComedicRewriteImmunity(UUID playerId, int currentTick) {
@@ -5731,6 +7128,25 @@ public final class MagicAbilityManager {
 		if (trackedCooldownTicks >= 0) {
 			state.usedTargetCooldownOverrides.merge(ability, trackedCooldownTicks, Math::max);
 		}
+	}
+
+	private static void trackOrionsGambitCooldownOverride(UUID playerId, MagicAbility ability, int trackedCooldownTicks) {
+		if (trackedCooldownTicks < 0) {
+			return;
+		}
+
+		UUID casterId = ORIONS_GAMBIT_CASTER_BY_TARGET.get(playerId);
+		if (casterId == null) {
+			return;
+		}
+
+		OrionGambitState state = ORIONS_GAMBIT_STATES.get(casterId);
+		if (state == null || state.stage != OrionGambitStage.LINKED || !playerId.equals(state.targetId)) {
+			return;
+		}
+
+		state.usedTargetAbilities.add(ability);
+		state.usedTargetCooldownOverrides.merge(ability, trackedCooldownTicks, Math::max);
 	}
 
 	private static boolean shouldKeepCassiopeiaEnabled(ServerPlayerEntity player) {
@@ -6500,6 +7916,15 @@ public final class MagicAbilityManager {
 					WITTY_ONE_LINER_COOLDOWN_END_TICK.put(state.targetId, currentTick + cooldownTicks);
 				} else {
 					WITTY_ONE_LINER_COOLDOWN_END_TICK.remove(state.targetId);
+				}
+				continue;
+			}
+			if (ability == MagicAbility.COMEDIC_ASSISTANT && state.usedTargetCooldownOverrides.containsKey(ability)) {
+				int cooldownTicks = Math.max(0, state.usedTargetCooldownOverrides.get(ability));
+				if (cooldownTicks > 0) {
+					COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(state.targetId, currentTick + cooldownTicks);
+				} else {
+					COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(state.targetId);
 				}
 				continue;
 			}
@@ -7831,7 +9256,8 @@ public final class MagicAbilityManager {
 			case JESTER -> List.of(
 				MagicAbility.SPOTLIGHT,
 				MagicAbility.WITTY_ONE_LINER,
-				MagicAbility.COMEDIC_REWRITE
+				MagicAbility.COMEDIC_REWRITE,
+				MagicAbility.COMEDIC_ASSISTANT
 			);
 			case CONSTELLATION -> List.of(
 				MagicAbility.CASSIOPEIA,
@@ -7860,6 +9286,7 @@ public final class MagicAbilityManager {
 			case MARTYRS_FLAME -> martyrsFlameCooldownRemaining(player, currentTick);
 			case WITTY_ONE_LINER -> wittyOneLinerCooldownRemaining(player, currentTick);
 			case COMEDIC_REWRITE -> comedicRewriteCooldownRemaining(player, currentTick);
+			case COMEDIC_ASSISTANT -> comedicAssistantCooldownRemaining(player, currentTick);
 			case ABSOLUTE_ZERO -> absoluteZeroCooldownRemaining(player, currentTick);
 			case PLANCK_HEAT -> planckHeatCooldownRemaining(player, currentTick);
 			case TILL_DEATH_DO_US_PART -> tillDeathDoUsPartCooldownRemaining(player, currentTick);
@@ -8128,6 +9555,11 @@ public final class MagicAbilityManager {
 
 		if (ability == MagicAbility.COMEDIC_REWRITE) {
 			startComedicRewriteCooldown(playerId, currentTick);
+			return;
+		}
+
+		if (ability == MagicAbility.COMEDIC_ASSISTANT) {
+			startComedicAssistantCooldown(playerId, currentTick, COMEDIC_ASSISTANT_PROC_COOLDOWN_TICKS);
 			return;
 		}
 
@@ -9029,6 +10461,14 @@ public final class MagicAbilityManager {
 			return removed ? 1 : 0;
 		}
 
+		if (ability == MagicAbility.COMEDIC_ASSISTANT) {
+			boolean removed = COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(playerId) != null;
+			removed |= COMEDIC_ASSISTANT_ARMED_STATES.remove(playerId) != null;
+			COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(playerId);
+			removed |= clearComedicAssistantCaneImpactState(playerId);
+			return removed ? 1 : 0;
+		}
+
 		if (ability == MagicAbility.HERCULES_BURDEN_OF_THE_SKY) {
 			return HERCULES_COOLDOWN_END_TICK.remove(playerId) != null ? 1 : 0;
 		}
@@ -9099,6 +10539,7 @@ public final class MagicAbilityManager {
 			+ resetCooldown(player, MagicAbility.SPOTLIGHT)
 			+ resetCooldown(player, MagicAbility.WITTY_ONE_LINER)
 			+ resetCooldown(player, MagicAbility.COMEDIC_REWRITE)
+			+ resetCooldown(player, MagicAbility.COMEDIC_ASSISTANT)
 			+ resetCooldown(player, MagicAbility.HERCULES_BURDEN_OF_THE_SKY)
 			+ resetCooldown(player, MagicAbility.SAGITTARIUS_ASTRAL_ARROW)
 			+ resetCooldown(player, MagicAbility.ORIONS_GAMBIT)
@@ -9109,6 +10550,16 @@ public final class MagicAbilityManager {
 			+ resetCooldown(player, MagicAbility.FROST_DOMAIN_EXPANSION)
 			+ resetCooldown(player, MagicAbility.LOVE_DOMAIN_EXPANSION)
 			+ resetCooldown(player, MagicAbility.ASTRAL_CATACLYSM);
+	}
+
+	public static void clearLockedAbilityState(ServerPlayerEntity player, MagicAbility ability) {
+		if (player == null || ability != MagicAbility.COMEDIC_ASSISTANT) {
+			return;
+		}
+
+		clearComedicAssistantState(player.getUuid());
+		COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(player.getUuid());
+		clearComedicAssistantCaneImpactState(player.getUuid());
 	}
 
 	public static void clearAllRuntimeState(ServerPlayerEntity player) {
@@ -9148,6 +10599,10 @@ public final class MagicAbilityManager {
 		COMEDIC_REWRITE_IMMUNITY_END_TICK.remove(playerId);
 		COMEDIC_REWRITE_FALL_PROTECTION_END_TICK.remove(playerId);
 		COMEDIC_REWRITE_PENDING_STATES.remove(playerId);
+		COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(playerId);
+		COMEDIC_ASSISTANT_ARMED_STATES.remove(playerId);
+		COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(playerId);
+		clearComedicAssistantCaneImpactState(playerId);
 		HERCULES_COOLDOWN_END_TICK.remove(playerId);
 		SAGITTARIUS_COOLDOWN_END_TICK.remove(playerId);
 		ORIONS_GAMBIT_COOLDOWN_END_TICK.remove(playerId);
@@ -10093,6 +11548,530 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private enum ComedicAssistantOutcome {
+		GIANT_SLIME_SLAM("giant_slime_slam"),
+		PANDA_BOWLING_BALL("panda_bowling_ball"),
+		PARROT_KIDNAPPING("parrot_kidnapping"),
+		DIVINE_OVERREACTION("divine_overreaction"),
+		ACME_DROP("acme_drop"),
+		PIE_TO_THE_FACE("pie_to_the_face"),
+		GIANT_CANE_YANK("giant_cane_yank");
+
+		private final String id;
+
+		ComedicAssistantOutcome(String id) {
+			this.id = id;
+		}
+
+		private Text displayName() {
+			return Text.translatable("magic.jester_gag." + id);
+		}
+	}
+
+	private record ComedicAssistantArmedState(
+		RegistryKey<World> dimension,
+		int expiresTick,
+		int nextIndicatorTick
+	) {
+	}
+
+	private static final class ComedicAssistantParrotCarryState {
+		private final RegistryKey<World> dimension;
+		private final double targetY;
+		private final int endTick;
+		private int nextParticleTick;
+		private int nextSoundTick;
+		private final ComedicAssistantParrotSettings settings;
+
+		private ComedicAssistantParrotCarryState(
+			RegistryKey<World> dimension,
+			double targetY,
+			int endTick,
+			int nextParticleTick,
+			int nextSoundTick,
+			ComedicAssistantParrotSettings settings
+		) {
+			this.dimension = dimension;
+			this.targetY = targetY;
+			this.endTick = endTick;
+			this.nextParticleTick = nextParticleTick;
+			this.nextSoundTick = nextSoundTick;
+			this.settings = settings;
+		}
+
+		private RegistryKey<World> dimension() {
+			return dimension;
+		}
+
+		private double targetY() {
+			return targetY;
+		}
+
+		private int endTick() {
+			return endTick;
+		}
+
+		private int nextParticleTick() {
+			return nextParticleTick;
+		}
+
+		private void nextParticleTick(int nextParticleTick) {
+			this.nextParticleTick = nextParticleTick;
+		}
+
+		private int nextSoundTick() {
+			return nextSoundTick;
+		}
+
+		private void nextSoundTick(int nextSoundTick) {
+			this.nextSoundTick = nextSoundTick;
+		}
+
+		private ComedicAssistantParrotSettings settings() {
+			return settings;
+		}
+	}
+
+	private record ComedicAssistantAcmeVisualState(
+		RegistryKey<World> dimension,
+		UUID visualEntityId,
+		UUID targetEntityId,
+		int endTick,
+		double dropSpeed
+	) {
+	}
+
+	private static final class ComedicAssistantCaneImpactState {
+		private final RegistryKey<World> dimension;
+		private final UUID casterId;
+		private final int startTick;
+		private final int endTick;
+		private Vec3d lastPosition;
+		private Vec3d lastVelocity;
+		private double lastSpeed;
+
+		private ComedicAssistantCaneImpactState(
+			RegistryKey<World> dimension,
+			UUID casterId,
+			int startTick,
+			int endTick,
+			Vec3d lastPosition,
+			Vec3d lastVelocity,
+			double lastSpeed
+		) {
+			this.dimension = dimension;
+			this.casterId = casterId;
+			this.startTick = startTick;
+			this.endTick = endTick;
+			this.lastPosition = lastPosition;
+			this.lastVelocity = lastVelocity;
+			this.lastSpeed = Math.max(0.0, lastSpeed);
+		}
+
+		private RegistryKey<World> dimension() {
+			return dimension;
+		}
+
+		private UUID casterId() {
+			return casterId;
+		}
+
+		private int startTick() {
+			return startTick;
+		}
+
+		private int endTick() {
+			return endTick;
+		}
+
+		private Vec3d lastPosition() {
+			return lastPosition;
+		}
+
+		private void lastPosition(Vec3d lastPosition) {
+			this.lastPosition = lastPosition;
+		}
+
+		private Vec3d lastVelocity() {
+			return lastVelocity;
+		}
+
+		private void lastVelocity(Vec3d lastVelocity) {
+			this.lastVelocity = lastVelocity;
+		}
+
+		private double lastSpeed() {
+			return lastSpeed;
+		}
+
+		private void lastSpeed(double lastSpeed) {
+			this.lastSpeed = Math.max(0.0, lastSpeed);
+		}
+	}
+
+	private record ComedicAssistantSlimeSettings(
+		boolean enabled,
+		int weight,
+		float bonusDamage,
+		int slownessDurationTicks,
+		int slownessAmplifier,
+		int oozingDurationTicks,
+		int oozingAmplifier,
+		int visualDurationTicks,
+		double visualSpawnHeight,
+		double visualFallSpeed,
+		int visualSize,
+		int particleCount,
+		float spawnSoundVolume,
+		float spawnSoundPitch,
+		float impactSoundVolume,
+		float impactSoundPitch
+	) {
+		private static ComedicAssistantSlimeSettings defaults(
+			boolean enabled,
+			int weight,
+			float bonusDamage,
+			int slownessDurationTicks,
+			int slownessAmplifier,
+			int oozingDurationTicks,
+			int oozingAmplifier,
+			int visualDurationTicks,
+			double visualSpawnHeight,
+			double visualFallSpeed,
+			int visualSize,
+			int particleCount,
+			float spawnSoundVolume,
+			float spawnSoundPitch,
+			float impactSoundVolume,
+			float impactSoundPitch
+		) {
+			return new ComedicAssistantSlimeSettings(
+				enabled,
+				weight,
+				bonusDamage,
+				slownessDurationTicks,
+				slownessAmplifier,
+				oozingDurationTicks,
+				oozingAmplifier,
+				visualDurationTicks,
+				visualSpawnHeight,
+				visualFallSpeed,
+				visualSize,
+				particleCount,
+				spawnSoundVolume,
+				spawnSoundPitch,
+				impactSoundVolume,
+				impactSoundPitch
+			);
+		}
+	}
+
+	private record ComedicAssistantPandaSettings(
+		boolean enabled,
+		int weight,
+		float bonusDamage,
+		double horizontalLaunch,
+		double verticalLaunch,
+		int slownessDurationTicks,
+		int slownessAmplifier,
+		int visualDurationTicks,
+		double visualSpawnDistance,
+		double visualChargeVelocity,
+		int particleCount,
+		float rollSoundVolume,
+		float rollSoundPitch,
+		float impactSoundVolume,
+		float impactSoundPitch
+	) {
+		private static ComedicAssistantPandaSettings defaults(
+			boolean enabled,
+			int weight,
+			float bonusDamage,
+			double horizontalLaunch,
+			double verticalLaunch,
+			int slownessDurationTicks,
+			int slownessAmplifier,
+			int visualDurationTicks,
+			double visualSpawnDistance,
+			double visualChargeVelocity,
+			int particleCount,
+			float rollSoundVolume,
+			float rollSoundPitch,
+			float impactSoundVolume,
+			float impactSoundPitch
+		) {
+			return new ComedicAssistantPandaSettings(
+				enabled,
+				weight,
+				bonusDamage,
+				horizontalLaunch,
+				verticalLaunch,
+				slownessDurationTicks,
+				slownessAmplifier,
+				visualDurationTicks,
+				visualSpawnDistance,
+				visualChargeVelocity,
+				particleCount,
+				rollSoundVolume,
+				rollSoundPitch,
+				impactSoundVolume,
+				impactSoundPitch
+			);
+		}
+	}
+
+	private record ComedicAssistantParrotSettings(
+		boolean enabled,
+		int weight,
+		float bonusDamage,
+		double liftHeight,
+		double upwardVelocity,
+		int maxCarryTicks,
+		double releaseDownwardVelocity,
+		boolean applyGlowing,
+		int glowingDurationTicks,
+		int visualDurationTicks,
+		int visualCount,
+		double visualRadius,
+		double visualVerticalOffset,
+		int particleCount,
+		int flapSoundIntervalTicks,
+		float soundVolume,
+		float soundPitch
+	) {
+		private static ComedicAssistantParrotSettings defaults(
+			boolean enabled,
+			int weight,
+			float bonusDamage,
+			double liftHeight,
+			double upwardVelocity,
+			int maxCarryTicks,
+			double releaseDownwardVelocity,
+			boolean applyGlowing,
+			int glowingDurationTicks,
+			int visualDurationTicks,
+			int visualCount,
+			double visualRadius,
+			double visualVerticalOffset,
+			int particleCount,
+			int flapSoundIntervalTicks,
+			float soundVolume,
+			float soundPitch
+		) {
+			return new ComedicAssistantParrotSettings(
+				enabled,
+				weight,
+				bonusDamage,
+				liftHeight,
+				upwardVelocity,
+				maxCarryTicks,
+				releaseDownwardVelocity,
+				applyGlowing,
+				glowingDurationTicks,
+				visualDurationTicks,
+				visualCount,
+				visualRadius,
+				visualVerticalOffset,
+				particleCount,
+				flapSoundIntervalTicks,
+				soundVolume,
+				soundPitch
+			);
+		}
+	}
+
+	private record ComedicAssistantDivineSettings(
+		boolean enabled,
+		int weight,
+		float bonusDamage,
+		int strikeCount,
+		double strikeRadius,
+		int glowingDurationTicks,
+		int blindnessDurationTicks,
+		int blindnessAmplifier,
+		int nauseaDurationTicks,
+		int nauseaAmplifier,
+		int particleCount,
+		float soundVolume,
+		float soundPitch
+	) {
+		private static ComedicAssistantDivineSettings defaults(
+			boolean enabled,
+			int weight,
+			float bonusDamage,
+			int strikeCount,
+			double strikeRadius,
+			int glowingDurationTicks,
+			int blindnessDurationTicks,
+			int blindnessAmplifier,
+			int nauseaDurationTicks,
+			int nauseaAmplifier,
+			int particleCount,
+			float soundVolume,
+			float soundPitch
+		) {
+			return new ComedicAssistantDivineSettings(
+				enabled,
+				weight,
+				bonusDamage,
+				strikeCount,
+				strikeRadius,
+				glowingDurationTicks,
+				blindnessDurationTicks,
+				blindnessAmplifier,
+				nauseaDurationTicks,
+				nauseaAmplifier,
+				particleCount,
+				soundVolume,
+				soundPitch
+			);
+		}
+	}
+
+	private record ComedicAssistantAcmeSettings(
+		boolean enabled,
+		int weight,
+		float bonusDamage,
+		int slownessDurationTicks,
+		int slownessAmplifier,
+		int weaknessDurationTicks,
+		int weaknessAmplifier,
+		int visualDurationTicks,
+		double visualDropHeight,
+		int particleCount,
+		float soundVolume,
+		float soundPitch
+	) {
+		private static ComedicAssistantAcmeSettings defaults(
+			boolean enabled,
+			int weight,
+			float bonusDamage,
+			int slownessDurationTicks,
+			int slownessAmplifier,
+			int weaknessDurationTicks,
+			int weaknessAmplifier,
+			int visualDurationTicks,
+			double visualDropHeight,
+			int particleCount,
+			float soundVolume,
+			float soundPitch
+		) {
+			return new ComedicAssistantAcmeSettings(
+				enabled,
+				weight,
+				bonusDamage,
+				slownessDurationTicks,
+				slownessAmplifier,
+				weaknessDurationTicks,
+				weaknessAmplifier,
+				visualDurationTicks,
+				visualDropHeight,
+				particleCount,
+				soundVolume,
+				soundPitch
+			);
+		}
+	}
+
+	private record ComedicAssistantPieSettings(
+		boolean enabled,
+		int weight,
+		float bonusDamage,
+		int blindnessDurationTicks,
+		int blindnessAmplifier,
+		int nauseaDurationTicks,
+		int nauseaAmplifier,
+		int particleCount,
+		float soundVolume,
+		float soundPitch
+	) {
+		private static ComedicAssistantPieSettings defaults(
+			boolean enabled,
+			int weight,
+			float bonusDamage,
+			int blindnessDurationTicks,
+			int blindnessAmplifier,
+			int nauseaDurationTicks,
+			int nauseaAmplifier,
+			int particleCount,
+			float soundVolume,
+			float soundPitch
+		) {
+			return new ComedicAssistantPieSettings(
+				enabled,
+				weight,
+				bonusDamage,
+				blindnessDurationTicks,
+				blindnessAmplifier,
+				nauseaDurationTicks,
+				nauseaAmplifier,
+				particleCount,
+				soundVolume,
+				soundPitch
+			);
+		}
+	}
+
+	private record ComedicAssistantCaneSettings(
+		boolean enabled,
+		int weight,
+		float bonusDamage,
+		double horizontalLaunch,
+		double verticalLaunch,
+		int velocityDamageTrackingTicks,
+		double velocityDamageThreshold,
+		double velocityDamageMultiplier,
+		double velocityDamageMax,
+		int slownessDurationTicks,
+		int slownessAmplifier,
+		int visualDurationTicks,
+		double visualSpawnDistance,
+		double visualChargeVelocity,
+		int particleCount,
+		float soundVolume,
+		float soundPitch
+	) {
+		private static ComedicAssistantCaneSettings defaults(
+			boolean enabled,
+			int weight,
+			float bonusDamage,
+			double horizontalLaunch,
+			double verticalLaunch,
+			int velocityDamageTrackingTicks,
+			double velocityDamageThreshold,
+			double velocityDamageMultiplier,
+			double velocityDamageMax,
+			int slownessDurationTicks,
+			int slownessAmplifier,
+			int visualDurationTicks,
+			double visualSpawnDistance,
+			double visualChargeVelocity,
+			int particleCount,
+			float soundVolume,
+			float soundPitch
+		) {
+			return new ComedicAssistantCaneSettings(
+				enabled,
+				weight,
+				bonusDamage,
+				horizontalLaunch,
+				verticalLaunch,
+				velocityDamageTrackingTicks,
+				velocityDamageThreshold,
+				velocityDamageMultiplier,
+				velocityDamageMax,
+				slownessDurationTicks,
+				slownessAmplifier,
+				visualDurationTicks,
+				visualSpawnDistance,
+				visualChargeVelocity,
+				particleCount,
+				soundVolume,
+				soundPitch
+			);
+		}
+	}
+
 	private enum ComedicRewriteOutcome {
 		LAUNCHED_THROUGH_THE_SCENE,
 		RAVAGER_BIT,
@@ -10116,6 +12095,7 @@ public final class MagicAbilityManager {
 		private final int[] entityIds;
 		private final List<UUID> viewerIds;
 		private final ComedicRewriteVisualFollowState followState;
+		private final ComedicRewriteVisualRotationState rotationState;
 		private final Entity[] entities;
 		private boolean chargeStopped;
 
@@ -10125,6 +12105,7 @@ public final class MagicAbilityManager {
 			int[] entityIds,
 			List<UUID> viewerIds,
 			ComedicRewriteVisualFollowState followState,
+			ComedicRewriteVisualRotationState rotationState,
 			Entity[] entities
 		) {
 			this.endTick = endTick;
@@ -10132,6 +12113,7 @@ public final class MagicAbilityManager {
 			this.entityIds = entityIds;
 			this.viewerIds = viewerIds;
 			this.followState = followState;
+			this.rotationState = rotationState;
 			this.entities = entities;
 		}
 
@@ -10155,6 +12137,10 @@ public final class MagicAbilityManager {
 			return followState;
 		}
 
+		private ComedicRewriteVisualRotationState rotationState() {
+			return rotationState;
+		}
+
 		private Entity[] entities() {
 			return entities;
 		}
@@ -10169,8 +12155,23 @@ public final class MagicAbilityManager {
 	}
 
 	private record ComedicRewriteVisualFollowState(
-		UUID anchorPlayerId,
-		Vec3d[] headOffsets
+		RegistryKey<World> dimension,
+		UUID anchorEntityId,
+		Vec3d[] offsets,
+		ComedicRewriteVisualFollowMode mode,
+		double verticalSpeed
+	) {
+	}
+
+	private enum ComedicRewriteVisualFollowMode {
+		ENTITY_TOP,
+		DROP_TO_ENTITY_TOP
+	}
+
+	private record ComedicRewriteVisualRotationState(
+		boolean alignYawToVelocity,
+		float yawOffsetDegrees,
+		float pitchPerTick
 	) {
 	}
 

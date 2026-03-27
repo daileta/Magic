@@ -298,6 +298,7 @@ public final class MagicConfig {
 		public JesterSpotlightConfig jesterSpotlight = new JesterSpotlightConfig();
 		public JesterWittyOneLinerConfig jesterWittyOneLiner = new JesterWittyOneLinerConfig();
 		public JesterComedicRewriteConfig jesterComedicRewrite = new JesterComedicRewriteConfig();
+		public JesterComedicAssistantConfig jesterComedicAssistant = new JesterComedicAssistantConfig();
 		public ConstellationCassiopeiaConfig constellationCassiopeia = new ConstellationCassiopeiaConfig();
 		public ConstellationHerculesConfig constellationHercules = new ConstellationHerculesConfig();
 		public ConstellationSagittariusConfig constellationSagittarius = new ConstellationSagittariusConfig();
@@ -348,6 +349,9 @@ public final class MagicConfig {
 			if (jesterComedicRewrite == null) {
 				jesterComedicRewrite = new JesterComedicRewriteConfig();
 			}
+			if (jesterComedicAssistant == null) {
+				jesterComedicAssistant = new JesterComedicAssistantConfig();
+			}
 			if (constellationCassiopeia == null) {
 				constellationCassiopeia = new ConstellationCassiopeiaConfig();
 			}
@@ -381,6 +385,7 @@ public final class MagicConfig {
 			jesterSpotlight.normalize();
 			jesterWittyOneLiner.normalize();
 			jesterComedicRewrite.normalize();
+			jesterComedicAssistant.normalize();
 			constellationCassiopeia.normalize();
 			constellationHercules.normalize();
 			constellationSagittarius.normalize();
@@ -955,6 +960,436 @@ public final class MagicConfig {
 			visualCount = Math.max(0, visualCount);
 			visualRadius = Math.max(0.0, visualRadius);
 			visualLiftVelocity = Math.max(0.0, visualLiftVelocity);
+		}
+	}
+
+	public static final class JesterComedicAssistantConfig {
+		public double activationCostPercent = 25.0;
+		public int armedDurationTicks = 15 * 20;
+		public int procCooldownTicks = 15 * 20;
+		public int cancelCooldownTicks = 3 * 20;
+		public boolean allowPlayerTargets = true;
+		public boolean allowMobTargets = true;
+		public int armedIndicatorRefreshTicks = 20;
+		public int armedParticleCount = 4;
+		public int overlayFadeInTicks = 4;
+		public int overlayStayTicks = 30;
+		public int overlayFadeOutTicks = 8;
+		public JesterComedicAssistantSlimeConfig giantSlimeSlam = defaultGiantSlimeSlam();
+		public JesterComedicAssistantPandaConfig pandaBowlingBall = defaultPandaBowlingBall();
+		public JesterComedicAssistantParrotConfig parrotKidnapping = defaultParrotKidnapping();
+		public JesterComedicAssistantDivineConfig divineOverreaction = defaultDivineOverreaction();
+		public JesterComedicAssistantAcmeConfig acmeDrop = defaultAcmeDrop();
+		public JesterComedicAssistantPieConfig pieToTheFace = defaultPieToTheFace();
+		public JesterComedicAssistantCaneConfig giantCaneYank = defaultGiantCaneYank();
+
+		private void normalize() {
+			if (giantSlimeSlam == null) {
+				giantSlimeSlam = defaultGiantSlimeSlam();
+			}
+			if (pandaBowlingBall == null) {
+				pandaBowlingBall = defaultPandaBowlingBall();
+			}
+			if (parrotKidnapping == null) {
+				parrotKidnapping = defaultParrotKidnapping();
+			}
+			if (divineOverreaction == null) {
+				divineOverreaction = defaultDivineOverreaction();
+			}
+			if (acmeDrop == null) {
+				acmeDrop = defaultAcmeDrop();
+			}
+			if (pieToTheFace == null) {
+				pieToTheFace = defaultPieToTheFace();
+			}
+			if (giantCaneYank == null) {
+				giantCaneYank = defaultGiantCaneYank();
+			}
+
+			activationCostPercent = MathHelper.clamp(activationCostPercent, 0.0, 100.0);
+			armedDurationTicks = Math.max(1, armedDurationTicks);
+			procCooldownTicks = Math.max(0, procCooldownTicks);
+			cancelCooldownTicks = Math.max(0, cancelCooldownTicks);
+			armedIndicatorRefreshTicks = Math.max(1, armedIndicatorRefreshTicks);
+			armedParticleCount = Math.max(0, armedParticleCount);
+			overlayFadeInTicks = Math.max(0, overlayFadeInTicks);
+			overlayStayTicks = Math.max(0, overlayStayTicks);
+			overlayFadeOutTicks = Math.max(0, overlayFadeOutTicks);
+			giantSlimeSlam.normalize();
+			pandaBowlingBall.normalize();
+			parrotKidnapping.normalize();
+			divineOverreaction.normalize();
+			acmeDrop.normalize();
+			pieToTheFace.normalize();
+			giantCaneYank.normalize();
+		}
+
+		private static JesterComedicAssistantSlimeConfig defaultGiantSlimeSlam() {
+			JesterComedicAssistantSlimeConfig config = new JesterComedicAssistantSlimeConfig();
+			config.enabled = true;
+			config.weight = 1;
+			config.bonusDamage = 4.0F;
+			config.slownessDurationTicks = 60;
+			config.slownessAmplifier = 1;
+			config.oozingDurationTicks = 30 * 20;
+			config.oozingAmplifier = 0;
+			config.visualDurationTicks = 30;
+			config.visualSpawnHeight = 6.0;
+			config.visualFallSpeed = 1.3;
+			config.visualSize = 6;
+			config.particleCount = 24;
+			config.spawnSoundVolume = 0.85F;
+			config.spawnSoundPitch = 0.8F;
+			config.impactSoundVolume = 1.15F;
+			config.impactSoundPitch = 0.85F;
+			return config;
+		}
+
+		private static JesterComedicAssistantPandaConfig defaultPandaBowlingBall() {
+			JesterComedicAssistantPandaConfig config = new JesterComedicAssistantPandaConfig();
+			config.enabled = true;
+			config.weight = 1;
+			config.bonusDamage = 5.0F;
+			config.horizontalLaunch = 3.3;
+			config.verticalLaunch = 0.8;
+			config.slownessDurationTicks = 30;
+			config.slownessAmplifier = 0;
+			config.visualDurationTicks = 18;
+			config.visualSpawnDistance = 3.0;
+			config.visualChargeVelocity = 2.6;
+			config.particleCount = 18;
+			config.rollSoundVolume = 1.0F;
+			config.rollSoundPitch = 0.95F;
+			config.impactSoundVolume = 1.0F;
+			config.impactSoundPitch = 0.8F;
+			return config;
+		}
+
+		private static JesterComedicAssistantParrotConfig defaultParrotKidnapping() {
+			JesterComedicAssistantParrotConfig config = new JesterComedicAssistantParrotConfig();
+			config.enabled = true;
+			config.weight = 1;
+			config.bonusDamage = 2.0F;
+			config.liftHeight = 35.0;
+			config.upwardVelocity = 1.55;
+			config.maxCarryTicks = 30;
+			config.releaseDownwardVelocity = 1.2;
+			config.applyGlowing = true;
+			config.glowingDurationTicks = 30;
+			config.visualDurationTicks = 28;
+			config.visualCount = 10;
+			config.visualRadius = 1.35;
+			config.visualVerticalOffset = 0.35;
+			config.particleCount = 28;
+			config.flapSoundIntervalTicks = 6;
+			config.soundVolume = 0.8F;
+			config.soundPitch = 1.25F;
+			return config;
+		}
+
+		private static JesterComedicAssistantDivineConfig defaultDivineOverreaction() {
+			JesterComedicAssistantDivineConfig config = new JesterComedicAssistantDivineConfig();
+			config.enabled = true;
+			config.weight = 1;
+			config.bonusDamage = 10.0F;
+			config.strikeCount = 20;
+			config.strikeRadius = 1.5;
+			config.glowingDurationTicks = 20;
+			config.blindnessDurationTicks = 20;
+			config.blindnessAmplifier = 0;
+			config.nauseaDurationTicks = 40;
+			config.nauseaAmplifier = 0;
+			config.particleCount = 40;
+			config.soundVolume = 0.8F;
+			config.soundPitch = 1.0F;
+			return config;
+		}
+
+		private static JesterComedicAssistantAcmeConfig defaultAcmeDrop() {
+			JesterComedicAssistantAcmeConfig config = new JesterComedicAssistantAcmeConfig();
+			config.enabled = true;
+			config.weight = 1;
+			config.bonusDamage = 6.0F;
+			config.slownessDurationTicks = 30;
+			config.slownessAmplifier = 5;
+			config.weaknessDurationTicks = 60;
+			config.weaknessAmplifier = 0;
+			config.visualDurationTicks = 18;
+			config.visualDropHeight = 10.0;
+			config.particleCount = 20;
+			config.soundVolume = 1.25F;
+			config.soundPitch = 0.75F;
+			return config;
+		}
+
+		private static JesterComedicAssistantPieConfig defaultPieToTheFace() {
+			JesterComedicAssistantPieConfig config = new JesterComedicAssistantPieConfig();
+			config.enabled = true;
+			config.weight = 1;
+			config.bonusDamage = 2.0F;
+			config.blindnessDurationTicks = 5 * 20;
+			config.blindnessAmplifier = 0;
+			config.nauseaDurationTicks = 60;
+			config.nauseaAmplifier = 0;
+			config.particleCount = 24;
+			config.soundVolume = 0.9F;
+			config.soundPitch = 1.15F;
+			return config;
+		}
+
+		private static JesterComedicAssistantCaneConfig defaultGiantCaneYank() {
+			JesterComedicAssistantCaneConfig config = new JesterComedicAssistantCaneConfig();
+			config.enabled = true;
+			config.weight = 1;
+			config.bonusDamage = 3.0F;
+			config.horizontalLaunch = 15.2;
+			config.verticalLaunch = 0.9;
+			config.velocityDamageTrackingTicks = 45;
+			config.velocityDamageThreshold = 0.75;
+			config.velocityDamageMultiplier = 3.5;
+			config.velocityDamageMax = 24.0;
+			config.slownessDurationTicks = 40;
+			config.slownessAmplifier = 0;
+			config.visualDurationTicks = 14;
+			config.visualSpawnDistance = 4.75;
+			config.visualChargeVelocity = 11.2;
+			config.particleCount = 12;
+			config.soundVolume = 0.95F;
+			config.soundPitch = 0.95F;
+			return config;
+		}
+	}
+
+	public static final class JesterComedicAssistantSlimeConfig {
+		public boolean enabled = true;
+		public int weight = 1;
+		public float bonusDamage = 0.0F;
+		public int slownessDurationTicks = 0;
+		public int slownessAmplifier = -1;
+		public int oozingDurationTicks = 0;
+		public int oozingAmplifier = -1;
+		public int visualDurationTicks = 0;
+		public double visualSpawnHeight = 0.0;
+		public double visualFallSpeed = 0.0;
+		public int visualSize = 1;
+		public int particleCount = 0;
+		public float spawnSoundVolume = 0.0F;
+		public float spawnSoundPitch = 0.0F;
+		public float impactSoundVolume = 0.0F;
+		public float impactSoundPitch = 0.0F;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			bonusDamage = Math.max(0.0F, bonusDamage);
+			slownessDurationTicks = Math.max(0, slownessDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			oozingDurationTicks = Math.max(0, oozingDurationTicks);
+			oozingAmplifier = Math.max(-1, oozingAmplifier);
+			visualDurationTicks = Math.max(0, visualDurationTicks);
+			visualSpawnHeight = Math.max(0.0, visualSpawnHeight);
+			visualFallSpeed = Math.max(0.0, visualFallSpeed);
+			visualSize = MathHelper.clamp(visualSize, 1, 127);
+			particleCount = Math.max(0, particleCount);
+			spawnSoundVolume = Math.max(0.0F, spawnSoundVolume);
+			spawnSoundPitch = Math.max(0.0F, spawnSoundPitch);
+			impactSoundVolume = Math.max(0.0F, impactSoundVolume);
+			impactSoundPitch = Math.max(0.0F, impactSoundPitch);
+		}
+	}
+
+	public static final class JesterComedicAssistantPandaConfig {
+		public boolean enabled = true;
+		public int weight = 1;
+		public float bonusDamage = 0.0F;
+		public double horizontalLaunch = 0.0;
+		public double verticalLaunch = 0.0;
+		public int slownessDurationTicks = 0;
+		public int slownessAmplifier = -1;
+		public int visualDurationTicks = 0;
+		public double visualSpawnDistance = 0.0;
+		public double visualChargeVelocity = 0.0;
+		public int particleCount = 0;
+		public float rollSoundVolume = 0.0F;
+		public float rollSoundPitch = 0.0F;
+		public float impactSoundVolume = 0.0F;
+		public float impactSoundPitch = 0.0F;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			bonusDamage = Math.max(0.0F, bonusDamage);
+			horizontalLaunch = Math.max(0.0, horizontalLaunch);
+			verticalLaunch = Math.max(0.0, verticalLaunch);
+			slownessDurationTicks = Math.max(0, slownessDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			visualDurationTicks = Math.max(0, visualDurationTicks);
+			visualSpawnDistance = Math.max(0.0, visualSpawnDistance);
+			visualChargeVelocity = Math.max(0.0, visualChargeVelocity);
+			particleCount = Math.max(0, particleCount);
+			rollSoundVolume = Math.max(0.0F, rollSoundVolume);
+			rollSoundPitch = Math.max(0.0F, rollSoundPitch);
+			impactSoundVolume = Math.max(0.0F, impactSoundVolume);
+			impactSoundPitch = Math.max(0.0F, impactSoundPitch);
+		}
+	}
+
+	public static final class JesterComedicAssistantParrotConfig {
+		public boolean enabled = true;
+		public int weight = 1;
+		public float bonusDamage = 0.0F;
+		public double liftHeight = 0.0;
+		public double upwardVelocity = 0.0;
+		public int maxCarryTicks = 0;
+		public double releaseDownwardVelocity = 0.0;
+		public boolean applyGlowing = false;
+		public int glowingDurationTicks = 0;
+		public int visualDurationTicks = 0;
+		public int visualCount = 0;
+		public double visualRadius = 0.0;
+		public double visualVerticalOffset = 0.0;
+		public int particleCount = 0;
+		public int flapSoundIntervalTicks = 1;
+		public float soundVolume = 0.0F;
+		public float soundPitch = 0.0F;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			bonusDamage = Math.max(0.0F, bonusDamage);
+			liftHeight = Math.max(0.0, liftHeight);
+			upwardVelocity = Math.max(0.0, upwardVelocity);
+			maxCarryTicks = Math.max(0, maxCarryTicks);
+			releaseDownwardVelocity = Math.max(0.0, releaseDownwardVelocity);
+			glowingDurationTicks = Math.max(0, glowingDurationTicks);
+			visualDurationTicks = Math.max(0, visualDurationTicks);
+			visualCount = Math.max(0, visualCount);
+			visualRadius = Math.max(0.0, visualRadius);
+			particleCount = Math.max(0, particleCount);
+			flapSoundIntervalTicks = Math.max(1, flapSoundIntervalTicks);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
+		}
+	}
+
+	public static final class JesterComedicAssistantDivineConfig {
+		public boolean enabled = true;
+		public int weight = 1;
+		public float bonusDamage = 0.0F;
+		public int strikeCount = 0;
+		public double strikeRadius = 0.0;
+		public int glowingDurationTicks = 0;
+		public int blindnessDurationTicks = 0;
+		public int blindnessAmplifier = -1;
+		public int nauseaDurationTicks = 0;
+		public int nauseaAmplifier = -1;
+		public int particleCount = 0;
+		public float soundVolume = 0.0F;
+		public float soundPitch = 0.0F;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			bonusDamage = Math.max(0.0F, bonusDamage);
+			strikeCount = Math.max(0, strikeCount);
+			strikeRadius = Math.max(0.0, strikeRadius);
+			glowingDurationTicks = Math.max(0, glowingDurationTicks);
+			blindnessDurationTicks = Math.max(0, blindnessDurationTicks);
+			blindnessAmplifier = Math.max(-1, blindnessAmplifier);
+			nauseaDurationTicks = Math.max(0, nauseaDurationTicks);
+			nauseaAmplifier = Math.max(-1, nauseaAmplifier);
+			particleCount = Math.max(0, particleCount);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
+		}
+	}
+
+	public static final class JesterComedicAssistantAcmeConfig {
+		public boolean enabled = true;
+		public int weight = 1;
+		public float bonusDamage = 0.0F;
+		public int slownessDurationTicks = 0;
+		public int slownessAmplifier = -1;
+		public int weaknessDurationTicks = 0;
+		public int weaknessAmplifier = -1;
+		public int visualDurationTicks = 0;
+		public double visualDropHeight = 0.0;
+		public int particleCount = 0;
+		public float soundVolume = 0.0F;
+		public float soundPitch = 0.0F;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			bonusDamage = Math.max(0.0F, bonusDamage);
+			slownessDurationTicks = Math.max(0, slownessDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			weaknessDurationTicks = Math.max(0, weaknessDurationTicks);
+			weaknessAmplifier = Math.max(-1, weaknessAmplifier);
+			visualDurationTicks = Math.max(0, visualDurationTicks);
+			visualDropHeight = Math.max(0.0, visualDropHeight);
+			particleCount = Math.max(0, particleCount);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
+		}
+	}
+
+	public static final class JesterComedicAssistantPieConfig {
+		public boolean enabled = true;
+		public int weight = 1;
+		public float bonusDamage = 0.0F;
+		public int blindnessDurationTicks = 0;
+		public int blindnessAmplifier = -1;
+		public int nauseaDurationTicks = 0;
+		public int nauseaAmplifier = -1;
+		public int particleCount = 0;
+		public float soundVolume = 0.0F;
+		public float soundPitch = 0.0F;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			bonusDamage = Math.max(0.0F, bonusDamage);
+			blindnessDurationTicks = Math.max(0, blindnessDurationTicks);
+			blindnessAmplifier = Math.max(-1, blindnessAmplifier);
+			nauseaDurationTicks = Math.max(0, nauseaDurationTicks);
+			nauseaAmplifier = Math.max(-1, nauseaAmplifier);
+			particleCount = Math.max(0, particleCount);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
+		}
+	}
+
+	public static final class JesterComedicAssistantCaneConfig {
+		public boolean enabled = true;
+		public int weight = 1;
+		public float bonusDamage = 0.0F;
+		public double horizontalLaunch = 0.0;
+		public double verticalLaunch = 0.0;
+		public int velocityDamageTrackingTicks = 0;
+		public double velocityDamageThreshold = 0.0;
+		public double velocityDamageMultiplier = 0.0;
+		public double velocityDamageMax = 0.0;
+		public int slownessDurationTicks = 0;
+		public int slownessAmplifier = -1;
+		public int visualDurationTicks = 0;
+		public double visualSpawnDistance = 0.0;
+		public double visualChargeVelocity = 0.0;
+		public int particleCount = 0;
+		public float soundVolume = 0.0F;
+		public float soundPitch = 0.0F;
+
+		private void normalize() {
+			weight = Math.max(0, weight);
+			bonusDamage = Math.max(0.0F, bonusDamage);
+			horizontalLaunch = Math.max(0.0, horizontalLaunch);
+			verticalLaunch = Math.max(0.0, verticalLaunch);
+			velocityDamageTrackingTicks = Math.max(0, velocityDamageTrackingTicks);
+			velocityDamageThreshold = Math.max(0.0, velocityDamageThreshold);
+			velocityDamageMultiplier = Math.max(0.0, velocityDamageMultiplier);
+			velocityDamageMax = Math.max(0.0, velocityDamageMax);
+			slownessDurationTicks = Math.max(0, slownessDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			visualDurationTicks = Math.max(0, visualDurationTicks);
+			visualSpawnDistance = Math.max(0.0, visualSpawnDistance);
+			visualChargeVelocity = Math.max(0.0, visualChargeVelocity);
+			particleCount = Math.max(0, particleCount);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
 		}
 	}
 
