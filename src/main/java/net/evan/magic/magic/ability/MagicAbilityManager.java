@@ -8325,11 +8325,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean isMaximumAbility(MagicAbility ability) {
-		return ability == MagicAbility.PLANCK_HEAT
-			|| ability == MagicAbility.MANIPULATION
-			|| ability == MagicAbility.COMEDIC_REWRITE
-			|| ability == MagicAbility.ORIONS_GAMBIT
-			|| ability == MagicAbility.BANKRUPTCY;
+		return false;
 	}
 
 	private static boolean isBankruptcyProtectedAbility(
