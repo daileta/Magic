@@ -1,6 +1,7 @@
 package net.evan.magic.command;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import net.evan.magic.magic.MagicPlayerData;
 import net.evan.magic.magic.MagicSchool;
 import net.evan.magic.magic.ability.MagicAbility;
 import net.evan.magic.magic.ability.MagicAbilityManager;
+import net.evan.magic.magic.ability.GreedRuntime;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
@@ -90,6 +92,34 @@ public final class MagicCommands {
 						CommandManager.literal("testing")
 							.then(testingModeLiteral("enable", true))
 							.then(testingModeLiteral("disable", false))
+					)
+					.then(
+						CommandManager.literal("greed")
+							.then(
+								CommandManager.literal("coins")
+									.then(
+										CommandManager.literal("add")
+											.then(
+												CommandManager.argument("amount", DoubleArgumentType.doubleArg(0.01))
+													.executes(context ->
+														addGreedCoinsForSelf(
+															context.getSource(),
+															DoubleArgumentType.getDouble(context, "amount")
+														)
+													)
+													.then(
+														CommandManager.argument("targets", EntityArgumentType.players())
+															.executes(context ->
+																addGreedCoins(
+																	context.getSource(),
+																	EntityArgumentType.getPlayers(context, "targets"),
+																	DoubleArgumentType.getDouble(context, "amount")
+																)
+															)
+													)
+											)
+									)
+							)
 					)
 					.then(
 						CommandManager.literal("school")
@@ -238,6 +268,10 @@ public final class MagicCommands {
 		return setSchool(source, List.of(source.getPlayerOrThrow()), school);
 	}
 
+	private static int addGreedCoinsForSelf(ServerCommandSource source, double amount) throws CommandSyntaxException {
+		return addGreedCoins(source, List.of(source.getPlayerOrThrow()), amount);
+	}
+
 	private static int resetAll(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
 		int resetCount = 0;
 		for (ServerPlayerEntity target : targets) {
@@ -328,6 +362,39 @@ public final class MagicCommands {
 
 		sendSchoolSetFeedback(source, targets, school);
 		return changedCount == 0 ? Command.SINGLE_SUCCESS : changedCount;
+	}
+
+	private static int addGreedCoins(ServerCommandSource source, Collection<ServerPlayerEntity> targets, double amount) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		int skippedNonGreed = 0;
+
+		for (ServerPlayerEntity target : targets) {
+			if (MagicPlayerData.getSchool(target) != MagicSchool.GREED) {
+				skippedNonGreed++;
+				continue;
+			}
+			if (GreedRuntime.addCoins(target, amount) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.greed.coins.add.failure.no_greed_targets"));
+			return 0;
+		}
+
+		sendGreedCoinAddFeedback(source, updatedTargets, amount);
+		if (skippedNonGreed > 0) {
+			source.sendError(
+				Text.translatable(
+					skippedNonGreed == 1
+						? "command.magic.greed.coins.add.skipped_non_greed.single"
+						: "command.magic.greed.coins.add.skipped_non_greed.multiple",
+					skippedNonGreed
+				)
+			);
+		}
+		return updatedTargets.size();
 	}
 
 	private static void sendAllResetFeedback(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
@@ -441,6 +508,42 @@ public final class MagicCommands {
 			() -> Text.translatable("command.magic.school.set.multiple", school.displayName(), targets.size()),
 			true
 		);
+	}
+
+	private static void sendGreedCoinAddFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		double amount
+	) {
+		String formattedAmount = formatCoinAmount(amount);
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.greed.coins.add.single", formattedAmount, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.greed.coins.add.multiple", formattedAmount, targets.size()),
+			true
+		);
+	}
+
+	private static String formatCoinAmount(double amount) {
+		long coinUnits = Math.round(Math.max(0.0, amount) * MagicPlayerData.GREED_COIN_UNITS_PER_COIN);
+		long wholeCoins = coinUnits / MagicPlayerData.GREED_COIN_UNITS_PER_COIN;
+		long fractionalUnits = coinUnits % MagicPlayerData.GREED_COIN_UNITS_PER_COIN;
+		if (fractionalUnits == 0L) {
+			return Long.toString(wholeCoins);
+		}
+
+		String fractional = fractionalUnits < 10L ? "0" + fractionalUnits : Long.toString(fractionalUnits);
+		while (fractional.endsWith("0")) {
+			fractional = fractional.substring(0, fractional.length() - 1);
+		}
+		return wholeCoins + "." + fractional;
 	}
 
 	private static int reloadConfig(ServerCommandSource source) {

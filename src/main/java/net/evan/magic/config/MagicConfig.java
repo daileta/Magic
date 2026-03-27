@@ -2,10 +2,16 @@ package net.evan.magic.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
 import com.google.gson.annotations.SerializedName;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
+import com.google.gson.stream.JsonWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,9 +30,49 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.util.math.MathHelper;
 
 public final class MagicConfig {
+	private static final TypeAdapter<Integer> FLEXIBLE_INTEGER_ADAPTER = new TypeAdapter<>() {
+		@Override
+		public void write(JsonWriter out, Integer value) throws IOException {
+			if (value == null) {
+				out.nullValue();
+				return;
+			}
+
+			out.value(value);
+		}
+
+		@Override
+		public Integer read(JsonReader in) throws IOException {
+			JsonToken token = in.peek();
+			if (token == JsonToken.NULL) {
+				in.nextNull();
+				return 0;
+			}
+			if (token != JsonToken.NUMBER && token != JsonToken.STRING) {
+				throw new IOException("Expected numeric config value but found " + token);
+			}
+
+			String raw = in.nextString();
+			try {
+				BigDecimal rounded = new BigDecimal(raw).setScale(0, RoundingMode.HALF_UP);
+				if (rounded.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0) {
+					return Integer.MAX_VALUE;
+				}
+				if (rounded.compareTo(BigDecimal.valueOf(Integer.MIN_VALUE)) < 0) {
+					return Integer.MIN_VALUE;
+				}
+				return rounded.intValueExact();
+			} catch (NumberFormatException | ArithmeticException exception) {
+				throw new IOException("Invalid integer config value: " + raw, exception);
+			}
+		}
+	};
+
 	private static final Gson GSON = new GsonBuilder()
 		.setPrettyPrinting()
 		.disableHtmlEscaping()
+		.registerTypeAdapter(Integer.class, FLEXIBLE_INTEGER_ADAPTER)
+		.registerTypeAdapter(int.class, FLEXIBLE_INTEGER_ADAPTER)
 		.create();
 
 	private static final Path CONFIG_PATH = FabricLoader.getInstance()
@@ -176,6 +222,11 @@ public final class MagicConfig {
 		try (Writer writer = Files.newBufferedWriter(CONFIG_PATH, StandardCharsets.UTF_8)) {
 			GSON.toJson(config, writer);
 		}
+	}
+
+	private static double normalizeCoinAmount(double value) {
+		double clamped = Math.max(0.0, value);
+		return Math.round(clamped * 100.0) / 100.0;
 	}
 
 	private static Set<MagicAbility> parseAbilityIds(List<String> ids, String context) {
@@ -754,8 +805,8 @@ public final class MagicConfig {
 		private static JesterComedicRewriteLaunchConfig defaultLaunchedThroughTheScene() {
 			JesterComedicRewriteLaunchConfig config = new JesterComedicRewriteLaunchConfig();
 			config.weight = 50;
-			config.baseHorizontalVelocity = 1.35;
-			config.horizontalVelocityPerSeverity = 1.1;
+			config.baseHorizontalVelocity = 1.6;
+			config.horizontalVelocityPerSeverity = 1.2;
 			config.baseVerticalVelocity = 0.6;
 			config.verticalVelocityPerSeverity = 0.35;
 			config.slownessDurationTicks = 40;
@@ -768,8 +819,8 @@ public final class MagicConfig {
 		private static JesterComedicRewriteRavagerConfig defaultRavagerBit() {
 			JesterComedicRewriteRavagerConfig config = new JesterComedicRewriteRavagerConfig();
 			config.weight = 25;
-			config.baseHorizontalVelocity = 1.1;
-			config.horizontalVelocityPerSeverity = 0.9;
+			config.baseHorizontalVelocity = 1.35;
+			config.horizontalVelocityPerSeverity = 1.05;
 			config.baseVerticalVelocity = 0.5;
 			config.verticalVelocityPerSeverity = 0.25;
 			config.slownessDurationTicks = 60;
@@ -777,10 +828,12 @@ public final class MagicConfig {
 			config.smokeParticleCount = 16;
 			config.dustParticleCount = 20;
 			config.showVisualCameo = true;
-			config.visualDurationTicks = 8;
-			config.visualSpawnDistance = 2.75;
+			config.visualDurationTicks = 38;
+			config.visualSpawnDistance = 2.0;
 			config.visualVerticalOffset = 0.0;
-			config.visualChargeVelocity = 1.85;
+			config.visualChargeVelocity = 2.0;
+			config.visualChargeVelocityBuffer = 0.45;
+			config.visualChargeDurationTicks = 6;
 			return config;
 		}
 
@@ -795,10 +848,11 @@ public final class MagicConfig {
 			config.levitationDurationTicks = 12;
 			config.featherParticleCount = 18;
 			config.showVisualCameo = true;
-			config.visualDurationTicks = 12;
+			config.visualDurationTicks = 32;
 			config.visualCount = 3;
 			config.visualRadius = 0.9;
 			config.visualVerticalOffset = 0.2;
+			config.visualFollowPlayerHead = true;
 			config.visualLiftVelocity = 0.15;
 			return config;
 		}
@@ -843,6 +897,8 @@ public final class MagicConfig {
 		public double visualSpawnDistance = 0.0;
 		public double visualVerticalOffset = 0.0;
 		public double visualChargeVelocity = 0.0;
+		public double visualChargeVelocityBuffer = 0.0;
+		public int visualChargeDurationTicks = 0;
 
 		private void normalize() {
 			weight = Math.max(0, weight);
@@ -857,6 +913,8 @@ public final class MagicConfig {
 			visualDurationTicks = Math.max(0, visualDurationTicks);
 			visualSpawnDistance = Math.max(0.0, visualSpawnDistance);
 			visualChargeVelocity = Math.max(0.0, visualChargeVelocity);
+			visualChargeVelocityBuffer = Math.max(0.0, visualChargeVelocityBuffer);
+			visualChargeDurationTicks = Math.max(0, visualChargeDurationTicks);
 		}
 	}
 
@@ -874,6 +932,7 @@ public final class MagicConfig {
 		public int visualCount = 0;
 		public double visualRadius = 0.0;
 		public double visualVerticalOffset = 0.0;
+		public boolean visualFollowPlayerHead = true;
 		public double visualLiftVelocity = 0.0;
 
 		private void normalize() {
@@ -1156,7 +1215,7 @@ public final class MagicConfig {
 		public int cooldownTicks = 30 * 20;
 		public double markedActionRange = 32.0;
 		public int maxTrackedPlayers = 3;
-		public int maxCoins = 18;
+		public double maxCoins = 18.0;
 		public int inactivityWipeTicks = 5 * 60 * 20;
 		public int contributionLifetimeTicks = 10 * 60 * 20;
 		public int markParticleIntervalTicks = 4;
@@ -1173,7 +1232,7 @@ public final class MagicConfig {
 			cooldownTicks = Math.max(0, cooldownTicks);
 			markedActionRange = Math.max(1.0, markedActionRange);
 			maxTrackedPlayers = Math.max(1, maxTrackedPlayers);
-			maxCoins = Math.max(1, maxCoins);
+			maxCoins = normalizeCoinAmount(maxCoins);
 			inactivityWipeTicks = Math.max(1, inactivityWipeTicks);
 			contributionLifetimeTicks = Math.max(1, contributionLifetimeTicks);
 			markParticleIntervalTicks = Math.max(1, markParticleIntervalTicks);
@@ -1195,7 +1254,7 @@ public final class MagicConfig {
 				if (key == null || key.isBlank() || value == null) {
 					continue;
 				}
-				normalized.put(key.trim().toLowerCase(), normalizeCoinTriggerValue(value));
+				normalized.put(key.trim().toLowerCase(), normalizeCoinAmount(value));
 			}
 			if (normalized.isEmpty()) {
 				normalized = defaultCoinTriggers();
@@ -1221,10 +1280,6 @@ public final class MagicConfig {
 			return defaults;
 		}
 
-		private static double normalizeCoinTriggerValue(double value) {
-			double clamped = Math.max(0.0, value);
-			return Math.round(clamped * 2.0) / 2.0;
-		}
 	}
 
 	public static final class TollkeepersClaimConfig {
@@ -1238,9 +1293,19 @@ public final class MagicConfig {
 		public double reducedJumpVelocityMultiplier = 0.55;
 		public int rootSlownessAmplifier = 255;
 		public int rootMiningFatigueAmplifier = 5;
-		public int markedExitBonusCoins = 1;
+		public double markedExitBonusCoins = 1.0;
 		public int ringParticleIntervalTicks = 4;
-		public int ringParticlePoints = 20;
+		public int ringParticlePoints = 30;
+		public double ringColumnHeight = 3.0;
+		public int ringVerticalPoints = 12;
+		public double ringCurveStartHeight = 1.0;
+		public double ringCurveOutwardRadius = 0.85;
+		public double ringSpinDegreesPerTick = 12.0;
+		public double ringTwistDegreesPerBlock = 120.0;
+		public double ringWaveRadiusAmplitude = 0.28;
+		public double ringWaveVerticalAmplitude = 0.08;
+		public double ringWaveCyclesPerColumn = 2.5;
+		public double ringWaveDegreesPerTick = 18.0;
 		public int risingParticleCount = 5;
 		public int shimmerSoundIntervalTicks = 20;
 		public TollkeepersClaimStageConfig stageOne = defaultStageOne();
@@ -1276,9 +1341,19 @@ public final class MagicConfig {
 			reducedJumpVelocityMultiplier = MathHelper.clamp(reducedJumpVelocityMultiplier, 0.0, 1.0);
 			rootSlownessAmplifier = Math.max(0, rootSlownessAmplifier);
 			rootMiningFatigueAmplifier = Math.max(0, rootMiningFatigueAmplifier);
-			markedExitBonusCoins = Math.max(0, markedExitBonusCoins);
+			markedExitBonusCoins = normalizeCoinAmount(markedExitBonusCoins);
 			ringParticleIntervalTicks = Math.max(1, ringParticleIntervalTicks);
 			ringParticlePoints = Math.max(3, ringParticlePoints);
+			ringColumnHeight = Math.max(0.1, ringColumnHeight);
+			ringVerticalPoints = Math.max(2, ringVerticalPoints);
+			ringCurveStartHeight = MathHelper.clamp(ringCurveStartHeight, 0.0, ringColumnHeight);
+			ringCurveOutwardRadius = Math.max(0.0, ringCurveOutwardRadius);
+			ringSpinDegreesPerTick = Math.max(0.0, ringSpinDegreesPerTick);
+			ringTwistDegreesPerBlock = Math.max(0.0, ringTwistDegreesPerBlock);
+			ringWaveRadiusAmplitude = Math.max(0.0, ringWaveRadiusAmplitude);
+			ringWaveVerticalAmplitude = Math.max(0.0, ringWaveVerticalAmplitude);
+			ringWaveCyclesPerColumn = Math.max(0.0, ringWaveCyclesPerColumn);
+			ringWaveDegreesPerTick = Math.max(0.0, ringWaveDegreesPerTick);
 			risingParticleCount = Math.max(0, risingParticleCount);
 			shimmerSoundIntervalTicks = Math.max(1, shimmerSoundIntervalTicks);
 			stageOne.normalize();

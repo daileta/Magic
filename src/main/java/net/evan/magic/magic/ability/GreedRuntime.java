@@ -60,7 +60,8 @@ import net.minecraft.world.World;
 
 public final class GreedRuntime {
 	private static final int TICKS_PER_SECOND = 20;
-	private static final int COIN_UNITS_PER_COIN = 2;
+	private static final int COIN_UNITS_PER_COIN = MagicPlayerData.GREED_COIN_UNITS_PER_COIN;
+	private static final UUID COMMAND_COIN_SOURCE_ID = new UUID(0L, 1L);
 	private static final Identifier KINGS_DUES_ATTACK_SPEED_MODIFIER_ID = Identifier.of(
 		Magic.MOD_ID,
 		"kings_dues_attack_speed_lock"
@@ -189,9 +190,6 @@ public final class GreedRuntime {
 			recordActionFromPlayer(attacker, "full_charge_bow_shot");
 			return;
 		}
-		if (isCriticalHit(attacker, source)) {
-			recordActionFromPlayer(attacker, "critical_hit");
-		}
 	}
 
 	public static void onShieldDisabled(ServerPlayerEntity attacker) {
@@ -214,6 +212,26 @@ public final class GreedRuntime {
 
 	public static void recordExternalAction(ServerPlayerEntity actor, String triggerId) {
 		recordActionFromPlayer(actor, triggerId);
+	}
+
+	public static int addCoins(ServerPlayerEntity player, double coins) {
+		if (player == null || MagicPlayerData.getSchool(player) != MagicSchool.GREED) {
+			return 0;
+		}
+
+		int currentTick = currentTick(player);
+		if (currentTick == Integer.MIN_VALUE) {
+			return 0;
+		}
+
+		int requestedCoinUnits = coinUnitsFromConfiguredCoins(coins);
+		if (requestedCoinUnits <= 0) {
+			return 0;
+		}
+
+		int previousCoinUnits = MagicPlayerData.getGreedCoinUnits(player);
+		addCoinUnits(player, COMMAND_COIN_SOURCE_ID, requestedCoinUnits, currentTick);
+		return Math.max(0, MagicPlayerData.getGreedCoinUnits(player) - previousCoinUnits);
 	}
 
 	public static void onEndServerTick(MinecraftServer server, int currentTick) {
@@ -454,7 +472,7 @@ public final class GreedRuntime {
 		);
 		removeCoins(player, spend);
 		if (player.getEntityWorld() instanceof ServerWorld serverWorld) {
-			spawnZoneParticles(serverWorld, TOLLKEEPER_ZONES.get(player.getUuid()));
+			spawnZoneParticles(serverWorld, TOLLKEEPER_ZONES.get(player.getUuid()), currentTick);
 			serverWorld.playSound(
 				null,
 				centerX,
@@ -571,7 +589,10 @@ public final class GreedRuntime {
 		}
 
 		Double configuredCoins = MagicConfig.get().greed.appraisersMark.coinTriggers.get(triggerId.trim().toLowerCase());
-		int configuredCoinUnits = coinUnitsFromConfiguredCoins(configuredCoins);
+		if (configuredCoins == null) {
+			return;
+		}
+		int configuredCoinUnits = coinUnitsFromConfiguredCoins(configuredCoins.doubleValue());
 		if (configuredCoinUnits <= 0) {
 			return;
 		}
@@ -672,7 +693,7 @@ public final class GreedRuntime {
 			}
 
 			if (currentTick >= zone.nextParticleTick) {
-				spawnZoneParticles(world, zone);
+				spawnZoneParticles(world, zone, currentTick);
 				zone.nextParticleTick = currentTick + MagicConfig.get().greed.tollkeepersClaim.ringParticleIntervalTicks;
 			}
 			if (currentTick >= zone.nextSoundTick) {
@@ -707,11 +728,11 @@ public final class GreedRuntime {
 
 				if (zone.insidePlayerIds.contains(player.getUuid())) {
 					applyRoot(player, zone, currentTick);
-					if (isMarkedTarget(caster, player) && MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins > 0) {
+					if (isMarkedTarget(caster, player) && MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins > 0.0) {
 						addCoinUnits(
 							caster,
 							player.getUuid(),
-							coinUnitsFromWholeCoins(MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins),
+							coinUnitsFromConfiguredCoins(MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins),
 							currentTick
 						);
 					}
@@ -1004,18 +1025,16 @@ public final class GreedRuntime {
 
 		GreedCoinStorage storage = GREED_COIN_STORAGES.computeIfAbsent(caster.getUuid(), ignored -> new GreedCoinStorage());
 		expireContributions(storage, currentTick);
-		if (!storage.contributions.containsKey(sourcePlayerId)) {
-			while (storage.contributions.size() >= MagicConfig.get().greed.appraisersMark.maxTrackedPlayers) {
-				Iterator<Map.Entry<UUID, GreedCoinContribution>> iterator = storage.contributions.entrySet().iterator();
-				if (!iterator.hasNext()) {
+		boolean commandContribution = COMMAND_COIN_SOURCE_ID.equals(sourcePlayerId);
+		if (!commandContribution && !storage.contributions.containsKey(sourcePlayerId)) {
+			while (trackedPlayerContributionCount(storage) >= MagicConfig.get().greed.appraisersMark.maxTrackedPlayers) {
+				if (!removeOldestTrackedPlayerContribution(storage)) {
 					break;
 				}
-				iterator.next();
-				iterator.remove();
 			}
 		}
 
-		int availableRoom = Math.max(0, coinUnitsFromWholeCoins(MagicConfig.get().greed.appraisersMark.maxCoins) - totalCoinUnits(storage));
+		int availableRoom = Math.max(0, coinUnitsFromConfiguredCoins(MagicConfig.get().greed.appraisersMark.maxCoins) - totalCoinUnits(storage));
 		if (availableRoom <= 0) {
 			MagicPlayerData.setGreedCoinUnits(caster, totalCoinUnits(storage));
 			return;
@@ -1095,6 +1114,29 @@ public final class GreedRuntime {
 		}
 	}
 
+	private static int trackedPlayerContributionCount(GreedCoinStorage storage) {
+		int count = 0;
+		for (UUID contributorId : storage.contributions.keySet()) {
+			if (!COMMAND_COIN_SOURCE_ID.equals(contributorId)) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	private static boolean removeOldestTrackedPlayerContribution(GreedCoinStorage storage) {
+		Iterator<Map.Entry<UUID, GreedCoinContribution>> iterator = storage.contributions.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, GreedCoinContribution> entry = iterator.next();
+			if (COMMAND_COIN_SOURCE_ID.equals(entry.getKey())) {
+				continue;
+			}
+			iterator.remove();
+			return true;
+		}
+		return false;
+	}
+
 	private static void spawnMarkedParticles(ServerWorld world, ServerPlayerEntity target) {
 		MagicConfig.AppraisersMarkConfig config = MagicConfig.get().greed.appraisersMark;
 		world.spawnParticles(
@@ -1110,13 +1152,29 @@ public final class GreedRuntime {
 		);
 	}
 
-	private static void spawnZoneParticles(ServerWorld world, TollkeepersClaimZoneState zone) {
+	private static void spawnZoneParticles(ServerWorld world, TollkeepersClaimZoneState zone, int currentTick) {
 		MagicConfig.TollkeepersClaimConfig config = MagicConfig.get().greed.tollkeepersClaim;
-		for (int i = 0; i < config.ringParticlePoints; i++) {
-			double angle = Math.PI * 2.0 * i / config.ringParticlePoints;
-			double ringX = zone.centerX + Math.cos(angle) * zone.radius;
-			double ringZ = zone.centerZ + Math.sin(angle) * zone.radius;
-			world.spawnParticles(ParticleTypes.WAX_ON, ringX, zone.centerY, ringZ, 1, 0.0, 0.0, 0.0, 0.0);
+		int verticalPoints = Math.max(2, config.ringVerticalPoints);
+		double spinRadians = Math.toRadians(config.ringSpinDegreesPerTick * currentTick);
+		double waveTravelRadians = Math.toRadians(config.ringWaveDegreesPerTick * currentTick);
+		for (int verticalIndex = 0; verticalIndex < verticalPoints; verticalIndex++) {
+			double heightProgress = verticalPoints == 1 ? 0.0 : verticalIndex / (double) (verticalPoints - 1);
+			double height = config.ringColumnHeight * heightProgress;
+			double verticalTwistRadians = Math.toRadians(config.ringTwistDegreesPerBlock * height);
+			for (int i = 0; i < config.ringParticlePoints; i++) {
+				double baseAngle = Math.PI * 2.0 * i / config.ringParticlePoints;
+				double waveRadians = heightProgress * Math.PI * 2.0 * config.ringWaveCyclesPerColumn + baseAngle - waveTravelRadians;
+				double radius =
+					zone.radius +
+					tollkeepersCurveOutwardOffset(config, height) +
+					Math.sin(waveRadians) * config.ringWaveRadiusAmplitude;
+				double angle = baseAngle + spinRadians + verticalTwistRadians + Math.cos(waveRadians) * 0.16;
+				double ringY = zone.centerY + height + Math.cos(waveRadians) * config.ringWaveVerticalAmplitude;
+				double ringX = zone.centerX + Math.cos(angle) * radius;
+				double ringZ = zone.centerZ + Math.sin(angle) * radius;
+				world.spawnParticles(ParticleTypes.WAX_ON, ringX, ringY, ringZ, 1, 0.0, 0.0, 0.0, 0.0);
+				world.spawnParticles(ParticleTypes.GLOW, ringX, ringY, ringZ, 1, 0.0, 0.0, 0.0, 0.0);
+			}
 		}
 		if (config.risingParticleCount > 0) {
 			world.spawnParticles(
@@ -1142,6 +1200,16 @@ public final class GreedRuntime {
 				0.0
 			);
 		}
+	}
+
+	private static double tollkeepersCurveOutwardOffset(MagicConfig.TollkeepersClaimConfig config, double height) {
+		if (height <= config.ringCurveStartHeight || config.ringColumnHeight <= config.ringCurveStartHeight + 1.0E-6) {
+			return 0.0;
+		}
+
+		double progress = (height - config.ringCurveStartHeight) / (config.ringColumnHeight - config.ringCurveStartHeight);
+		double curvedProgress = MathHelper.clamp(progress, 0.0, 1.0);
+		return config.ringCurveOutwardRadius * curvedProgress * curvedProgress;
 	}
 
 	private static void spawnChainParticles(ServerPlayerEntity player) {
@@ -1276,10 +1344,7 @@ public final class GreedRuntime {
 		return Math.max(0, coins) * COIN_UNITS_PER_COIN;
 	}
 
-	private static int coinUnitsFromConfiguredCoins(Double coins) {
-		if (coins == null) {
-			return 0;
-		}
+	private static int coinUnitsFromConfiguredCoins(double coins) {
 		return Math.max(0, (int) Math.round(Math.max(0.0, coins) * COIN_UNITS_PER_COIN));
 	}
 
@@ -1310,20 +1375,6 @@ public final class GreedRuntime {
 
 		ItemStack weaponStack = projectile.getWeaponStack();
 		return weaponStack != null && !weaponStack.isEmpty() && weaponStack.getItem() instanceof BowItem && projectile.isCritical();
-	}
-
-	private static boolean isCriticalHit(ServerPlayerEntity attacker, DamageSource source) {
-		return !source.isOf(DamageTypes.MACE_SMASH) &&
-			!source.isOf(DamageTypes.TRIDENT) &&
-			!source.isOf(DamageTypes.ARROW) &&
-			!source.isOf(DamageTypes.FIREWORKS) &&
-			attacker.getAttackCooldownProgress(0.5F) > 0.9F &&
-			attacker.fallDistance > 0.0F &&
-			!attacker.isOnGround() &&
-			!attacker.isClimbing() &&
-			!attacker.isTouchingWater() &&
-			!attacker.hasVehicle() &&
-			!attacker.isSprinting();
 	}
 
 	private static ServerPlayerEntity attackingPlayerFrom(DamageSource source) {

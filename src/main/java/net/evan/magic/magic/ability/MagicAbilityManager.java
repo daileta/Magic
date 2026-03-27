@@ -50,6 +50,7 @@ import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectCategory;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
@@ -64,6 +65,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
 import net.minecraft.network.packet.s2c.play.EntitiesDestroyS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntityPositionSyncS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntityTrackerUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
@@ -82,6 +84,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryEntryLookup;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.DamageTypeTags;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -152,8 +155,8 @@ public final class MagicAbilityManager {
 	private static double COMEDIC_REWRITE_VISUAL_VIEW_DISTANCE = 48.0;
 	private static ComedicRewriteLaunchSettings COMEDIC_REWRITE_LAUNCHED_THROUGH_THE_SCENE = ComedicRewriteLaunchSettings.defaults(
 		50,
-		1.35,
-		1.1,
+		1.6,
+		1.2,
 		0.6,
 		0.35,
 		40,
@@ -163,8 +166,8 @@ public final class MagicAbilityManager {
 	);
 	private static ComedicRewriteRavagerSettings COMEDIC_REWRITE_RAVAGER_BIT = ComedicRewriteRavagerSettings.defaults(
 		25,
-		1.1,
-		0.9,
+		1.35,
+		1.05,
 		0.5,
 		0.25,
 		60,
@@ -172,10 +175,12 @@ public final class MagicAbilityManager {
 		16,
 		20,
 		true,
-		8,
-		2.75,
+		38,
+		2.0,
 		0.0,
-		1.85
+		2.0,
+		0.45,
+		6
 	);
 	private static ComedicRewriteParrotSettings COMEDIC_REWRITE_PARROT_RESCUE = ComedicRewriteParrotSettings.defaults(
 		25,
@@ -187,10 +192,11 @@ public final class MagicAbilityManager {
 		12,
 		18,
 		true,
-		12,
+		32,
 		3,
 		0.9,
 		0.2,
+		true,
 		0.15
 	);
 	private static double CASSIOPEIA_DETECTION_RADIUS = 64.0;
@@ -457,6 +463,9 @@ public final class MagicAbilityManager {
 	private static final ParticleEffect ASTRAL_EXECUTION_BEAM_PARTICLE = ParticleTypes.GLOW;
 	private static final ParticleEffect ASTRAL_EXECUTION_BEAM_OUTER_PARTICLE = ParticleTypes.END_ROD;
 	private static final ParticleEffect ASTRAL_EXECUTION_BEAM_SPARK_PARTICLE = ParticleTypes.ELECTRIC_SPARK;
+	private static final ParticleEffect FROST_SHARD_PARTICLE = new ItemStackParticleEffect(ParticleTypes.ITEM, new ItemStack(ModItems.FROST_SHARD));
+	private static final double DOMAIN_TELEPORT_POSITION_EPSILON_SQUARED = 4.0E-4;
+	private static final float DOMAIN_TELEPORT_ROTATION_EPSILON_DEGREES = 0.5F;
 
 	private static final List<net.minecraft.registry.entry.RegistryEntry<net.minecraft.entity.effect.StatusEffect>> COMMON_NEGATIVE_EFFECTS = List.of(
 		StatusEffects.SLOWNESS,
@@ -2749,7 +2758,12 @@ public final class MagicAbilityManager {
 		}
 
 		runWithDomainTeleportBypass(() -> {
-			entity.requestTeleport(x, y, z);
+			boolean positionChanged = entity.squaredDistanceTo(x, y, z) > DOMAIN_TELEPORT_POSITION_EPSILON_SQUARED;
+			boolean rotationChanged = angleDeltaDegrees(entity.getYaw(), yaw) > DOMAIN_TELEPORT_ROTATION_EPSILON_DEGREES
+				|| angleDeltaDegrees(entity.getPitch(), pitch) > DOMAIN_TELEPORT_ROTATION_EPSILON_DEGREES;
+			if (positionChanged) {
+				entity.requestTeleport(x, y, z);
+			}
 			entity.setVelocity(0.0, 0.0, 0.0);
 			entity.setOnGround(true);
 			entity.setYaw(yaw);
@@ -2757,10 +2771,14 @@ public final class MagicAbilityManager {
 			entity.setHeadYaw(yaw);
 			entity.setBodyYaw(yaw);
 
-			if (entity instanceof ServerPlayerEntity player) {
+			if (entity instanceof ServerPlayerEntity player && (positionChanged || rotationChanged)) {
 				player.networkHandler.requestTeleport(x, y, z, yaw, pitch);
 			}
 		});
+	}
+
+	private static float angleDeltaDegrees(float current, float target) {
+		return Math.abs(MathHelper.wrapDegrees(target - current));
 	}
 
 	private static void runWithDomainTeleportBypass(Runnable action) {
@@ -3350,6 +3368,10 @@ public final class MagicAbilityManager {
 		Iterator<ComedicRewriteVisualCameo> iterator = COMEDIC_REWRITE_VISUAL_CAMEOS.iterator();
 		while (iterator.hasNext()) {
 			ComedicRewriteVisualCameo cameo = iterator.next();
+			syncComedicRewriteVisualCameoFollow(server, cameo);
+			if (!cameo.chargeStopped() && cameo.chargeEndTick() > 0 && cameo.chargeEndTick() <= currentTick) {
+				stopComedicRewriteVisualCameoCharge(server, cameo);
+			}
 			if (cameo.endTick() > currentTick) {
 				continue;
 			}
@@ -3363,6 +3385,57 @@ public final class MagicAbilityManager {
 			}
 			iterator.remove();
 		}
+	}
+
+	private static void syncComedicRewriteVisualCameoFollow(MinecraftServer server, ComedicRewriteVisualCameo cameo) {
+		ComedicRewriteVisualFollowState followState = cameo.followState();
+		if (followState == null) {
+			return;
+		}
+
+		ServerPlayerEntity anchor = server.getPlayerManager().getPlayer(followState.anchorPlayerId());
+		if (anchor == null || anchor.isDead()) {
+			return;
+		}
+
+		List<ServerPlayerEntity> viewers = comedicRewriteVisualViewers(server, cameo.viewerIds());
+		if (viewers.isEmpty()) {
+			return;
+		}
+
+		Vec3d anchorBase = new Vec3d(anchor.getX(), anchor.getY() + anchor.getHeight(), anchor.getZ());
+		Vec3d[] headOffsets = followState.headOffsets();
+		Entity[] entities = cameo.entities();
+		int count = Math.min(entities.length, headOffsets.length);
+		for (int index = 0; index < count; index++) {
+			Entity entity = entities[index];
+			Vec3d targetPos = anchorBase.add(headOffsets[index]);
+			entity.refreshPositionAndAngles(targetPos.x, targetPos.y, targetPos.z, entity.getYaw(), entity.getPitch());
+			entity.setVelocity(Vec3d.ZERO);
+			EntityPositionSyncS2CPacket positionPacket = EntityPositionSyncS2CPacket.create(entity);
+			EntityVelocityUpdateS2CPacket velocityPacket = new EntityVelocityUpdateS2CPacket(entity.getId(), entity.getVelocity());
+			for (ServerPlayerEntity viewer : viewers) {
+				viewer.networkHandler.sendPacket(positionPacket);
+				viewer.networkHandler.sendPacket(velocityPacket);
+			}
+		}
+	}
+
+	private static void stopComedicRewriteVisualCameoCharge(MinecraftServer server, ComedicRewriteVisualCameo cameo) {
+		List<ServerPlayerEntity> viewers = comedicRewriteVisualViewers(server, cameo.viewerIds());
+		if (viewers.isEmpty()) {
+			cameo.markChargeStopped();
+			return;
+		}
+
+		for (Entity entity : cameo.entities()) {
+			entity.setVelocity(Vec3d.ZERO);
+			EntityVelocityUpdateS2CPacket velocityPacket = new EntityVelocityUpdateS2CPacket(entity.getId(), entity.getVelocity());
+			for (ServerPlayerEntity viewer : viewers) {
+				viewer.networkHandler.sendPacket(velocityPacket);
+			}
+		}
+		cameo.markChargeStopped();
 	}
 
 	private static void applyPassiveAbilityEffects(ServerPlayerEntity player, int currentTick) {
@@ -3408,9 +3481,7 @@ public final class MagicAbilityManager {
 		}
 
 		if (MARTYRS_FLAME_APPLY_GLOWING_EFFECT) {
-			player.addStatusEffect(
-				new StatusEffectInstance(StatusEffects.GLOWING, EFFECT_REFRESH_TICKS, 0, true, false, true)
-			);
+			refreshStatusEffect(player, StatusEffects.GLOWING, EFFECT_REFRESH_TICKS, 0, true, false, true);
 		}
 		if (currentTick % MARTYRS_FLAME_FIRE_PARTICLE_INTERVAL_TICKS == 0) {
 			spawnMartyrsFlameCasterParticles(player);
@@ -3759,9 +3830,7 @@ public final class MagicAbilityManager {
 
 	private static void applyBelowFreezing(ServerPlayerEntity player) {
 		cleanseCommonNegativeEffects(player);
-		player.addStatusEffect(
-			new StatusEffectInstance(StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, BELOW_FREEZING_RESISTANCE_AMPLIFIER, true, false, true)
-		);
+		refreshStatusEffect(player, StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, BELOW_FREEZING_RESISTANCE_AMPLIFIER, true, false, true);
 		spawnCasterAuraParticles(player);
 		applyAuraSlowness(player, BELOW_FREEZING_AURA_RADIUS, BELOW_FREEZING_AURA_SLOWNESS_AMPLIFIER, 1);
 	}
@@ -3772,9 +3841,7 @@ public final class MagicAbilityManager {
 		Map<UUID, Set<UUID>> absoluteZeroAuraSeenThisTick
 	) {
 		cleanseAbsoluteZeroNegatives(player);
-		player.addStatusEffect(
-			new StatusEffectInstance(StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, ABSOLUTE_ZERO_RESISTANCE_AMPLIFIER, true, false, true)
-		);
+		refreshStatusEffect(player, StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, ABSOLUTE_ZERO_RESISTANCE_AMPLIFIER, true, false, true);
 		spawnAbsoluteZeroCasterParticles(player);
 		Map<UUID, Integer> nextDamageTicksByTarget = ABSOLUTE_ZERO_NEXT_DAMAGE_TICK.computeIfAbsent(player.getUuid(), ignored -> new HashMap<>());
 		Set<UUID> seenTargets = absoluteZeroAuraSeenThisTick.computeIfAbsent(player.getUuid(), ignored -> new HashSet<>());
@@ -3789,10 +3856,7 @@ public final class MagicAbilityManager {
 
 			if (entity instanceof LivingEntity target) {
 				seenTargets.add(target.getUuid());
-				target.removeStatusEffect(StatusEffects.SLOWNESS);
-				target.addStatusEffect(
-					new StatusEffectInstance(StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, ABSOLUTE_ZERO_AURA_SLOWNESS_AMPLIFIER, true, true, true)
-				);
+				refreshStatusEffect(target, StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, ABSOLUTE_ZERO_AURA_SLOWNESS_AMPLIFIER, true, true, true);
 
 				spawnHitboxShardParticles(target, 1);
 
@@ -3870,9 +3934,7 @@ public final class MagicAbilityManager {
 
 	private static void applyPlanckHeatFrostPhase(ServerPlayerEntity caster, int currentTick) {
 		cleanseAbsoluteZeroNegatives(caster);
-		caster.addStatusEffect(
-			new StatusEffectInstance(StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, ABSOLUTE_ZERO_RESISTANCE_AMPLIFIER, true, false, true)
-		);
+		refreshStatusEffect(caster, StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, ABSOLUTE_ZERO_RESISTANCE_AMPLIFIER, true, false, true);
 		spawnPlanckHeatFrostCasterParticles(caster);
 
 		UUID casterId = caster.getUuid();
@@ -3889,10 +3951,7 @@ public final class MagicAbilityManager {
 			if (entity instanceof LivingEntity target) {
 				UUID targetId = target.getUuid();
 				seenTargets.add(targetId);
-				target.removeStatusEffect(StatusEffects.SLOWNESS);
-				target.addStatusEffect(
-					new StatusEffectInstance(StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, PLANCK_HEAT_FROST_SLOWNESS_AMPLIFIER, true, true, true)
-				);
+				refreshStatusEffect(target, StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, PLANCK_HEAT_FROST_SLOWNESS_AMPLIFIER, true, true, true);
 				spawnHitboxShardParticles(target, 2);
 
 				int nextDamageTick = nextDamageTicksByTarget.getOrDefault(targetId, currentTick + PLANCK_HEAT_FROST_DAMAGE_INTERVAL_TICKS);
@@ -3924,26 +3983,8 @@ public final class MagicAbilityManager {
 
 			if (entity instanceof LivingEntity target) {
 				applyOrRefreshEnhancedFire(target, caster.getUuid(), currentTick, PLANCK_HEAT_AURA_ENHANCED_FIRE_DURATION_TICKS);
-				target.addStatusEffect(
-					new StatusEffectInstance(
-						StatusEffects.HUNGER,
-						EFFECT_REFRESH_TICKS,
-						PLANCK_HEAT_FIRE_PHASE_HUNGER_AMPLIFIER,
-						true,
-						true,
-						true
-					)
-				);
-				target.addStatusEffect(
-					new StatusEffectInstance(
-						StatusEffects.NAUSEA,
-						EFFECT_REFRESH_TICKS,
-						PLANCK_HEAT_FIRE_PHASE_NAUSEA_AMPLIFIER,
-						true,
-						true,
-						true
-					)
-				);
+				refreshStatusEffect(target, StatusEffects.HUNGER, EFFECT_REFRESH_TICKS, PLANCK_HEAT_FIRE_PHASE_HUNGER_AMPLIFIER, true, true, true);
+				refreshStatusEffect(target, StatusEffects.NAUSEA, EFFECT_REFRESH_TICKS, PLANCK_HEAT_FIRE_PHASE_NAUSEA_AMPLIFIER, true, true, true);
 			}
 		}
 	}
@@ -4300,7 +4341,7 @@ public final class MagicAbilityManager {
 		);
 		world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_RAVAGER_ROAR, SoundCategory.PLAYERS, 1.1F, 0.85F);
 		world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_ANVIL_LAND, SoundCategory.PLAYERS, 0.8F, 0.75F);
-		spawnComedicRewriteRavagerVisual(player, world, direction);
+		spawnComedicRewriteRavagerVisual(player, world, direction, horizontalVelocity);
 	}
 
 	private static void applyComedicRewriteParrotOutcome(
@@ -4375,7 +4416,12 @@ public final class MagicAbilityManager {
 		player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, durationTicks, amplifier, true, false, true));
 	}
 
-	private static void spawnComedicRewriteRavagerVisual(ServerPlayerEntity player, ServerWorld world, Vec3d direction) {
+	private static void spawnComedicRewriteRavagerVisual(
+		ServerPlayerEntity player,
+		ServerWorld world,
+		Vec3d direction,
+		double playerHorizontalVelocity
+	) {
 		if (!COMEDIC_REWRITE_RAVAGER_BIT.showVisualCameo() || COMEDIC_REWRITE_RAVAGER_BIT.visualDurationTicks() <= 0) {
 			return;
 		}
@@ -4398,11 +4444,17 @@ public final class MagicAbilityManager {
 		ravager.setOnGround(player.isOnGround());
 		ravager.setAiDisabled(true);
 		ravager.setSilent(true);
-		ravager.setVelocity(spawnDirection.multiply(COMEDIC_REWRITE_RAVAGER_BIT.visualChargeVelocity()));
+		double chargeVelocity = Math.max(
+			COMEDIC_REWRITE_RAVAGER_BIT.visualChargeVelocity(),
+			Math.max(0.0, playerHorizontalVelocity) + COMEDIC_REWRITE_RAVAGER_BIT.visualChargeVelocityBuffer()
+		);
+		ravager.setVelocity(spawnDirection.multiply(chargeVelocity));
 		queueComedicRewriteVisualCameo(
 			world.getServer(),
 			COMEDIC_REWRITE_RAVAGER_BIT.visualDurationTicks(),
 			viewers,
+			COMEDIC_REWRITE_RAVAGER_BIT.visualChargeDurationTicks(),
+			null,
 			ravager
 		);
 	}
@@ -4424,13 +4476,20 @@ public final class MagicAbilityManager {
 		Vec3d carryVelocity = player.getVelocity().add(0.0, COMEDIC_REWRITE_PARROT_RESCUE.visualLiftVelocity(), 0.0);
 		float yaw = horizontalYawFromDirection(carryVelocity.lengthSquared() > 1.0E-5 ? carryVelocity : carryDirection);
 		List<Entity> parrots = new ArrayList<>();
+		Vec3d[] headOffsets = new Vec3d[COMEDIC_REWRITE_PARROT_RESCUE.visualCount()];
 		for (int index = 0; index < COMEDIC_REWRITE_PARROT_RESCUE.visualCount(); index++) {
 			double angle = (Math.PI * 2.0 * index) / COMEDIC_REWRITE_PARROT_RESCUE.visualCount();
 			double offsetX = Math.cos(angle) * COMEDIC_REWRITE_PARROT_RESCUE.visualRadius();
 			double offsetZ = Math.sin(angle) * COMEDIC_REWRITE_PARROT_RESCUE.visualRadius();
-			double offsetY = player.getBodyY(0.65) + COMEDIC_REWRITE_PARROT_RESCUE.visualVerticalOffset() + (index % 2 == 0 ? 0.1 : 0.0);
+			Vec3d headOffset = new Vec3d(
+				offsetX,
+				COMEDIC_REWRITE_PARROT_RESCUE.visualVerticalOffset() + (index % 2 == 0 ? 0.1 : 0.0),
+				offsetZ
+			);
+			headOffsets[index] = headOffset;
+			Vec3d spawnPos = new Vec3d(player.getX(), player.getY() + player.getHeight(), player.getZ()).add(headOffset);
 			ParrotEntity parrot = new ParrotEntity(EntityType.PARROT, world);
-			parrot.refreshPositionAndAngles(player.getX() + offsetX, offsetY, player.getZ() + offsetZ, yaw, 0.0F);
+			parrot.refreshPositionAndAngles(spawnPos.x, spawnPos.y, spawnPos.z, yaw, 0.0F);
 			parrot.setBodyYaw(yaw);
 			parrot.setHeadYaw(yaw);
 			parrot.setAiDisabled(true);
@@ -4440,13 +4499,21 @@ public final class MagicAbilityManager {
 				DataComponentTypes.PARROT_VARIANT,
 				ParrotEntity.Variant.byIndex(player.getRandom().nextInt(ParrotEntity.Variant.values().length))
 			);
-			parrot.setVelocity(carryVelocity.add(offsetX * 0.08, 0.0, offsetZ * 0.08));
+			parrot.setVelocity(
+				COMEDIC_REWRITE_PARROT_RESCUE.visualFollowPlayerHead()
+					? Vec3d.ZERO
+					: carryVelocity.add(offsetX * 0.08, 0.0, offsetZ * 0.08)
+			);
 			parrots.add(parrot);
 		}
 		queueComedicRewriteVisualCameo(
 			world.getServer(),
 			COMEDIC_REWRITE_PARROT_RESCUE.visualDurationTicks(),
 			viewers,
+			0,
+			COMEDIC_REWRITE_PARROT_RESCUE.visualFollowPlayerHead()
+				? new ComedicRewriteVisualFollowState(player.getUuid(), headOffsets)
+				: null,
 			parrots.toArray(Entity[]::new)
 		);
 	}
@@ -4462,10 +4529,23 @@ public final class MagicAbilityManager {
 		return viewers;
 	}
 
+	private static List<ServerPlayerEntity> comedicRewriteVisualViewers(MinecraftServer server, List<UUID> viewerIds) {
+		List<ServerPlayerEntity> viewers = new ArrayList<>(viewerIds.size());
+		for (UUID viewerId : viewerIds) {
+			ServerPlayerEntity viewer = server.getPlayerManager().getPlayer(viewerId);
+			if (viewer != null) {
+				viewers.add(viewer);
+			}
+		}
+		return viewers;
+	}
+
 	private static void queueComedicRewriteVisualCameo(
 		MinecraftServer server,
 		int durationTicks,
 		List<ServerPlayerEntity> viewers,
+		int chargeDurationTicks,
+		ComedicRewriteVisualFollowState followState,
 		Entity... entities
 	) {
 		if (server == null || durationTicks <= 0 || viewers.isEmpty() || entities.length == 0) {
@@ -4481,7 +4561,17 @@ public final class MagicAbilityManager {
 		for (ServerPlayerEntity viewer : viewers) {
 			viewerIds.add(viewer.getUuid());
 		}
-		COMEDIC_REWRITE_VISUAL_CAMEOS.add(new ComedicRewriteVisualCameo(server.getTicks() + durationTicks, entityIds, List.copyOf(viewerIds)));
+		int chargeEndTick = chargeDurationTicks > 0 && chargeDurationTicks < durationTicks ? server.getTicks() + chargeDurationTicks : 0;
+		COMEDIC_REWRITE_VISUAL_CAMEOS.add(
+			new ComedicRewriteVisualCameo(
+				server.getTicks() + durationTicks,
+				chargeEndTick,
+				entityIds,
+				List.copyOf(viewerIds),
+				followState,
+				entities
+			)
+		);
 	}
 
 	private static int spawnPacketOnlyEntity(List<ServerPlayerEntity> viewers, Entity entity) {
@@ -4963,7 +5053,9 @@ public final class MagicAbilityManager {
 			Math.max(0, config.visualDurationTicks),
 			Math.max(0.0, config.visualSpawnDistance),
 			config.visualVerticalOffset,
-			Math.max(0.0, config.visualChargeVelocity)
+			Math.max(0.0, config.visualChargeVelocity),
+			Math.max(0.0, config.visualChargeVelocityBuffer),
+			Math.max(0, config.visualChargeDurationTicks)
 		);
 	}
 
@@ -4982,6 +5074,7 @@ public final class MagicAbilityManager {
 			Math.max(0, config.visualCount),
 			Math.max(0.0, config.visualRadius),
 			config.visualVerticalOffset,
+			config.visualFollowPlayerHead,
 			Math.max(0.0, config.visualLiftVelocity)
 		);
 	}
@@ -5154,14 +5247,10 @@ public final class MagicAbilityManager {
 		);
 
 		if (stageSettings.jumpBoostAmplifier() >= 0) {
-			player.addStatusEffect(
-				new StatusEffectInstance(StatusEffects.JUMP_BOOST, SPOTLIGHT_EFFECT_REFRESH_TICKS, stageSettings.jumpBoostAmplifier(), true, false, true)
-			);
+			refreshStatusEffect(player, StatusEffects.JUMP_BOOST, SPOTLIGHT_EFFECT_REFRESH_TICKS, stageSettings.jumpBoostAmplifier(), true, false, true);
 		}
 		if (stageSettings.resistanceAmplifier() >= 0) {
-			player.addStatusEffect(
-				new StatusEffectInstance(StatusEffects.RESISTANCE, SPOTLIGHT_EFFECT_REFRESH_TICKS, stageSettings.resistanceAmplifier(), true, false, true)
-			);
+			refreshStatusEffect(player, StatusEffects.RESISTANCE, SPOTLIGHT_EFFECT_REFRESH_TICKS, stageSettings.resistanceAmplifier(), true, false, true);
 		}
 
 		double newBonusPoints = stageSettings.maxHealthBonusPoints();
@@ -5806,9 +5895,7 @@ public final class MagicAbilityManager {
 
 			teleportDomainEntity(target, state.lockedX, state.lockedY, state.lockedZ, target.getYaw(), target.getPitch());
 			target.stopUsingItem();
-			target.addStatusEffect(
-				new StatusEffectInstance(StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, HERCULES_SLOWNESS_AMPLIFIER, true, false, false)
-			);
+			refreshStatusEffect(target, StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, HERCULES_SLOWNESS_AMPLIFIER, true, false, false);
 			if (target instanceof MobEntity mob) {
 				mob.getNavigation().stop();
 			}
@@ -6148,25 +6235,23 @@ public final class MagicAbilityManager {
 	}
 
 	private static void applyOrionsGambitPenaltyEffects(ServerPlayerEntity caster) {
-		caster.addStatusEffect(
-			new StatusEffectInstance(
-				StatusEffects.WEAKNESS,
-				ORIONS_GAMBIT_CASTER_PENALTY_REFRESH_TICKS,
-				ORIONS_GAMBIT_CASTER_WEAKNESS_AMPLIFIER,
-				true,
-				false,
-				true
-			)
+		refreshStatusEffect(
+			caster,
+			StatusEffects.WEAKNESS,
+			ORIONS_GAMBIT_CASTER_PENALTY_REFRESH_TICKS,
+			ORIONS_GAMBIT_CASTER_WEAKNESS_AMPLIFIER,
+			true,
+			false,
+			true
 		);
-		caster.addStatusEffect(
-			new StatusEffectInstance(
-				StatusEffects.SLOWNESS,
-				ORIONS_GAMBIT_CASTER_PENALTY_REFRESH_TICKS,
-				ORIONS_GAMBIT_CASTER_SLOWNESS_AMPLIFIER,
-				true,
-				false,
-				true
-			)
+		refreshStatusEffect(
+			caster,
+			StatusEffects.SLOWNESS,
+			ORIONS_GAMBIT_CASTER_PENALTY_REFRESH_TICKS,
+			ORIONS_GAMBIT_CASTER_SLOWNESS_AMPLIFIER,
+			true,
+			false,
+			true
 		);
 		double cappedHealthPoints = ORIONS_GAMBIT_CASTER_MAX_HEALTH_HEARTS * 2.0;
 		EntityAttributeInstance maxHealth = caster.getAttributeInstance(EntityAttributes.MAX_HEALTH);
@@ -6809,18 +6894,15 @@ public final class MagicAbilityManager {
 		float[] forcedAngles = computeFacingAngles(target, caster.getEyePos());
 		teleportDomainEntity(target, state.lockedX, state.lockedY, state.lockedZ, forcedAngles[0], forcedAngles[1]);
 		target.stopUsingItem();
-		target.addStatusEffect(
-			new StatusEffectInstance(StatusEffects.SLOWNESS, LOVE_LOCK_EFFECT_TICKS, LOVE_LOCK_SLOWNESS_AMPLIFIER, true, false, false)
-		);
-		target.addStatusEffect(
-			new StatusEffectInstance(
-				StatusEffects.MINING_FATIGUE,
-				LOVE_LOCK_EFFECT_TICKS,
-				LOVE_LOCK_MINING_FATIGUE_AMPLIFIER,
-				true,
-				false,
-				false
-			)
+		refreshStatusEffect(target, StatusEffects.SLOWNESS, LOVE_LOCK_EFFECT_TICKS, LOVE_LOCK_SLOWNESS_AMPLIFIER, true, false, false);
+		refreshStatusEffect(
+			target,
+			StatusEffects.MINING_FATIGUE,
+			LOVE_LOCK_EFFECT_TICKS,
+			LOVE_LOCK_MINING_FATIGUE_AMPLIFIER,
+			true,
+			false,
+			false
 		);
 		if (currentTick - state.lastParticleTick >= LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS) {
 			spawnLoveAtFirstSightTargetParticles(target);
@@ -6864,9 +6946,7 @@ public final class MagicAbilityManager {
 			}
 
 			if (entity instanceof LivingEntity livingTarget) {
-				livingTarget.addStatusEffect(
-					new StatusEffectInstance(StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, slownessAmplifier, true, true, true)
-				);
+				refreshStatusEffect(livingTarget, StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, slownessAmplifier, true, true, true);
 				spawnHitboxShardParticles(livingTarget, shardCount);
 			}
 		}
@@ -7250,6 +7330,39 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static void refreshStatusEffect(
+		LivingEntity entity,
+		RegistryEntry<StatusEffect> effect,
+		int durationTicks,
+		int amplifier,
+		boolean ambient,
+		boolean showParticles,
+		boolean showIcon
+	) {
+		if (durationTicks <= 0 || amplifier < 0) {
+			return;
+		}
+
+		StatusEffectInstance existing = entity.getStatusEffect(effect);
+		if (existing != null) {
+			int refreshThreshold = Math.max(1, durationTicks / 2);
+			if (existing.getAmplifier() > amplifier && existing.getDuration() > refreshThreshold) {
+				return;
+			}
+			if (
+				existing.getAmplifier() == amplifier
+				&& existing.isAmbient() == ambient
+				&& existing.shouldShowParticles() == showParticles
+				&& existing.shouldShowIcon() == showIcon
+				&& existing.getDuration() > refreshThreshold
+			) {
+				return;
+			}
+		}
+
+		entity.addStatusEffect(new StatusEffectInstance(effect, durationTicks, amplifier, ambient, showParticles, showIcon));
+	}
+
 	private static void cleanseAbsoluteZeroNegatives(LivingEntity entity) {
 		for (StatusEffectInstance statusEffect : List.copyOf(entity.getStatusEffects())) {
 			var effectType = statusEffect.getEffectType();
@@ -7447,16 +7560,11 @@ public final class MagicAbilityManager {
 		}
 
 		Box box = entity.getBoundingBox();
-		ItemStackParticleEffect shardParticle = new ItemStackParticleEffect(
-			ParticleTypes.ITEM,
-			new ItemStack(ModItems.FROST_SHARD)
-		);
-
 		for (int i = 0; i < count; i++) {
 			double x = box.minX + entity.getRandom().nextDouble() * box.getLengthX();
 			double y = box.minY + entity.getRandom().nextDouble() * box.getLengthY();
 			double z = box.minZ + entity.getRandom().nextDouble() * box.getLengthZ();
-			world.spawnParticles(shardParticle, x, y, z, 1, 0.08, 0.12, 0.08, 0.005);
+			world.spawnParticles(FROST_SHARD_PARTICLE, x, y, z, 1, 0.08, 0.12, 0.08, 0.005);
 		}
 	}
 
@@ -7588,25 +7696,23 @@ public final class MagicAbilityManager {
 		player.addStatusEffect(
 			new StatusEffectInstance(StatusEffects.INSTANT_HEALTH, 1, DOMAIN_CLASH_INSTANT_HEALTH_AMPLIFIER, true, false, true)
 		);
-		player.addStatusEffect(
-			new StatusEffectInstance(
-				StatusEffects.REGENERATION,
-				DOMAIN_CLASH_REGENERATION_REFRESH_TICKS,
-				DOMAIN_CLASH_REGENERATION_AMPLIFIER,
-				true,
-				false,
-				true
-			)
+		refreshStatusEffect(
+			player,
+			StatusEffects.REGENERATION,
+			DOMAIN_CLASH_REGENERATION_REFRESH_TICKS,
+			DOMAIN_CLASH_REGENERATION_AMPLIFIER,
+			true,
+			false,
+			true
 		);
-		player.addStatusEffect(
-			new StatusEffectInstance(
-				StatusEffects.RESISTANCE,
-				DOMAIN_CLASH_REGENERATION_REFRESH_TICKS,
-				DOMAIN_CLASH_RESISTANCE_AMPLIFIER,
-				true,
-				false,
-				true
-			)
+		refreshStatusEffect(
+			player,
+			StatusEffects.RESISTANCE,
+			DOMAIN_CLASH_REGENERATION_REFRESH_TICKS,
+			DOMAIN_CLASH_RESISTANCE_AMPLIFIER,
+			true,
+			false,
+			true
 		);
 	}
 
@@ -9673,10 +9779,67 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private record ComedicRewriteVisualCameo(
-		int endTick,
-		int[] entityIds,
-		List<UUID> viewerIds
+	private static final class ComedicRewriteVisualCameo {
+		private final int endTick;
+		private final int chargeEndTick;
+		private final int[] entityIds;
+		private final List<UUID> viewerIds;
+		private final ComedicRewriteVisualFollowState followState;
+		private final Entity[] entities;
+		private boolean chargeStopped;
+
+		private ComedicRewriteVisualCameo(
+			int endTick,
+			int chargeEndTick,
+			int[] entityIds,
+			List<UUID> viewerIds,
+			ComedicRewriteVisualFollowState followState,
+			Entity[] entities
+		) {
+			this.endTick = endTick;
+			this.chargeEndTick = chargeEndTick;
+			this.entityIds = entityIds;
+			this.viewerIds = viewerIds;
+			this.followState = followState;
+			this.entities = entities;
+		}
+
+		private int endTick() {
+			return endTick;
+		}
+
+		private int chargeEndTick() {
+			return chargeEndTick;
+		}
+
+		private int[] entityIds() {
+			return entityIds;
+		}
+
+		private List<UUID> viewerIds() {
+			return viewerIds;
+		}
+
+		private ComedicRewriteVisualFollowState followState() {
+			return followState;
+		}
+
+		private Entity[] entities() {
+			return entities;
+		}
+
+		private boolean chargeStopped() {
+			return chargeStopped;
+		}
+
+		private void markChargeStopped() {
+			chargeStopped = true;
+		}
+	}
+
+	private record ComedicRewriteVisualFollowState(
+		UUID anchorPlayerId,
+		Vec3d[] headOffsets
 	) {
 	}
 
@@ -9730,7 +9893,9 @@ public final class MagicAbilityManager {
 		int visualDurationTicks,
 		double visualSpawnDistance,
 		double visualVerticalOffset,
-		double visualChargeVelocity
+		double visualChargeVelocity,
+		double visualChargeVelocityBuffer,
+		int visualChargeDurationTicks
 	) {
 		private static ComedicRewriteRavagerSettings defaults(
 			int weight,
@@ -9746,7 +9911,9 @@ public final class MagicAbilityManager {
 			int visualDurationTicks,
 			double visualSpawnDistance,
 			double visualVerticalOffset,
-			double visualChargeVelocity
+			double visualChargeVelocity,
+			double visualChargeVelocityBuffer,
+			int visualChargeDurationTicks
 		) {
 			return new ComedicRewriteRavagerSettings(
 				weight,
@@ -9762,7 +9929,9 @@ public final class MagicAbilityManager {
 				visualDurationTicks,
 				visualSpawnDistance,
 				visualVerticalOffset,
-				visualChargeVelocity
+				visualChargeVelocity,
+				visualChargeVelocityBuffer,
+				visualChargeDurationTicks
 			);
 		}
 	}
@@ -9781,6 +9950,7 @@ public final class MagicAbilityManager {
 		int visualCount,
 		double visualRadius,
 		double visualVerticalOffset,
+		boolean visualFollowPlayerHead,
 		double visualLiftVelocity
 	) {
 		private static ComedicRewriteParrotSettings defaults(
@@ -9797,6 +9967,7 @@ public final class MagicAbilityManager {
 			int visualCount,
 			double visualRadius,
 			double visualVerticalOffset,
+			boolean visualFollowPlayerHead,
 			double visualLiftVelocity
 		) {
 			return new ComedicRewriteParrotSettings(
@@ -9813,6 +9984,7 @@ public final class MagicAbilityManager {
 				visualCount,
 				visualRadius,
 				visualVerticalOffset,
+				visualFollowPlayerHead,
 				visualLiftVelocity
 			);
 		}

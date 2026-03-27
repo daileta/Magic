@@ -2,6 +2,7 @@ package net.evan.magic.mixin;
 
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.evan.magic.magic.ability.GreedRuntime;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
@@ -37,6 +38,22 @@ public abstract class PlayerEntityMixin {
 	private void magic$recordGreedShieldDisable(ServerWorld world, LivingEntity attacker, CallbackInfo ci) {
 		if (attacker instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
 			GreedRuntime.onShieldDisabled(serverPlayer);
+		}
+	}
+
+	@Inject(method = "addAttackParticlesAndSounds", at = @At("HEAD"))
+	private void magic$recordGreedCriticalHit(
+		Entity target,
+		boolean criticalHit,
+		boolean sweeping,
+		boolean cooldownPassed,
+		boolean pierce,
+		float enchantDamage,
+		CallbackInfo ci
+	) {
+		PlayerEntity self = (PlayerEntity) (Object) this;
+		if (criticalHit && self instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
+			GreedRuntime.recordExternalAction(serverPlayer, "critical_hit");
 		}
 	}
 

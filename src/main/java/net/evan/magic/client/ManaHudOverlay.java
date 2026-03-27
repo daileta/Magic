@@ -21,6 +21,14 @@ public final class ManaHudOverlay {
 	private static final Identifier MANA_HUD_LAYER = Identifier.of(Magic.MOD_ID, "mana_bar");
 	private static final int BAR_WIDTH = 182;
 	private static final int BAR_HEIGHT = 5;
+	private static final int GREED_COINS_MARGIN = 6;
+	private static final int GREED_COINS_BOX_PADDING_X = 4;
+	private static final int GREED_COINS_BOX_PADDING_Y = 3;
+	private static final int GREED_COINS_SCHOOL_GAP = 6;
+	private static final int GREED_COINS_LINE_GAP = 2;
+	private static final int GREED_COINS_BOX_BACKGROUND = 0x70000000;
+	private static final int GREED_COINS_LABEL_COLOR = 0xFFF4DE95;
+	private static final int GREED_COINS_VALUE_COLOR = 0xFFFFC94A;
 	private static final int CLASH_BAR_BACKGROUND = 0xAA222222;
 	private static final int CLASH_BAR_PROGRESS = 0xFF29CC72;
 	private static final int CLASH_BAR_WRONG_FLASH = 0xFFFF2B2B;
@@ -114,17 +122,41 @@ public final class ManaHudOverlay {
 		int textX = drawContext.getScaledWindowWidth() - textWidth - 6;
 		int textY = drawContext.getScaledWindowHeight() - 18;
 		if (school == MagicSchool.GREED) {
-			Text greedCoins = Text.literal("Coins: " + MagicPlayerData.formatGreedCoins(client.player));
-			int coinsWidth = client.textRenderer.getWidth(greedCoins);
-			drawContext.drawTextWithShadow(
-				client.textRenderer,
-				greedCoins,
-				drawContext.getScaledWindowWidth() - coinsWidth - 6,
-				drawContext.getScaledWindowHeight() - 30,
-				GREED_COLOR
-			);
+			renderGreedCoins(drawContext, client, textY);
 		}
 		drawContext.drawTextWithShadow(client.textRenderer, schoolName, textX, textY, colorForSchool(school));
+	}
+
+	private static void renderGreedCoins(DrawContext drawContext, MinecraftClient client, int schoolTextY) {
+		Text label = Text.literal("Coins");
+		Text value = Text.literal(MagicPlayerData.formatGreedCoins(client.player)).formatted(Formatting.BOLD);
+		int labelWidth = client.textRenderer.getWidth(label);
+		int valueWidth = client.textRenderer.getWidth(value);
+		int contentWidth = Math.max(labelWidth, valueWidth);
+		int contentHeight = client.textRenderer.fontHeight * 2 + GREED_COINS_LINE_GAP;
+		int coinsX = drawContext.getScaledWindowWidth() - contentWidth - GREED_COINS_MARGIN - GREED_COINS_BOX_PADDING_X;
+		int coinsY = schoolTextY - contentHeight - GREED_COINS_SCHOOL_GAP;
+		drawContext.fill(
+			coinsX - GREED_COINS_BOX_PADDING_X,
+			coinsY - GREED_COINS_BOX_PADDING_Y,
+			coinsX + contentWidth + GREED_COINS_BOX_PADDING_X,
+			coinsY + contentHeight + GREED_COINS_BOX_PADDING_Y,
+			GREED_COINS_BOX_BACKGROUND
+		);
+		drawContext.drawTextWithShadow(
+			client.textRenderer,
+			label,
+			coinsX + (contentWidth - labelWidth) / 2,
+			coinsY,
+			GREED_COINS_LABEL_COLOR
+		);
+		drawContext.drawTextWithShadow(
+			client.textRenderer,
+			value,
+			coinsX + (contentWidth - valueWidth) / 2,
+			coinsY + client.textRenderer.fontHeight + GREED_COINS_LINE_GAP,
+			GREED_COINS_VALUE_COLOR
+		);
 	}
 
 	public static void showJesterJoke(String message, int colorRgb, int fadeInTicks, int stayTicks, int fadeOutTicks) {
