@@ -7,6 +7,7 @@ import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.evan.magic.network.MagicNetworking;
 import net.evan.magic.registry.ModBlocks;
 import net.evan.magic.registry.ModItems;
+import net.evan.magic.registry.ModParticles;
 import net.evan.magic.registry.ModStatusEffects;
 
 public final class ModBootstrap {
@@ -22,6 +23,7 @@ public final class ModBootstrap {
 
 		MagicConfig.initialize();
 		MagicPlayerData.initialize();
+		ModParticles.register();
 		ModStatusEffects.register();
 		MagicNetworking.initialize();
 		MagicAbilityManager.initialize();

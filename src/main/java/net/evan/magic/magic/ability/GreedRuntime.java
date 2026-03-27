@@ -15,6 +15,7 @@ import net.evan.magic.config.MagicConfig.KingsDuesStageConfig;
 import net.evan.magic.config.MagicConfig.TollkeepersClaimStageConfig;
 import net.evan.magic.magic.MagicPlayerData;
 import net.evan.magic.magic.MagicSchool;
+import net.evan.magic.particle.TollkeepersClaimVortexParticleEffect;
 import net.evan.magic.registry.ModStatusEffects;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -60,6 +61,7 @@ import net.minecraft.world.World;
 
 public final class GreedRuntime {
 	private static final int TICKS_PER_SECOND = 20;
+	private static final int TOLLKEEPERS_CLAIM_VORTEX_ARMS = 8;
 	private static final int COIN_UNITS_PER_COIN = MagicPlayerData.GREED_COIN_UNITS_PER_COIN;
 	private static final UUID COMMAND_COIN_SOURCE_ID = new UUID(0L, 1L);
 	private static final Identifier KINGS_DUES_ATTACK_SPEED_MODIFIER_ID = Identifier.of(
@@ -457,22 +459,22 @@ public final class GreedRuntime {
 		double centerY = blockPos.getY() + 0.05;
 		double centerZ = blockPos.getZ() + 0.5;
 		int durationTicks = Math.max(1, config.baseDurationTicks + spend * config.durationPerCoinTicks);
-		TOLLKEEPER_ZONES.put(
+		TollkeepersClaimZoneState zone = new TollkeepersClaimZoneState(
 			player.getUuid(),
-			new TollkeepersClaimZoneState(
-				player.getUuid(),
-				player.getEntityWorld().getRegistryKey(),
-				centerX,
-				centerY,
-				centerZ,
-				config.zoneRadius,
-				spend,
-				currentTick + durationTicks
-			)
+			player.getEntityWorld().getRegistryKey(),
+			centerX,
+			centerY,
+			centerZ,
+			config.zoneRadius,
+			spend,
+			currentTick + durationTicks
 		);
+		TOLLKEEPER_ZONES.put(player.getUuid(), zone);
 		removeCoins(player, spend);
 		if (player.getEntityWorld() instanceof ServerWorld serverWorld) {
-			spawnZoneParticles(serverWorld, TOLLKEEPER_ZONES.get(player.getUuid()), currentTick);
+			spawnZoneParticles(serverWorld, zone, currentTick);
+			zone.nextParticleTick = currentTick + config.vortexParticleIntervalTicks;
+			zone.nextSoundTick = currentTick + config.shimmerSoundIntervalTicks;
 			serverWorld.playSound(
 				null,
 				centerX,
@@ -694,7 +696,7 @@ public final class GreedRuntime {
 
 			if (currentTick >= zone.nextParticleTick) {
 				spawnZoneParticles(world, zone, currentTick);
-				zone.nextParticleTick = currentTick + MagicConfig.get().greed.tollkeepersClaim.ringParticleIntervalTicks;
+				zone.nextParticleTick = currentTick + MagicConfig.get().greed.tollkeepersClaim.vortexParticleIntervalTicks;
 			}
 			if (currentTick >= zone.nextSoundTick) {
 				world.playSound(
@@ -1154,62 +1156,39 @@ public final class GreedRuntime {
 
 	private static void spawnZoneParticles(ServerWorld world, TollkeepersClaimZoneState zone, int currentTick) {
 		MagicConfig.TollkeepersClaimConfig config = MagicConfig.get().greed.tollkeepersClaim;
-		int verticalPoints = Math.max(2, config.ringVerticalPoints);
-		double spinRadians = Math.toRadians(config.ringSpinDegreesPerTick * currentTick);
-		double waveTravelRadians = Math.toRadians(config.ringWaveDegreesPerTick * currentTick);
-		for (int verticalIndex = 0; verticalIndex < verticalPoints; verticalIndex++) {
-			double heightProgress = verticalPoints == 1 ? 0.0 : verticalIndex / (double) (verticalPoints - 1);
-			double height = config.ringColumnHeight * heightProgress;
-			double verticalTwistRadians = Math.toRadians(config.ringTwistDegreesPerBlock * height);
-			for (int i = 0; i < config.ringParticlePoints; i++) {
-				double baseAngle = Math.PI * 2.0 * i / config.ringParticlePoints;
-				double waveRadians = heightProgress * Math.PI * 2.0 * config.ringWaveCyclesPerColumn + baseAngle - waveTravelRadians;
-				double radius =
-					zone.radius +
-					tollkeepersCurveOutwardOffset(config, height) +
-					Math.sin(waveRadians) * config.ringWaveRadiusAmplitude;
-				double angle = baseAngle + spinRadians + verticalTwistRadians + Math.cos(waveRadians) * 0.16;
-				double ringY = zone.centerY + height + Math.cos(waveRadians) * config.ringWaveVerticalAmplitude;
-				double ringX = zone.centerX + Math.cos(angle) * radius;
-				double ringZ = zone.centerZ + Math.sin(angle) * radius;
-				world.spawnParticles(ParticleTypes.WAX_ON, ringX, ringY, ringZ, 1, 0.0, 0.0, 0.0, 0.0);
-				world.spawnParticles(ParticleTypes.GLOW, ringX, ringY, ringZ, 1, 0.0, 0.0, 0.0, 0.0);
-			}
-		}
-		if (config.risingParticleCount > 0) {
+		double spinSpeed = Math.toRadians(config.vortexSpinDegreesPerTick);
+		double twistPerBlock = Math.toRadians(config.vortexTwistDegreesPerBlock);
+		double baseAngle = spinSpeed * currentTick;
+		for (int armIndex = 0; armIndex < TOLLKEEPERS_CLAIM_VORTEX_ARMS; armIndex++) {
+			double angle = baseAngle + Math.PI * 2.0 * armIndex / TOLLKEEPERS_CLAIM_VORTEX_ARMS;
+			double particleX = zone.centerX + Math.cos(angle) * zone.radius;
+			double particleZ = zone.centerZ + Math.sin(angle) * zone.radius;
 			world.spawnParticles(
-				GOLD_NUGGET_PARTICLE,
-				zone.centerX,
-				zone.centerY + 0.2,
-				zone.centerZ,
-				config.risingParticleCount,
-				zone.radius * 0.45,
-				0.12,
-				zone.radius * 0.45,
-				0.02
-			);
-			world.spawnParticles(
-				ParticleTypes.GLOW,
-				zone.centerX,
-				zone.centerY + 0.25,
-				zone.centerZ,
-				Math.max(1, config.risingParticleCount / 2),
-				zone.radius * 0.4,
-				0.18,
-				zone.radius * 0.4,
+				new TollkeepersClaimVortexParticleEffect(
+					zone.centerX,
+					zone.centerY,
+					zone.centerZ,
+					0.0,
+					angle,
+					spinSpeed,
+					twistPerBlock,
+					zone.radius,
+					config.vortexStraightHeight,
+					config.vortexTotalHeight,
+					config.vortexOutwardCurve,
+					config.vortexParticleLifetimeTicks,
+					config.vortexParticleScale
+				),
+				particleX,
+				zone.centerY,
+				particleZ,
+				1,
+				0.0,
+				0.0,
+				0.0,
 				0.0
 			);
 		}
-	}
-
-	private static double tollkeepersCurveOutwardOffset(MagicConfig.TollkeepersClaimConfig config, double height) {
-		if (height <= config.ringCurveStartHeight || config.ringColumnHeight <= config.ringCurveStartHeight + 1.0E-6) {
-			return 0.0;
-		}
-
-		double progress = (height - config.ringCurveStartHeight) / (config.ringColumnHeight - config.ringCurveStartHeight);
-		double curvedProgress = MathHelper.clamp(progress, 0.0, 1.0);
-		return config.ringCurveOutwardRadius * curvedProgress * curvedProgress;
 	}
 
 	private static void spawnChainParticles(ServerPlayerEntity player) {
