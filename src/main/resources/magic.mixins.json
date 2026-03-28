@@ -3,6 +3,7 @@
 	"package": "net.evan.magic.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
+		"ArmorStandEntityAccessorMixin",
 		"BlockDisplayEntityAccessorMixin",
 		"DisplayEntityAccessorMixin",
 		"EndCrystalEntityMixin",
@@ -15,7 +16,8 @@
 		"TntMinecartEntityMixin"
 	],
 	"client": [
-		"MinecraftClientMixin"
+		"MinecraftClientMixin",
+		"PlayerEntityRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -48,6 +48,13 @@ public final class MagicPlayerData {
 			.syncWith(PacketCodecs.BOOLEAN, AttachmentSyncPredicate.targetOnly())
 	);
 
+	private static final AttachmentType<Boolean> PLUS_ULTRA_ACTIVE = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "plus_ultra_active"),
+		builder -> builder
+			.initializer(() -> false)
+			.syncWith(PacketCodecs.BOOLEAN, AttachmentSyncPredicate.all())
+	);
+
 	private static final AttachmentType<Boolean> DOMAIN_CLASH_ACTIVE = AttachmentRegistry.create(
 		Identifier.of(Magic.MOD_ID, "domain_clash_active"),
 		builder -> builder
@@ -135,6 +142,7 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, CURRENT_MANA, MAX_MANA, 0);
 		setAttachedIfChanged(target, ACTIVE_ABILITY_SLOT, 0, 0);
 		setAttachedIfChanged(target, DEPLETED_RECOVERY_MODE, false, false);
+		setAttachedIfChanged(target, PLUS_ULTRA_ACTIVE, false, false);
 		setAttachedIfChanged(target, DOMAIN_CLASH_ACTIVE, false, false);
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROGRESS, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROMPT_KEY, 0, 0);
@@ -151,6 +159,7 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, CURRENT_MANA, 0, 0);
 		setAttachedIfChanged(target, ACTIVE_ABILITY_SLOT, 0, 0);
 		setAttachedIfChanged(target, DEPLETED_RECOVERY_MODE, false, false);
+		setAttachedIfChanged(target, PLUS_ULTRA_ACTIVE, false, false);
 		setAttachedIfChanged(target, DOMAIN_CLASH_ACTIVE, false, false);
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROGRESS, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_CLASH_PROMPT_KEY, 0, 0);
@@ -191,6 +200,15 @@ public final class MagicPlayerData {
 	public static void setDepletedRecoveryMode(PlayerEntity player, boolean enabled) {
 		AttachmentTarget target = target(player);
 		setAttachedIfChanged(target, DEPLETED_RECOVERY_MODE, enabled, false);
+	}
+
+	public static boolean isPlusUltraActive(PlayerEntity player) {
+		return target(player).getAttachedOrElse(PLUS_ULTRA_ACTIVE, false);
+	}
+
+	public static void setPlusUltraActive(PlayerEntity player, boolean active) {
+		AttachmentTarget target = target(player);
+		setAttachedIfChanged(target, PLUS_ULTRA_ACTIVE, active, false);
 	}
 
 	public static boolean isDomainClashActive(PlayerEntity player) {

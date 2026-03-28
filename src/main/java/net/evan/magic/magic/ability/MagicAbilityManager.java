@@ -15,6 +15,7 @@ import net.evan.magic.Magic;
 import net.evan.magic.config.MagicConfig;
 import net.evan.magic.magic.MagicPlayerData;
 import net.evan.magic.magic.MagicSchool;
+import net.evan.magic.mixin.ArmorStandEntityAccessorMixin;
 import net.evan.magic.mixin.BlockDisplayEntityAccessorMixin;
 import net.evan.magic.mixin.DisplayEntityAccessorMixin;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
@@ -49,6 +50,7 @@ import net.minecraft.entity.MovementType;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.decoration.BlockAttachedEntity;
 import net.minecraft.entity.decoration.DisplayEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -121,6 +123,7 @@ import net.minecraft.world.World;
 public final class MagicAbilityManager {
 	private static final int TICKS_PER_SECOND = 20;
 	private static final int COOLDOWN_MESSAGE_DEBOUNCE_TICKS = 20;
+	private static final float DEFAULT_PLAYER_FLY_SPEED = 0.05F;
 	private static int BELOW_FREEZING_MANA_DRAIN_PER_SECOND = 5;
 	private static int ABSOLUTE_ZERO_MANA_DRAIN_PER_SECOND = 20;
 	private static int LOVE_AT_FIRST_SIGHT_IDLE_DRAIN_PER_SECOND = 2;
@@ -333,6 +336,55 @@ public final class MagicAbilityManager {
 		0.95F,
 		0.95F
 	);
+	private static double PLUS_ULTRA_ACTIVATION_COST_PERCENT = 80.0;
+	private static int PLUS_ULTRA_DURATION_TICKS = 30 * TICKS_PER_SECOND;
+	private static double PLUS_ULTRA_OUTLINE_RADIUS = 150.0;
+	private static int PLUS_ULTRA_OUTLINE_REFRESH_TICKS = 10;
+	private static double PLUS_ULTRA_INCOMING_DAMAGE_MULTIPLIER = 0.1;
+	private static boolean PLUS_ULTRA_FLIGHT_ENABLED = true;
+	private static boolean PLUS_ULTRA_ELYTRA_POSE_WHILE_FLYING = true;
+	private static boolean PLUS_ULTRA_OVERHEAD_TEXT_ENABLED = true;
+	private static String PLUS_ULTRA_OVERHEAD_TEXT = "No More Jokes.";
+	private static int PLUS_ULTRA_OVERHEAD_TEXT_REFRESH_TICKS = 2;
+	private static int PLUS_ULTRA_OVERHEAD_TEXT_DURATION_TICKS = 3 * TICKS_PER_SECOND;
+	private static double PLUS_ULTRA_OVERHEAD_TEXT_VERTICAL_OFFSET = 2.85;
+	private static float PLUS_ULTRA_FLIGHT_FLY_SPEED = 0.12F;
+	private static double PLUS_ULTRA_FLIGHT_ACCELERATION = 0.28;
+	private static double PLUS_ULTRA_FLIGHT_MAX_SPEED = 3.75;
+	private static double PLUS_ULTRA_FLIGHT_VERTICAL_ACCELERATION = 0.16;
+	private static double PLUS_ULTRA_FLIGHT_VERTICAL_MAX_SPEED = 1.35;
+	private static double PLUS_ULTRA_FLIGHT_DRAG = 0.95;
+	private static float PLUS_ULTRA_MELEE_BONUS_DAMAGE = 6.0F;
+	private static boolean PLUS_ULTRA_ALLOW_PLAYER_TARGETS = true;
+	private static boolean PLUS_ULTRA_ALLOW_MOB_TARGETS = true;
+	private static double PLUS_ULTRA_FLING_HORIZONTAL_STRENGTH = 5.75;
+	private static double PLUS_ULTRA_FLING_VERTICAL_STRENGTH = 1.05;
+	private static int PLUS_ULTRA_IMPACT_TRACKING_TICKS = 35;
+	private static double PLUS_ULTRA_IMPACT_VELOCITY_THRESHOLD = 1.1;
+	private static double PLUS_ULTRA_IMPACT_DAMAGE_MULTIPLIER = 3.0;
+	private static double PLUS_ULTRA_IMPACT_DAMAGE_MAX = 16.0;
+	private static int PLUS_ULTRA_SMOKE_PARTICLE_COUNT = 16;
+	private static double PLUS_ULTRA_SMOKE_PARTICLE_SPREAD = 0.4;
+	private static double PLUS_ULTRA_SMOKE_PARTICLE_SPEED = 0.05;
+	private static int PLUS_ULTRA_HIT_DUST_PARTICLE_COUNT = 10;
+	private static double PLUS_ULTRA_HIT_DUST_PARTICLE_SPREAD = 0.28;
+	private static double PLUS_ULTRA_HIT_DUST_PARTICLE_SPEED = 0.02;
+	private static int PLUS_ULTRA_IMPACT_PARTICLE_COUNT = 28;
+	private static double PLUS_ULTRA_IMPACT_PARTICLE_SPREAD = 0.55;
+	private static double PLUS_ULTRA_IMPACT_PARTICLE_SPEED = 0.12;
+	private static int PLUS_ULTRA_IMPACT_DUST_PARTICLE_COUNT = 20;
+	private static double PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD = 0.4;
+	private static double PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPEED = 0.05;
+	private static float PLUS_ULTRA_IMPACT_SOUND_VOLUME = 1.0F;
+	private static float PLUS_ULTRA_IMPACT_SOUND_PITCH = 0.8F;
+	private static int PLUS_ULTRA_EARLY_CANCEL_PENALTY_DURATION_TICKS = 15 * TICKS_PER_SECOND;
+	private static int PLUS_ULTRA_EARLY_CANCEL_SLOWNESS_AMPLIFIER = 0;
+	private static int PLUS_ULTRA_EARLY_CANCEL_WEAKNESS_AMPLIFIER = 0;
+	private static int PLUS_ULTRA_FULL_END_PENALTY_DURATION_TICKS = 30 * TICKS_PER_SECOND;
+	private static int PLUS_ULTRA_FULL_END_SLOWNESS_AMPLIFIER = 1;
+	private static int PLUS_ULTRA_FULL_END_WEAKNESS_AMPLIFIER = 1;
+	private static int PLUS_ULTRA_EARLY_CANCEL_COOLDOWN_TICKS = 15 * 60 * TICKS_PER_SECOND;
+	private static int PLUS_ULTRA_FULL_END_COOLDOWN_TICKS = 20 * 60 * TICKS_PER_SECOND;
 	private static double CASSIOPEIA_DETECTION_RADIUS = 64.0;
 	private static int CASSIOPEIA_OUTLINE_REFRESH_TICKS = 10;
 	private static double HERCULES_TARGET_RANGE = 64.0;
@@ -653,6 +705,11 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, ComedicAssistantParrotCarryState> COMEDIC_ASSISTANT_PARROT_CARRY_STATES = new HashMap<>();
 	private static final Map<UUID, ComedicAssistantAcmeVisualState> COMEDIC_ASSISTANT_ACME_VISUALS = new HashMap<>();
 	private static final Map<UUID, ComedicAssistantCaneImpactState> COMEDIC_ASSISTANT_CANE_IMPACT_STATES = new HashMap<>();
+	private static final Map<UUID, Integer> PLUS_ULTRA_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, PlusUltraState> PLUS_ULTRA_STATES = new HashMap<>();
+	private static final Map<UUID, Set<UUID>> PLUS_ULTRA_LAST_OUTLINED_PLAYERS = new HashMap<>();
+	private static final Map<UUID, PlusUltraImpactState> PLUS_ULTRA_IMPACT_STATES = new HashMap<>();
+	private static final Set<UUID> PLUS_ULTRA_DAMAGE_SCALING_GUARD = new HashSet<>();
 	private static final Map<UUID, Double> MARTYRS_FLAME_DRAIN_BUFFER = new HashMap<>();
 	private static final Map<UUID, MartyrsFlameBurnState> MARTYRS_FLAME_BURNING_TARGETS = new HashMap<>();
 	private static final Set<UUID> TILL_DEATH_DO_US_PART_PASSIVE_ENABLED = new HashSet<>();
@@ -733,6 +790,7 @@ public final class MagicAbilityManager {
 			}
 		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> applyPendingDomainReturn(handler.player, server));
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> onPlayerDisconnect(handler.player));
 		AttackEntityCallback.EVENT.register(MagicAbilityManager::onAttackEntity);
 		UseItemCallback.EVENT.register(MagicAbilityManager::onUseItem);
 		UseBlockCallback.EVENT.register(MagicAbilityManager::onUseBlock);
@@ -900,6 +958,57 @@ public final class MagicAbilityManager {
 		COMEDIC_ASSISTANT_ACME_DROP = comedicAssistantAcmeSettings(config.jesterComedicAssistant.acmeDrop);
 		COMEDIC_ASSISTANT_PIE_TO_THE_FACE = comedicAssistantPieSettings(config.jesterComedicAssistant.pieToTheFace);
 		COMEDIC_ASSISTANT_GIANT_CANE_YANK = comedicAssistantCaneSettings(config.jesterComedicAssistant.giantCaneYank);
+		PLUS_ULTRA_ACTIVATION_COST_PERCENT = MathHelper.clamp(config.jesterPlusUltra.activationCostPercent, 0.0, 100.0);
+		PLUS_ULTRA_DURATION_TICKS = Math.max(1, config.jesterPlusUltra.durationTicks);
+		PLUS_ULTRA_OUTLINE_RADIUS = Math.max(0.0, config.jesterPlusUltra.outlineRadius);
+		PLUS_ULTRA_OUTLINE_REFRESH_TICKS = Math.max(1, config.jesterPlusUltra.outlineRefreshTicks);
+		PLUS_ULTRA_INCOMING_DAMAGE_MULTIPLIER = MathHelper.clamp(config.jesterPlusUltra.incomingDamageMultiplier, 0.0, 1.0);
+		PLUS_ULTRA_FLIGHT_ENABLED = config.jesterPlusUltra.flightEnabled;
+		PLUS_ULTRA_ELYTRA_POSE_WHILE_FLYING = config.jesterPlusUltra.elytraPoseWhileFlying;
+		PLUS_ULTRA_OVERHEAD_TEXT_ENABLED = config.jesterPlusUltra.overheadTextEnabled;
+		PLUS_ULTRA_OVERHEAD_TEXT = config.jesterPlusUltra.overheadText == null || config.jesterPlusUltra.overheadText.isBlank()
+			? "No More Jokes."
+			: config.jesterPlusUltra.overheadText.trim();
+		PLUS_ULTRA_OVERHEAD_TEXT_REFRESH_TICKS = Math.max(1, config.jesterPlusUltra.overheadTextRefreshTicks);
+		PLUS_ULTRA_OVERHEAD_TEXT_DURATION_TICKS = Math.max(0, config.jesterPlusUltra.overheadTextDurationTicks);
+		PLUS_ULTRA_OVERHEAD_TEXT_VERTICAL_OFFSET = Math.max(0.0, config.jesterPlusUltra.overheadTextVerticalOffset);
+		PLUS_ULTRA_FLIGHT_FLY_SPEED = Math.max(0.0F, config.jesterPlusUltra.flightFlySpeed);
+		PLUS_ULTRA_FLIGHT_ACCELERATION = Math.max(0.0, config.jesterPlusUltra.flightAcceleration);
+		PLUS_ULTRA_FLIGHT_MAX_SPEED = Math.max(0.0, config.jesterPlusUltra.flightMaxSpeed);
+		PLUS_ULTRA_FLIGHT_VERTICAL_ACCELERATION = Math.max(0.0, config.jesterPlusUltra.flightVerticalAcceleration);
+		PLUS_ULTRA_FLIGHT_VERTICAL_MAX_SPEED = Math.max(0.0, config.jesterPlusUltra.flightVerticalMaxSpeed);
+		PLUS_ULTRA_FLIGHT_DRAG = MathHelper.clamp(config.jesterPlusUltra.flightDrag, 0.0, 1.0);
+		PLUS_ULTRA_MELEE_BONUS_DAMAGE = Math.max(0.0F, config.jesterPlusUltra.meleeBonusDamage);
+		PLUS_ULTRA_ALLOW_PLAYER_TARGETS = config.jesterPlusUltra.allowPlayerTargets;
+		PLUS_ULTRA_ALLOW_MOB_TARGETS = config.jesterPlusUltra.allowMobTargets;
+		PLUS_ULTRA_FLING_HORIZONTAL_STRENGTH = Math.max(0.0, config.jesterPlusUltra.flingHorizontalStrength);
+		PLUS_ULTRA_FLING_VERTICAL_STRENGTH = Math.max(0.0, config.jesterPlusUltra.flingVerticalStrength);
+		PLUS_ULTRA_IMPACT_TRACKING_TICKS = Math.max(0, config.jesterPlusUltra.impactTrackingTicks);
+		PLUS_ULTRA_IMPACT_VELOCITY_THRESHOLD = Math.max(0.0, config.jesterPlusUltra.impactVelocityThreshold);
+		PLUS_ULTRA_IMPACT_DAMAGE_MULTIPLIER = Math.max(0.0, config.jesterPlusUltra.impactDamageMultiplier);
+		PLUS_ULTRA_IMPACT_DAMAGE_MAX = Math.max(0.0, config.jesterPlusUltra.impactDamageMax);
+		PLUS_ULTRA_SMOKE_PARTICLE_COUNT = Math.max(0, config.jesterPlusUltra.smokeParticleCount);
+		PLUS_ULTRA_SMOKE_PARTICLE_SPREAD = Math.max(0.0, config.jesterPlusUltra.smokeParticleSpread);
+		PLUS_ULTRA_SMOKE_PARTICLE_SPEED = Math.max(0.0, config.jesterPlusUltra.smokeParticleSpeed);
+		PLUS_ULTRA_HIT_DUST_PARTICLE_COUNT = Math.max(0, config.jesterPlusUltra.hitDustParticleCount);
+		PLUS_ULTRA_HIT_DUST_PARTICLE_SPREAD = Math.max(0.0, config.jesterPlusUltra.hitDustParticleSpread);
+		PLUS_ULTRA_HIT_DUST_PARTICLE_SPEED = Math.max(0.0, config.jesterPlusUltra.hitDustParticleSpeed);
+		PLUS_ULTRA_IMPACT_PARTICLE_COUNT = Math.max(0, config.jesterPlusUltra.impactParticleCount);
+		PLUS_ULTRA_IMPACT_PARTICLE_SPREAD = Math.max(0.0, config.jesterPlusUltra.impactParticleSpread);
+		PLUS_ULTRA_IMPACT_PARTICLE_SPEED = Math.max(0.0, config.jesterPlusUltra.impactParticleSpeed);
+		PLUS_ULTRA_IMPACT_DUST_PARTICLE_COUNT = Math.max(0, config.jesterPlusUltra.impactDustParticleCount);
+		PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD = Math.max(0.0, config.jesterPlusUltra.impactDustParticleSpread);
+		PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPEED = Math.max(0.0, config.jesterPlusUltra.impactDustParticleSpeed);
+		PLUS_ULTRA_IMPACT_SOUND_VOLUME = Math.max(0.0F, config.jesterPlusUltra.impactSoundVolume);
+		PLUS_ULTRA_IMPACT_SOUND_PITCH = Math.max(0.0F, config.jesterPlusUltra.impactSoundPitch);
+		PLUS_ULTRA_EARLY_CANCEL_PENALTY_DURATION_TICKS = Math.max(0, config.jesterPlusUltra.earlyCancelPenaltyDurationTicks);
+		PLUS_ULTRA_EARLY_CANCEL_SLOWNESS_AMPLIFIER = Math.max(-1, config.jesterPlusUltra.earlyCancelSlownessAmplifier);
+		PLUS_ULTRA_EARLY_CANCEL_WEAKNESS_AMPLIFIER = Math.max(-1, config.jesterPlusUltra.earlyCancelWeaknessAmplifier);
+		PLUS_ULTRA_FULL_END_PENALTY_DURATION_TICKS = Math.max(0, config.jesterPlusUltra.fullEndPenaltyDurationTicks);
+		PLUS_ULTRA_FULL_END_SLOWNESS_AMPLIFIER = Math.max(-1, config.jesterPlusUltra.fullEndSlownessAmplifier);
+		PLUS_ULTRA_FULL_END_WEAKNESS_AMPLIFIER = Math.max(-1, config.jesterPlusUltra.fullEndWeaknessAmplifier);
+		PLUS_ULTRA_EARLY_CANCEL_COOLDOWN_TICKS = Math.max(0, config.jesterPlusUltra.earlyCancelCooldownTicks);
+		PLUS_ULTRA_FULL_END_COOLDOWN_TICKS = Math.max(0, config.jesterPlusUltra.fullEndCooldownTicks);
 		CASSIOPEIA_DETECTION_RADIUS = Math.max(1.0, config.constellationCassiopeia.detectionRadius);
 		CASSIOPEIA_OUTLINE_REFRESH_TICKS = Math.max(1, config.constellationCassiopeia.outlineRefreshTicks);
 		HERCULES_TARGET_RANGE = Math.max(1.0, config.constellationHercules.targetRange);
@@ -1098,6 +1207,11 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		if (currentActiveAbility == MagicAbility.PLUS_ULTRA && requestedAbility != MagicAbility.PLUS_ULTRA) {
+			player.sendMessage(Text.translatable("message.magic.ability.plus_ultra_locked"), true);
+			return;
+		}
+
 		if (!MagicConfig.get().abilityAccess.isAbilityUnlocked(playerId, requestedAbility)) {
 			player.sendMessage(Text.translatable("message.magic.ability.locked", requestedAbility.displayName()), true);
 			return;
@@ -1164,6 +1278,11 @@ public final class MagicAbilityManager {
 
 		if (requestedAbility == MagicAbility.COMEDIC_ASSISTANT) {
 			handleComedicAssistantRequest(player);
+			return;
+		}
+
+		if (requestedAbility == MagicAbility.PLUS_ULTRA) {
+			handlePlusUltraRequest(player);
 			return;
 		}
 
@@ -1305,6 +1424,399 @@ public final class MagicAbilityManager {
 		sendComedicAssistantArmedIndicator(player);
 		spawnComedicAssistantArmedParticles(player);
 		recordOrionsGambitAbilityUse(player, MagicAbility.COMEDIC_ASSISTANT);
+	}
+
+	private static void handlePlusUltraRequest(ServerPlayerEntity player) {
+		int currentTick = player.getEntityWorld().getServer().getTicks();
+		PlusUltraState activeState = PLUS_ULTRA_STATES.get(player.getUuid());
+		if (activeState != null) {
+			PlusUltraEndMode endMode = currentTick < activeState.halfwayTick() ? PlusUltraEndMode.MANUAL_EARLY : PlusUltraEndMode.FULL;
+			endPlusUltra(player, currentTick, endMode, true);
+			return;
+		}
+
+		int remainingTicks = plusUltraCooldownRemaining(player, currentTick);
+		if (remainingTicks > 0) {
+			sendAbilityCooldownMessage(player, MagicAbility.PLUS_ULTRA, remainingTicks, false);
+			return;
+		}
+
+		int manaCost = (int) Math.ceil(manaFromPercentExact(PLUS_ULTRA_ACTIVATION_COST_PERCENT));
+		if (!canSpendAbilityCost(player, manaCost)) {
+			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
+			return;
+		}
+
+		spendAbilityCost(player, manaCost);
+		activatePlusUltra(player, currentTick);
+		recordOrionsGambitAbilityUse(player, MagicAbility.PLUS_ULTRA);
+	}
+
+	private static void activatePlusUltra(ServerPlayerEntity player, int currentTick) {
+		UUID playerId = player.getUuid();
+		PlusUltraState previousState = PLUS_ULTRA_STATES.remove(playerId);
+		if (previousState != null) {
+			removePlusUltraOverheadText(player.getEntityWorld().getServer(), previousState);
+		}
+
+		boolean hadAllowFlying = player.getAbilities().allowFlying;
+		boolean hadFlying = player.getAbilities().flying;
+		float hadFlySpeed = player.getAbilities().getFlySpeed();
+		int overheadTextEndTick = currentTick + Math.max(0, PLUS_ULTRA_OVERHEAD_TEXT_DURATION_TICKS);
+		UUID overheadTextEntityId = PLUS_ULTRA_OVERHEAD_TEXT_ENABLED && PLUS_ULTRA_OVERHEAD_TEXT_DURATION_TICKS > 0 ? spawnPlusUltraOverheadText(player) : null;
+		PLUS_ULTRA_STATES.put(
+			playerId,
+			new PlusUltraState(
+				player.getEntityWorld().getRegistryKey(),
+				currentTick,
+				currentTick + Math.max(1, PLUS_ULTRA_DURATION_TICKS / 2),
+				currentTick + PLUS_ULTRA_DURATION_TICKS,
+				currentTick,
+				currentTick,
+				hadAllowFlying,
+				hadFlying,
+				hadFlySpeed,
+				overheadTextEndTick,
+				overheadTextEntityId
+			)
+		);
+		MagicPlayerData.setPlusUltraActive(player, true);
+		PLUS_ULTRA_LAST_OUTLINED_PLAYERS.remove(playerId);
+		setActiveAbility(player, MagicAbility.PLUS_ULTRA);
+		MagicPlayerData.setDepletedRecoveryMode(player, false);
+		ensurePlusUltraFlightState(player);
+		syncPlusUltraOutlines(player);
+		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.PLUS_ULTRA.displayName()), true);
+	}
+
+	private static void applyPlusUltra(ServerPlayerEntity player, int currentTick) {
+		PlusUltraState state = PLUS_ULTRA_STATES.get(player.getUuid());
+		if (state == null) {
+			clearPlusUltraRuntimeState(player, true);
+			return;
+		}
+
+		if (!shouldKeepPlusUltraEnabled(player) || player.getEntityWorld().getRegistryKey() != state.dimension()) {
+			endPlusUltra(player, currentTick, PlusUltraEndMode.FULL, false);
+			return;
+		}
+
+		if (currentTick >= state.endTick()) {
+			endPlusUltra(player, currentTick, PlusUltraEndMode.FULL, true);
+			return;
+		}
+
+		ensurePlusUltraFlightState(player);
+		if (currentTick >= state.nextOutlineTick()) {
+			syncPlusUltraOutlines(player);
+			state.nextOutlineTick(currentTick + PLUS_ULTRA_OUTLINE_REFRESH_TICKS);
+		}
+		if (state.overheadTextEntityId() != null && currentTick >= state.overheadTextEndTick()) {
+			removePlusUltraOverheadText(player.getEntityWorld().getServer(), state);
+			state.overheadTextEntityId(null);
+		}
+		if (currentTick < state.overheadTextEndTick() && currentTick >= state.nextTextTick()) {
+			syncPlusUltraOverheadText(player, state, currentTick);
+			state.nextTextTick(currentTick + PLUS_ULTRA_OVERHEAD_TEXT_REFRESH_TICKS);
+		}
+	}
+
+	private static void endPlusUltra(ServerPlayerEntity player, int currentTick, PlusUltraEndMode endMode, boolean sendFeedback) {
+		clearPlusUltraRuntimeState(player, true);
+		if (endMode != PlusUltraEndMode.ADMIN_CLEAR) {
+			if (endMode == PlusUltraEndMode.MANUAL_EARLY) {
+				applyPlusUltraPenalty(
+					player,
+					PLUS_ULTRA_EARLY_CANCEL_PENALTY_DURATION_TICKS,
+					PLUS_ULTRA_EARLY_CANCEL_SLOWNESS_AMPLIFIER,
+					PLUS_ULTRA_EARLY_CANCEL_WEAKNESS_AMPLIFIER
+				);
+				startPlusUltraCooldown(player.getUuid(), currentTick, PLUS_ULTRA_EARLY_CANCEL_COOLDOWN_TICKS);
+			} else {
+				applyPlusUltraPenalty(
+					player,
+					PLUS_ULTRA_FULL_END_PENALTY_DURATION_TICKS,
+					PLUS_ULTRA_FULL_END_SLOWNESS_AMPLIFIER,
+					PLUS_ULTRA_FULL_END_WEAKNESS_AMPLIFIER
+				);
+				startPlusUltraCooldown(player.getUuid(), currentTick, PLUS_ULTRA_FULL_END_COOLDOWN_TICKS);
+			}
+		}
+
+		if (sendFeedback) {
+			player.sendMessage(Text.translatable("message.magic.ability.deactivated", MagicAbility.PLUS_ULTRA.displayName()), true);
+		}
+	}
+
+	private static void applyPlusUltraPenalty(ServerPlayerEntity player, int durationTicks, int slownessAmplifier, int weaknessAmplifier) {
+		if (!player.isAlive()) {
+			return;
+		}
+
+		addConfiguredStatusEffect(player, StatusEffects.SLOWNESS, durationTicks, slownessAmplifier);
+		addConfiguredStatusEffect(player, StatusEffects.WEAKNESS, durationTicks, weaknessAmplifier);
+	}
+
+	private static void ensurePlusUltraFlightState(ServerPlayerEntity player) {
+		if (!PLUS_ULTRA_FLIGHT_ENABLED || player.isSpectator()) {
+			updatePlusUltraPose(player, false);
+			return;
+		}
+
+		boolean changed = false;
+		if (!player.getAbilities().allowFlying) {
+			player.getAbilities().allowFlying = true;
+			changed = true;
+		}
+		if (Math.abs(player.getAbilities().getFlySpeed() - PLUS_ULTRA_FLIGHT_FLY_SPEED) > 1.0E-4F) {
+			player.getAbilities().setFlySpeed(PLUS_ULTRA_FLIGHT_FLY_SPEED);
+			changed = true;
+		}
+		if (changed) {
+			player.sendAbilitiesUpdate();
+		}
+		applyPlusUltraFlightMovement(player);
+		updatePlusUltraPose(player, player.getAbilities().flying);
+	}
+
+	private static void applyPlusUltraFlightMovement(ServerPlayerEntity player) {
+		if (!player.getAbilities().flying) {
+			return;
+		}
+
+		Vec3d look = player.getRotationVector();
+		Vec3d normalizedLook = look.lengthSquared() > 1.0E-5 ? look.normalize() : Vec3d.ZERO;
+		Vec3d horizontalLook = new Vec3d(look.x, 0.0, look.z);
+		if (horizontalLook.lengthSquared() <= 1.0E-5) {
+			float yawRadians = player.getYaw() * MathHelper.RADIANS_PER_DEGREE;
+			horizontalLook = new Vec3d(-MathHelper.sin(yawRadians), 0.0, MathHelper.cos(yawRadians));
+		}
+		Vec3d normalizedHorizontalLook = horizontalLook.normalize();
+		Vec3d sideways = new Vec3d(-normalizedHorizontalLook.z, 0.0, normalizedHorizontalLook.x);
+		double forwardInput = MathHelper.clamp(player.forwardSpeed, -1.0F, 1.0F);
+		double sidewaysInput = MathHelper.clamp(player.sidewaysSpeed, -1.0F, 1.0F);
+		Vec3d acceleration = Vec3d.ZERO;
+		if (Math.abs(forwardInput) > 0.01) {
+			acceleration = acceleration.add(normalizedLook.multiply(forwardInput * PLUS_ULTRA_FLIGHT_ACCELERATION));
+		}
+		if (Math.abs(sidewaysInput) > 0.01) {
+			acceleration = acceleration.add(sideways.multiply(sidewaysInput * PLUS_ULTRA_FLIGHT_ACCELERATION * 0.75));
+		}
+		if (player.isJumping()) {
+			acceleration = acceleration.add(0.0, PLUS_ULTRA_FLIGHT_VERTICAL_ACCELERATION, 0.0);
+		}
+		if (player.isSneaking()) {
+			acceleration = acceleration.add(0.0, -PLUS_ULTRA_FLIGHT_VERTICAL_ACCELERATION, 0.0);
+		}
+
+		Vec3d nextVelocity = player.getVelocity().multiply(PLUS_ULTRA_FLIGHT_DRAG).add(acceleration);
+		player.setVelocity(clampPlusUltraFlightVelocity(nextVelocity));
+	}
+
+	private static Vec3d clampPlusUltraFlightVelocity(Vec3d velocity) {
+		double horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+		double clampedX = velocity.x;
+		double clampedZ = velocity.z;
+		if (PLUS_ULTRA_FLIGHT_MAX_SPEED > 0.0 && horizontalSpeed > PLUS_ULTRA_FLIGHT_MAX_SPEED) {
+			double scale = PLUS_ULTRA_FLIGHT_MAX_SPEED / horizontalSpeed;
+			clampedX *= scale;
+			clampedZ *= scale;
+		}
+		double clampedY = MathHelper.clamp(velocity.y, -PLUS_ULTRA_FLIGHT_VERTICAL_MAX_SPEED, PLUS_ULTRA_FLIGHT_VERTICAL_MAX_SPEED);
+		return new Vec3d(clampedX, clampedY, clampedZ);
+	}
+
+	private static void updatePlusUltraPose(ServerPlayerEntity player, boolean shouldUseFlyingPose) {
+	}
+
+	private static PlusUltraState clearPlusUltraRuntimeState(ServerPlayerEntity player, boolean clearOutlinePayload) {
+		UUID playerId = player.getUuid();
+		PlusUltraState state = PLUS_ULTRA_STATES.remove(playerId);
+		MagicPlayerData.setPlusUltraActive(player, false);
+		PLUS_ULTRA_LAST_OUTLINED_PLAYERS.remove(playerId);
+		clearPlusUltraImpactStates(playerId);
+		if (clearOutlinePayload) {
+			sendCassiopeiaOutlinePayload(player, List.of());
+		}
+
+		if (state != null) {
+			restorePlusUltraFlight(player, state.hadAllowFlying(), state.hadFlying(), state.hadFlySpeed());
+			removePlusUltraOverheadText(player.getEntityWorld().getServer(), state);
+		} else {
+			restorePlusUltraFlightFallback(player);
+		}
+
+		if (activeAbility(player) == MagicAbility.PLUS_ULTRA || MagicPlayerData.getActiveAbilitySlot(player) == MagicAbility.PLUS_ULTRA.slot()) {
+			setActiveAbility(player, MagicAbility.NONE);
+		}
+		return state;
+	}
+
+	private static void clearPlusUltraImpactStates(UUID playerId) {
+		PLUS_ULTRA_IMPACT_STATES.entrySet().removeIf(entry -> entry.getKey().equals(playerId) || playerId.equals(entry.getValue().casterId()));
+	}
+
+	private static void restorePlusUltraFlight(ServerPlayerEntity player, boolean allowFlying, boolean flying, float flySpeed) {
+		boolean nextAllowFlying = allowFlying || player.isCreative() || player.isSpectator();
+		boolean nextFlying = nextAllowFlying && (flying || player.isCreative() || player.isSpectator());
+		boolean changed = player.getAbilities().allowFlying != nextAllowFlying
+			|| player.getAbilities().flying != nextFlying
+			|| Math.abs(player.getAbilities().getFlySpeed() - flySpeed) > 1.0E-4F;
+		player.getAbilities().allowFlying = nextAllowFlying;
+		player.getAbilities().flying = nextFlying;
+		player.getAbilities().setFlySpeed(flySpeed);
+		if (changed) {
+			player.sendAbilitiesUpdate();
+		}
+		updatePlusUltraPose(player, false);
+	}
+
+	private static void restorePlusUltraFlightFallback(ServerPlayerEntity player) {
+		if (player.isCreative() || player.isSpectator()) {
+			return;
+		}
+
+		boolean changed = player.getAbilities().allowFlying || player.getAbilities().flying;
+		player.getAbilities().allowFlying = false;
+		player.getAbilities().flying = false;
+		if (Math.abs(player.getAbilities().getFlySpeed() - DEFAULT_PLAYER_FLY_SPEED) > 1.0E-4F) {
+			player.getAbilities().setFlySpeed(DEFAULT_PLAYER_FLY_SPEED);
+			changed = true;
+		}
+		if (changed) {
+			player.sendAbilitiesUpdate();
+		}
+		updatePlusUltraPose(player, false);
+	}
+
+	private static boolean shouldKeepPlusUltraEnabled(ServerPlayerEntity player) {
+		return player.isAlive()
+			&& MagicPlayerData.hasMagic(player)
+			&& MagicPlayerData.getSchool(player) == MagicSchool.JESTER
+			&& MagicConfig.get().abilityAccess.isAbilityUnlocked(player.getUuid(), MagicAbility.PLUS_ULTRA);
+	}
+
+	private static boolean hasActivePlusUltra(ServerPlayerEntity player) {
+		return player != null && activeAbility(player) == MagicAbility.PLUS_ULTRA && PLUS_ULTRA_STATES.containsKey(player.getUuid());
+	}
+
+	public static boolean shouldRenderPlusUltraFlightPose(PlayerEntity player) {
+		return player != null
+			&& PLUS_ULTRA_ELYTRA_POSE_WHILE_FLYING
+			&& MagicPlayerData.isPlusUltraActive(player)
+			&& player.getAbilities().flying
+			&& !player.isOnGround()
+			&& !player.isSpectator();
+	}
+
+	private static void syncPlusUltraOutlines(ServerPlayerEntity player) {
+		UUID playerId = player.getUuid();
+		Set<UUID> outlinedPlayers = new HashSet<>();
+		if (PLUS_ULTRA_OUTLINE_RADIUS > 0.0) {
+			Box area = player.getBoundingBox().expand(PLUS_ULTRA_OUTLINE_RADIUS);
+			for (ServerPlayerEntity target : player.getEntityWorld().getServer().getPlayerManager().getPlayerList()) {
+				if (target == player || !target.isAlive() || target.isSpectator() || target.getEntityWorld() != player.getEntityWorld()) {
+					continue;
+				}
+
+				if (target.getBoundingBox().intersects(area)) {
+					outlinedPlayers.add(target.getUuid());
+				}
+			}
+		}
+
+		Set<UUID> lastSent = PLUS_ULTRA_LAST_OUTLINED_PLAYERS.get(playerId);
+		if (lastSent != null && lastSent.equals(outlinedPlayers)) {
+			return;
+		}
+
+		PLUS_ULTRA_LAST_OUTLINED_PLAYERS.put(playerId, Set.copyOf(outlinedPlayers));
+		sendCassiopeiaOutlinePayload(player, outlinedPlayers);
+	}
+
+	private static void syncPlusUltraOverheadText(ServerPlayerEntity player, PlusUltraState state, int currentTick) {
+		if (!PLUS_ULTRA_OVERHEAD_TEXT_ENABLED || currentTick >= state.overheadTextEndTick()) {
+			if (state.overheadTextEntityId() != null) {
+				removePlusUltraOverheadText(player.getEntityWorld().getServer(), state);
+				state.overheadTextEntityId(null);
+			}
+			return;
+		}
+
+		ArmorStandEntity textEntity = null;
+		if (state.overheadTextEntityId() != null) {
+			Entity existing = player.getEntityWorld().getServer().getWorld(state.dimension()) == null
+				? null
+				: player.getEntityWorld().getServer().getWorld(state.dimension()).getEntity(state.overheadTextEntityId());
+			if (existing instanceof ArmorStandEntity armorStand && armorStand.isAlive()) {
+				textEntity = armorStand;
+			}
+		}
+
+		if (textEntity == null) {
+			state.overheadTextEntityId(spawnPlusUltraOverheadText(player));
+			if (state.overheadTextEntityId() == null) {
+				return;
+			}
+			Entity existing = player.getEntityWorld().getServer().getWorld(player.getEntityWorld().getRegistryKey()).getEntity(state.overheadTextEntityId());
+			if (existing instanceof ArmorStandEntity armorStand && armorStand.isAlive()) {
+				textEntity = armorStand;
+			}
+		}
+
+		if (textEntity == null) {
+			return;
+		}
+
+		textEntity.setCustomName(plusUltraOverheadText());
+		textEntity.setCustomNameVisible(true);
+		textEntity.refreshPositionAndAngles(
+			player.getX(),
+			player.getY() + PLUS_ULTRA_OVERHEAD_TEXT_VERTICAL_OFFSET,
+			player.getZ(),
+			0.0F,
+			0.0F
+		);
+	}
+
+	private static UUID spawnPlusUltraOverheadText(ServerPlayerEntity player) {
+		if (!PLUS_ULTRA_OVERHEAD_TEXT_ENABLED || PLUS_ULTRA_OVERHEAD_TEXT.isBlank() || PLUS_ULTRA_OVERHEAD_TEXT_DURATION_TICKS <= 0) {
+			return null;
+		}
+
+		ServerWorld world = (ServerWorld) player.getEntityWorld();
+		ArmorStandEntity textEntity = new ArmorStandEntity(world, player.getX(), player.getY() + PLUS_ULTRA_OVERHEAD_TEXT_VERTICAL_OFFSET, player.getZ());
+		textEntity.setInvisible(true);
+		textEntity.setInvulnerable(true);
+		textEntity.setNoGravity(true);
+		((ArmorStandEntityAccessorMixin) textEntity).magic$setMarker(true);
+		textEntity.setSilent(true);
+		textEntity.setCustomName(plusUltraOverheadText());
+		textEntity.setCustomNameVisible(true);
+		if (!world.spawnEntity(textEntity)) {
+			return null;
+		}
+		return textEntity.getUuid();
+	}
+
+	private static void removePlusUltraOverheadText(MinecraftServer server, PlusUltraState state) {
+		if (server == null || state == null || state.overheadTextEntityId() == null) {
+			return;
+		}
+
+		ServerWorld world = server.getWorld(state.dimension());
+		if (world == null) {
+			return;
+		}
+
+		Entity entity = world.getEntity(state.overheadTextEntityId());
+		if (entity != null) {
+			entity.discard();
+		}
+	}
+
+	private static Text plusUltraOverheadText() {
+		return Text.literal(PLUS_ULTRA_OVERHEAD_TEXT).formatted(Formatting.RED, Formatting.BOLD);
 	}
 
 	private static void handleHerculesBurdenRequest(ServerPlayerEntity player) {
@@ -1825,6 +2337,9 @@ public final class MagicAbilityManager {
 		}
 		if (!isBankruptcyProtectedAbility(MagicAbility.COMEDIC_ASSISTANT, preserveMaximumAbilities, preserveDomainAbilities)) {
 			clearComedicAssistantState(targetId);
+		}
+		if (!isBankruptcyProtectedAbility(MagicAbility.PLUS_ULTRA, preserveMaximumAbilities, preserveDomainAbilities) && targetAbility == MagicAbility.PLUS_ULTRA) {
+			endPlusUltra(target, currentTick, PlusUltraEndMode.FULL, false);
 		}
 		if (!isBankruptcyProtectedAbility(MagicAbility.TILL_DEATH_DO_US_PART, preserveMaximumAbilities, preserveDomainAbilities)) {
 			if (targetAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
@@ -2746,6 +3261,7 @@ public final class MagicAbilityManager {
 		}
 
 		tryTriggerComedicAssistant(attacker, entity, damageTaken);
+		tryTriggerPlusUltraHit(attacker, entity, damageTaken);
 	}
 
 	private static ServerPlayerEntity directMeleePlayerAttackerFrom(DamageSource source) {
@@ -3715,6 +4231,7 @@ public final class MagicAbilityManager {
 		updateComedicRewriteVisualCameos(server, currentTick);
 		updateComedicAssistantAcmeVisuals(server, currentTick);
 		updateComedicAssistantCaneImpactStates(server, currentTick);
+		updatePlusUltraImpactStates(server, currentTick);
 
 		if (currentTick % TICKS_PER_SECOND == 0) {
 			for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
@@ -3931,6 +4448,8 @@ public final class MagicAbilityManager {
 		COMEDIC_ASSISTANT_ARMED_STATES.remove(playerId);
 		COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(playerId);
 		clearComedicAssistantCaneImpactState(playerId);
+		PLUS_ULTRA_LAST_OUTLINED_PLAYERS.remove(playerId);
+		PLUS_ULTRA_DAMAGE_SCALING_GUARD.remove(playerId);
 		DOMAIN_CLASH_PENDING_DAMAGE.remove(playerId);
 		MAGIC_DAMAGE_PENDING_ATTACKER.remove(playerId);
 		MAGIC_DAMAGE_PENDING_ATTACKER.entrySet().removeIf(entry -> entry.getValue().equals(playerId));
@@ -4209,6 +4728,9 @@ public final class MagicAbilityManager {
 			if (activeAbility == MagicAbility.ORIONS_GAMBIT) {
 				endOrionsGambit(player, OrionGambitEndReason.SCHOOL_CHANGED, currentTick, false);
 			}
+			if (activeAbility == MagicAbility.PLUS_ULTRA) {
+				endPlusUltra(player, currentTick, PlusUltraEndMode.FULL, false);
+			}
 
 			setActiveAbility(player, MagicAbility.NONE);
 			return;
@@ -4256,6 +4778,11 @@ public final class MagicAbilityManager {
 
 		if (activeAbility == MagicAbility.ORIONS_GAMBIT) {
 			applyOrionsGambit(player, currentTick);
+			return;
+		}
+
+		if (activeAbility == MagicAbility.PLUS_ULTRA) {
+			applyPlusUltra(player, currentTick);
 			return;
 		}
 
@@ -4501,6 +5028,34 @@ public final class MagicAbilityManager {
 
 		if (source.isIn(DamageTypeTags.IS_FALL) && hasActiveComedicRewriteFallProtection(playerId, currentTick)) {
 			DOMAIN_CLASH_PENDING_DAMAGE.remove(playerId);
+			return false;
+		}
+
+		if (
+			hasActivePlusUltra(player)
+			&& !source.isOf(DamageTypes.OUT_OF_WORLD)
+			&& !source.isOf(DamageTypes.GENERIC_KILL)
+			&& !source.isOf(DamageTypes.OUTSIDE_BORDER)
+		) {
+			if (!PLUS_ULTRA_DAMAGE_SCALING_GUARD.add(playerId)) {
+				return true;
+			}
+
+			try {
+				float scaledAmount = (float) (amount * PLUS_ULTRA_INCOMING_DAMAGE_MULTIPLIER);
+				if (Math.abs(scaledAmount - amount) <= 1.0E-6F) {
+					return true;
+				}
+
+				if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+					return true;
+				}
+
+				player.damage(world, source, scaledAmount);
+			} finally {
+				PLUS_ULTRA_DAMAGE_SCALING_GUARD.remove(playerId);
+			}
+
 			return false;
 		}
 
@@ -5020,6 +5575,89 @@ public final class MagicAbilityManager {
 		applyComedicAssistantOutcome(outcome, attacker, target, world, currentTick, damageTaken);
 	}
 
+	private static void tryTriggerPlusUltraHit(ServerPlayerEntity attacker, LivingEntity target, float damageTaken) {
+		if (!hasActivePlusUltra(attacker) || !(target.getEntityWorld() instanceof ServerWorld world) || !isValidPlusUltraTarget(target)) {
+			return;
+		}
+
+		PlusUltraState state = PLUS_ULTRA_STATES.get(attacker.getUuid());
+		if (state == null || attacker.getEntityWorld().getRegistryKey() != state.dimension() || !shouldKeepPlusUltraEnabled(attacker)) {
+			return;
+		}
+
+		Vec3d hitPos = new Vec3d(target.getX(), target.getBodyY(0.45), target.getZ());
+		world.spawnParticles(
+			ParticleTypes.CLOUD,
+			hitPos.x,
+			hitPos.y,
+			hitPos.z,
+			PLUS_ULTRA_SMOKE_PARTICLE_COUNT,
+			PLUS_ULTRA_SMOKE_PARTICLE_SPREAD,
+			PLUS_ULTRA_SMOKE_PARTICLE_SPREAD * 0.6,
+			PLUS_ULTRA_SMOKE_PARTICLE_SPREAD,
+			PLUS_ULTRA_SMOKE_PARTICLE_SPEED
+		);
+		world.spawnParticles(
+			ParticleTypes.DUST_PLUME,
+			hitPos.x,
+			hitPos.y,
+			hitPos.z,
+			PLUS_ULTRA_HIT_DUST_PARTICLE_COUNT,
+			PLUS_ULTRA_HIT_DUST_PARTICLE_SPREAD,
+			PLUS_ULTRA_HIT_DUST_PARTICLE_SPREAD * 0.5,
+			PLUS_ULTRA_HIT_DUST_PARTICLE_SPREAD,
+			PLUS_ULTRA_HIT_DUST_PARTICLE_SPEED
+		);
+		applyComedicAssistantBonusDamage(attacker, target, world, PLUS_ULTRA_MELEE_BONUS_DAMAGE);
+		if (!target.isAlive()) {
+			return;
+		}
+
+		launchTarget(target, resolvePlusUltraLaunchDirection(attacker, target), PLUS_ULTRA_FLING_HORIZONTAL_STRENGTH, PLUS_ULTRA_FLING_VERTICAL_STRENGTH);
+		trackPlusUltraImpact(attacker, target, world);
+	}
+
+	private static boolean isValidPlusUltraTarget(LivingEntity target) {
+		if (target == null || !target.isAlive()) {
+			return false;
+		}
+		if (target instanceof ServerPlayerEntity) {
+			return PLUS_ULTRA_ALLOW_PLAYER_TARGETS;
+		}
+		return PLUS_ULTRA_ALLOW_MOB_TARGETS && target instanceof MobEntity;
+	}
+
+	private static Vec3d resolvePlusUltraLaunchDirection(ServerPlayerEntity attacker, LivingEntity target) {
+		Vec3d facing = attacker.getRotationVector();
+		Vec3d horizontalFacing = new Vec3d(facing.x, 0.0, facing.z);
+		if (horizontalFacing.lengthSquared() > 1.0E-5) {
+			return horizontalFacing.normalize();
+		}
+		return directionFromAttackerToTarget(attacker, target);
+	}
+
+	private static void trackPlusUltraImpact(ServerPlayerEntity attacker, LivingEntity target, ServerWorld world) {
+		MinecraftServer server = world.getServer();
+		if (server == null || PLUS_ULTRA_IMPACT_TRACKING_TICKS <= 0 || PLUS_ULTRA_IMPACT_DAMAGE_MAX <= 0.0) {
+			return;
+		}
+
+		int currentTick = server.getTicks();
+		PLUS_ULTRA_IMPACT_STATES.put(
+			target.getUuid(),
+			new PlusUltraImpactState(
+				world.getRegistryKey(),
+				attacker.getUuid(),
+				currentTick,
+				currentTick + PLUS_ULTRA_IMPACT_TRACKING_TICKS,
+				entityPosition(target),
+				target.getVelocity(),
+				target.getVelocity().length(),
+				false
+			)
+		);
+	}
+
 	private static void deactivateComedicAssistant(
 		ServerPlayerEntity player,
 		int currentTick,
@@ -5308,6 +5946,10 @@ public final class MagicAbilityManager {
 	private static void launchTarget(LivingEntity target, Vec3d direction, double horizontalVelocity, double verticalVelocity) {
 		Vec3d launchDirection = normalizedHorizontalDirection(direction, target instanceof ServerPlayerEntity player ? player : null);
 		target.setVelocity(launchDirection.x * horizontalVelocity, verticalVelocity, launchDirection.z * horizontalVelocity);
+		target.velocityDirty = true;
+		if (target instanceof ServerPlayerEntity playerTarget) {
+			playerTarget.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(playerTarget.getId(), playerTarget.getVelocity()));
+		}
 	}
 
 	private static Vec3d entityPosition(Entity entity) {
@@ -5692,6 +6334,67 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static void updatePlusUltraImpactStates(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, PlusUltraImpactState>> iterator = PLUS_ULTRA_IMPACT_STATES.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, PlusUltraImpactState> entry = iterator.next();
+			PlusUltraImpactState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension());
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			Entity entity = world.getEntity(entry.getKey());
+			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (currentTick > state.endTick()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (state.impacted()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (currentTick <= state.startTick()) {
+				state.lastPosition(entityPosition(target));
+				state.lastVelocity(target.getVelocity());
+				state.lastSpeed(target.getVelocity().length());
+				continue;
+			}
+
+			PlusUltraImpactHit impact = detectPlusUltraImpact(target, world, state);
+			if (impact != null) {
+				Vec3d targetPosition = entityPosition(target);
+				double impactSpeed = Math.max(
+					Math.max(state.lastSpeed(), state.lastVelocity().length()),
+					Math.max(target.getVelocity().length(), targetPosition.subtract(state.lastPosition()).length())
+				);
+				double damageAmount = Math.min(
+					PLUS_ULTRA_IMPACT_DAMAGE_MAX,
+					Math.max(0.0, impactSpeed - PLUS_ULTRA_IMPACT_VELOCITY_THRESHOLD) * PLUS_ULTRA_IMPACT_DAMAGE_MULTIPLIER
+				);
+				if (damageAmount > 0.0) {
+					dealTrackedMagicDamage(target, state.casterId(), world.getDamageSources().flyIntoWall(), (float) damageAmount);
+				}
+				state.impacted(true);
+				spawnPlusUltraImpactParticles(world, impact);
+				playConfiguredSound(world, impact.position(), SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY, PLUS_ULTRA_IMPACT_SOUND_VOLUME, PLUS_ULTRA_IMPACT_SOUND_PITCH);
+				iterator.remove();
+				continue;
+			}
+
+			state.lastPosition(entityPosition(target));
+			state.lastVelocity(target.getVelocity());
+			state.lastSpeed(target.getVelocity().length());
+		}
+	}
+
 	private static boolean hasComedicAssistantCaneBlockImpact(LivingEntity target, ServerWorld world, ComedicAssistantCaneImpactState state) {
 		if (target.isInsideWall() || target.horizontalCollision || target.verticalCollision || target.groundCollision) {
 			return true;
@@ -5735,6 +6438,274 @@ public final class MagicAbilityManager {
 			new RaycastContext(start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity)
 		);
 		return hitResult.getType() == HitResult.Type.BLOCK;
+	}
+
+	private static PlusUltraImpactHit detectPlusUltraImpact(LivingEntity target, ServerWorld world, PlusUltraImpactState state) {
+		Vec3d targetPosition = entityPosition(target);
+		Vec3d movement = targetPosition.subtract(state.lastPosition());
+		Vec3d sweepVector = movement.lengthSquared() > 1.0E-4 ? movement : state.lastVelocity();
+		if (sweepVector.lengthSquared() <= 1.0E-4) {
+			return null;
+		}
+
+		double currentSpeed = Math.max(target.getVelocity().length(), movement.length());
+		boolean collidedWithBlock = target.isInsideWall() || target.horizontalCollision || target.verticalCollision || target.groundCollision;
+		boolean slowedHard = state.lastSpeed() >= PLUS_ULTRA_IMPACT_VELOCITY_THRESHOLD
+			&& currentSpeed <= Math.max(0.2, state.lastSpeed() * 0.35);
+		Vec3d traceEndPos = movement.lengthSquared() > 1.0E-4 ? targetPosition : state.lastPosition().add(sweepVector);
+		BlockHitResult raycastHit = findPlusUltraImpactBlockHit(world, target, state.lastPosition(), traceEndPos, sweepVector);
+		if (raycastHit != null) {
+			return plusUltraImpactHit(world, raycastHit);
+		}
+
+		PlusUltraImpactHit sweptImpact = sweptPlusUltraImpactHit(target, world, state.lastPosition(), traceEndPos, sweepVector);
+		if (sweptImpact != null && (collidedWithBlock || slowedHard || movement.lengthSquared() > 1.0E-4)) {
+			return sweptImpact;
+		}
+
+		if (!collidedWithBlock) {
+			Box previousBox = target.getBoundingBox().offset(state.lastPosition().subtract(targetPosition));
+			Box sweptBox = previousBox.stretch(traceEndPos.subtract(state.lastPosition())).expand(0.15);
+			if (!world.getBlockCollisions(target, sweptBox).iterator().hasNext()) {
+				if (!slowedHard) {
+					return null;
+				}
+				PlusUltraImpactHit nearbyImpact = nearbyPlusUltraImpactHit(target, world, sweepVector);
+				if (nearbyImpact == null) {
+					return null;
+				}
+				return nearbyImpact;
+			}
+		}
+
+		return fallbackPlusUltraImpactHit(target, world, sweepVector);
+	}
+
+	private static PlusUltraImpactHit nearbyPlusUltraImpactHit(LivingEntity target, ServerWorld world, Vec3d sweepVector) {
+		return bestPlusUltraImpactHitInBox(world, target.getBoundingBox().expand(0.35), target.getBoundingBox().getCenter(), sweepVector);
+	}
+
+	private static PlusUltraImpactHit sweptPlusUltraImpactHit(LivingEntity target, ServerWorld world, Vec3d startPos, Vec3d endPos, Vec3d sweepVector) {
+		Vec3d currentPosition = entityPosition(target);
+		Box previousBox = target.getBoundingBox().offset(startPos.subtract(currentPosition));
+		Box sweptBox = previousBox.stretch(endPos.subtract(startPos)).expand(0.2);
+		return bestPlusUltraImpactHitInBox(world, sweptBox, target.getBoundingBox().getCenter(), sweepVector);
+	}
+
+	private static PlusUltraImpactHit bestPlusUltraImpactHitInBox(ServerWorld world, Box searchBox, Vec3d referencePos, Vec3d sweepVector) {
+		BlockPos minPos = BlockPos.ofFloored(searchBox.minX, searchBox.minY, searchBox.minZ);
+		BlockPos maxPos = BlockPos.ofFloored(searchBox.maxX, searchBox.maxY, searchBox.maxZ);
+		Vec3d direction = sweepVector.lengthSquared() > 1.0E-4 ? sweepVector.normalize() : Vec3d.ZERO;
+		PlusUltraImpactHit bestHit = null;
+		double bestDistanceSquared = Double.MAX_VALUE;
+		for (int x = minPos.getX(); x <= maxPos.getX(); x++) {
+			for (int y = minPos.getY(); y <= maxPos.getY(); y++) {
+				for (int z = minPos.getZ(); z <= maxPos.getZ(); z++) {
+					BlockPos candidatePos = new BlockPos(x, y, z);
+					BlockState candidateState = world.getBlockState(candidatePos);
+					if (candidateState.isAir() || candidateState.getCollisionShape(world, candidatePos).isEmpty()) {
+						continue;
+					}
+
+					PlusUltraImpactHit candidateHit = plusUltraImpactHit(candidatePos, candidateState, referencePos, direction);
+					Vec3d toCandidate = candidateHit.position().subtract(referencePos);
+					if (direction.lengthSquared() > 1.0E-4 && toCandidate.lengthSquared() > 1.0E-4 && direction.dotProduct(toCandidate.normalize()) < -0.35) {
+						continue;
+					}
+
+					double distanceSquared = referencePos.squaredDistanceTo(candidateHit.position());
+					if (distanceSquared < bestDistanceSquared) {
+						bestDistanceSquared = distanceSquared;
+						bestHit = candidateHit;
+					}
+				}
+			}
+		}
+		return bestHit;
+	}
+
+	private static BlockHitResult findPlusUltraImpactBlockHit(
+		ServerWorld world,
+		LivingEntity target,
+		Vec3d startPos,
+		Vec3d endPos,
+		Vec3d sweepVector
+	) {
+		double lowerSampleY = 0.1;
+		double middleSampleY = MathHelper.clamp(target.getHeight() * 0.5, 0.2, Math.max(0.2, target.getHeight() - 0.15));
+		double upperSampleY = Math.max(middleSampleY, target.getHeight() - 0.15);
+		Vec3d horizontalSweep = new Vec3d(sweepVector.x, 0.0, sweepVector.z);
+		Vec3d sideOffset = horizontalSweep.lengthSquared() > 1.0E-4
+			? new Vec3d(-horizontalSweep.z, 0.0, horizontalSweep.x).normalize().multiply(Math.max(0.2, target.getWidth() * 0.45))
+			: Vec3d.ZERO;
+
+		BlockHitResult bestHit = null;
+		bestHit = closerPlusUltraImpactHit(bestHit, plusUltraImpactRaycast(world, target, startPos, endPos, lowerSampleY, Vec3d.ZERO), startPos);
+		bestHit = closerPlusUltraImpactHit(bestHit, plusUltraImpactRaycast(world, target, startPos, endPos, middleSampleY, Vec3d.ZERO), startPos);
+		bestHit = closerPlusUltraImpactHit(bestHit, plusUltraImpactRaycast(world, target, startPos, endPos, middleSampleY, sideOffset), startPos);
+		bestHit = closerPlusUltraImpactHit(bestHit, plusUltraImpactRaycast(world, target, startPos, endPos, middleSampleY, sideOffset.multiply(-1.0)), startPos);
+		bestHit = closerPlusUltraImpactHit(bestHit, plusUltraImpactRaycast(world, target, startPos, endPos, upperSampleY, Vec3d.ZERO), startPos);
+		return bestHit;
+	}
+
+	private static BlockHitResult closerPlusUltraImpactHit(BlockHitResult currentBest, BlockHitResult candidate, Vec3d startPos) {
+		if (candidate == null) {
+			return currentBest;
+		}
+		if (currentBest == null) {
+			return candidate;
+		}
+		return startPos.squaredDistanceTo(candidate.getPos()) < startPos.squaredDistanceTo(currentBest.getPos()) ? candidate : currentBest;
+	}
+
+	private static BlockHitResult plusUltraImpactRaycast(
+		ServerWorld world,
+		Entity entity,
+		Vec3d startPos,
+		Vec3d endPos,
+		double yOffset,
+		Vec3d lateralOffset
+	) {
+		Vec3d start = startPos.add(lateralOffset).add(0.0, yOffset, 0.0);
+		Vec3d end = endPos.add(lateralOffset).add(0.0, yOffset, 0.0);
+		if (start.squaredDistanceTo(end) <= 1.0E-6) {
+			return null;
+		}
+
+		BlockHitResult hitResult = world.raycast(
+			new RaycastContext(start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity)
+		);
+		return hitResult.getType() == HitResult.Type.BLOCK ? hitResult : null;
+	}
+
+	private static PlusUltraImpactHit plusUltraImpactHit(ServerWorld world, BlockHitResult hitResult) {
+		BlockPos blockPos = hitResult.getBlockPos();
+		BlockState blockState = world.getBlockState(blockPos);
+		if (blockState.isAir()) {
+			BlockPos offsetPos = blockPos.offset(hitResult.getSide());
+			BlockState offsetState = world.getBlockState(offsetPos);
+			if (!offsetState.isAir()) {
+				blockPos = offsetPos;
+				blockState = offsetState;
+			}
+		}
+
+		if (blockState.isAir()) {
+			blockState = Blocks.DIRT.getDefaultState();
+		}
+		return plusUltraImpactHit(blockPos, blockState, hitResult.getPos(), hitResult.getSide());
+	}
+
+	private static PlusUltraImpactHit fallbackPlusUltraImpactHit(LivingEntity target, ServerWorld world, Vec3d sweepVector) {
+		Vec3d center = target.getBoundingBox().getCenter();
+		Vec3d direction = sweepVector.lengthSquared() > 1.0E-4 ? sweepVector.normalize() : Vec3d.ZERO;
+		double probeDistance = Math.max(0.35, target.getWidth() * 0.5);
+		PlusUltraImpactHit searchedHit = bestPlusUltraImpactHitInBox(
+			world,
+			target.getBoundingBox().stretch(direction.multiply(probeDistance)).expand(0.35),
+			center,
+			sweepVector
+		);
+		if (searchedHit != null) {
+			return searchedHit;
+		}
+
+		Direction side = plusUltraImpactSide(center, BlockPos.ofFloored(center), direction);
+		Vec3d impactPos = center.add(Vec3d.of(side.getVector()).multiply(Math.max(0.2, target.getWidth() * 0.45)));
+		return new PlusUltraImpactHit(impactPos, Blocks.DIRT.getDefaultState(), side);
+	}
+
+	private static PlusUltraImpactHit plusUltraImpactHit(BlockPos blockPos, BlockState blockState, Vec3d referencePos, Direction side) {
+		BlockState resolvedState = blockState.isAir() ? Blocks.DIRT.getDefaultState() : blockState;
+		Vec3d impactPos = plusUltraImpactSurfacePosition(blockPos, side, referencePos);
+		return new PlusUltraImpactHit(impactPos, resolvedState, side);
+	}
+
+	private static PlusUltraImpactHit plusUltraImpactHit(BlockPos blockPos, BlockState blockState, Vec3d referencePos, Vec3d sweepDirection) {
+		return plusUltraImpactHit(blockPos, blockState, referencePos, plusUltraImpactSide(referencePos, blockPos, sweepDirection));
+	}
+
+	private static Direction plusUltraImpactSide(Vec3d referencePos, BlockPos blockPos, Vec3d sweepDirection) {
+		if (sweepDirection.lengthSquared() > 1.0E-4) {
+			return Direction.getFacing(sweepDirection.x, sweepDirection.y, sweepDirection.z).getOpposite();
+		}
+
+		Vec3d blockCenter = Vec3d.ofCenter(blockPos);
+		Vec3d outward = referencePos.subtract(blockCenter);
+		if (outward.lengthSquared() > 1.0E-4) {
+			return Direction.getFacing(outward.x, outward.y, outward.z);
+		}
+		return Direction.UP;
+	}
+
+	private static Vec3d plusUltraImpactSurfacePosition(BlockPos blockPos, Direction side, Vec3d referencePos) {
+		double minX = blockPos.getX();
+		double minY = blockPos.getY();
+		double minZ = blockPos.getZ();
+		double maxX = minX + 1.0;
+		double maxY = minY + 1.0;
+		double maxZ = minZ + 1.0;
+		double impactX = MathHelper.clamp(referencePos.x, minX, maxX);
+		double impactY = MathHelper.clamp(referencePos.y, minY, maxY);
+		double impactZ = MathHelper.clamp(referencePos.z, minZ, maxZ);
+		switch (side) {
+			case WEST -> impactX = minX;
+			case EAST -> impactX = maxX;
+			case DOWN -> impactY = minY;
+			case UP -> impactY = maxY;
+			case NORTH -> impactZ = minZ;
+			case SOUTH -> impactZ = maxZ;
+		}
+		return new Vec3d(impactX, impactY, impactZ);
+	}
+
+	private static void spawnPlusUltraImpactParticles(ServerWorld world, PlusUltraImpactHit impact) {
+		if (impact == null) {
+			return;
+		}
+
+		BlockState particleState = impact.blockState().isAir() ? Blocks.DIRT.getDefaultState() : impact.blockState();
+		Vec3d normal = Vec3d.of(impact.side().getVector());
+		Vec3d emissionCenter = impact.position().add(normal.multiply(0.08));
+		double impactX = emissionCenter.x;
+		double impactY = emissionCenter.y;
+		double impactZ = emissionCenter.z;
+		double spreadX = impact.side().getAxis() == Direction.Axis.X ? 0.08 : PLUS_ULTRA_IMPACT_PARTICLE_SPREAD;
+		double spreadY = impact.side().getAxis() == Direction.Axis.Y ? 0.08 : Math.max(0.12, PLUS_ULTRA_IMPACT_PARTICLE_SPREAD * 0.55);
+		double spreadZ = impact.side().getAxis() == Direction.Axis.Z ? 0.08 : PLUS_ULTRA_IMPACT_PARTICLE_SPREAD;
+		world.spawnParticles(
+			new BlockStateParticleEffect(ParticleTypes.BLOCK, particleState),
+			impactX,
+			impactY,
+			impactZ,
+			PLUS_ULTRA_IMPACT_PARTICLE_COUNT,
+			spreadX,
+			spreadY,
+			spreadZ,
+			PLUS_ULTRA_IMPACT_PARTICLE_SPEED
+		);
+		world.spawnParticles(
+			ParticleTypes.CLOUD,
+			impactX,
+			impactY,
+			impactZ,
+			Math.max(4, PLUS_ULTRA_IMPACT_PARTICLE_COUNT / 4),
+			Math.max(0.04, spreadX * 0.85),
+			Math.max(0.08, spreadY * 0.85),
+			Math.max(0.04, spreadZ * 0.85),
+			Math.max(0.02, PLUS_ULTRA_IMPACT_PARTICLE_SPEED * 0.35)
+		);
+		world.spawnParticles(
+			ParticleTypes.DUST_PLUME,
+			impactX,
+			impactY,
+			impactZ,
+			PLUS_ULTRA_IMPACT_DUST_PARTICLE_COUNT,
+			impact.side().getAxis() == Direction.Axis.X ? 0.08 : PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD,
+			impact.side().getAxis() == Direction.Axis.Y ? 0.08 : Math.max(0.12, PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD * 0.45),
+			impact.side().getAxis() == Direction.Axis.Z ? 0.08 : PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD,
+			PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPEED
+		);
 	}
 
 	private static void updateComedicAssistantCarries(MinecraftServer server, int currentTick) {
@@ -6945,6 +7916,16 @@ public final class MagicAbilityManager {
 		return Math.max(0, COMEDIC_ASSISTANT_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
 	}
 
+	private static int plusUltraCooldownRemaining(ServerPlayerEntity player, int currentTick) {
+		if (isTestingMode(player)) {
+			return 0;
+		}
+		if (isOrionsGambitCooldownSuppressed(player)) {
+			return 0;
+		}
+		return Math.max(0, PLUS_ULTRA_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
+	}
+
 	private static void startComedicRewriteCooldown(UUID playerId, int currentTick) {
 		if (isCooldownDeferredByOrionsGambit(playerId, MagicAbility.COMEDIC_REWRITE) || COMEDIC_REWRITE_COOLDOWN_TICKS <= 0) {
 			COMEDIC_REWRITE_COOLDOWN_END_TICK.remove(playerId);
@@ -6965,6 +7946,20 @@ public final class MagicAbilityManager {
 			return;
 		}
 		COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(playerId, currentTick + safeCooldownTicks);
+	}
+
+	private static void startPlusUltraCooldown(UUID playerId, int currentTick, int cooldownTicks) {
+		int safeCooldownTicks = Math.max(0, cooldownTicks);
+		if (isCooldownDeferredByOrionsGambit(playerId, MagicAbility.PLUS_ULTRA)) {
+			trackOrionsGambitCooldownOverride(playerId, MagicAbility.PLUS_ULTRA, safeCooldownTicks);
+			PLUS_ULTRA_COOLDOWN_END_TICK.remove(playerId);
+			return;
+		}
+		if (safeCooldownTicks <= 0) {
+			PLUS_ULTRA_COOLDOWN_END_TICK.remove(playerId);
+			return;
+		}
+		PLUS_ULTRA_COOLDOWN_END_TICK.put(playerId, currentTick + safeCooldownTicks);
 	}
 
 	private static boolean hasActiveComedicRewriteImmunity(UUID playerId, int currentTick) {
@@ -7925,6 +8920,15 @@ public final class MagicAbilityManager {
 					COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(state.targetId, currentTick + cooldownTicks);
 				} else {
 					COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(state.targetId);
+				}
+				continue;
+			}
+			if (ability == MagicAbility.PLUS_ULTRA && state.usedTargetCooldownOverrides.containsKey(ability)) {
+				int cooldownTicks = Math.max(0, state.usedTargetCooldownOverrides.get(ability));
+				if (cooldownTicks > 0) {
+					PLUS_ULTRA_COOLDOWN_END_TICK.put(state.targetId, currentTick + cooldownTicks);
+				} else {
+					PLUS_ULTRA_COOLDOWN_END_TICK.remove(state.targetId);
 				}
 				continue;
 			}
@@ -9257,7 +10261,8 @@ public final class MagicAbilityManager {
 				MagicAbility.SPOTLIGHT,
 				MagicAbility.WITTY_ONE_LINER,
 				MagicAbility.COMEDIC_REWRITE,
-				MagicAbility.COMEDIC_ASSISTANT
+				MagicAbility.COMEDIC_ASSISTANT,
+				MagicAbility.PLUS_ULTRA
 			);
 			case CONSTELLATION -> List.of(
 				MagicAbility.CASSIOPEIA,
@@ -9287,6 +10292,7 @@ public final class MagicAbilityManager {
 			case WITTY_ONE_LINER -> wittyOneLinerCooldownRemaining(player, currentTick);
 			case COMEDIC_REWRITE -> comedicRewriteCooldownRemaining(player, currentTick);
 			case COMEDIC_ASSISTANT -> comedicAssistantCooldownRemaining(player, currentTick);
+			case PLUS_ULTRA -> plusUltraCooldownRemaining(player, currentTick);
 			case ABSOLUTE_ZERO -> absoluteZeroCooldownRemaining(player, currentTick);
 			case PLANCK_HEAT -> planckHeatCooldownRemaining(player, currentTick);
 			case TILL_DEATH_DO_US_PART -> tillDeathDoUsPartCooldownRemaining(player, currentTick);
@@ -9563,6 +10569,11 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		if (ability == MagicAbility.PLUS_ULTRA) {
+			startPlusUltraCooldown(playerId, currentTick, PLUS_ULTRA_FULL_END_COOLDOWN_TICKS);
+			return;
+		}
+
 		if (ability == MagicAbility.TILL_DEATH_DO_US_PART) {
 			if (isCooldownDeferredByOrionsGambit(playerId, ability) || TILL_DEATH_DO_US_PART_COOLDOWN_TICKS <= 0) {
 				TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.remove(playerId);
@@ -9757,7 +10768,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean isMaximumAbility(MagicAbility ability) {
-		return false;
+		return ability == MagicAbility.PLUS_ULTRA;
 	}
 
 	private static boolean isBankruptcyProtectedAbility(
@@ -10149,6 +11160,9 @@ public final class MagicAbilityManager {
 		if (activeAbility == MagicAbility.ORIONS_GAMBIT) {
 			endOrionsGambit(player, OrionGambitEndReason.CASTER_DIED, player.getEntityWorld().getServer().getTicks(), false);
 		}
+		if (activeAbility == MagicAbility.PLUS_ULTRA) {
+			endPlusUltra(player, player.getEntityWorld().getServer().getTicks(), PlusUltraEndMode.FULL, false);
+		}
 
 		setActiveAbility(player, MagicAbility.NONE);
 	}
@@ -10469,6 +11483,13 @@ public final class MagicAbilityManager {
 			return removed ? 1 : 0;
 		}
 
+		if (ability == MagicAbility.PLUS_ULTRA) {
+			boolean removed = PLUS_ULTRA_COOLDOWN_END_TICK.remove(playerId) != null;
+			removed |= PLUS_ULTRA_STATES.containsKey(playerId) || activeAbility(player) == MagicAbility.PLUS_ULTRA;
+			clearPlusUltraRuntimeState(player, true);
+			return removed ? 1 : 0;
+		}
+
 		if (ability == MagicAbility.HERCULES_BURDEN_OF_THE_SKY) {
 			return HERCULES_COOLDOWN_END_TICK.remove(playerId) != null ? 1 : 0;
 		}
@@ -10540,6 +11561,7 @@ public final class MagicAbilityManager {
 			+ resetCooldown(player, MagicAbility.WITTY_ONE_LINER)
 			+ resetCooldown(player, MagicAbility.COMEDIC_REWRITE)
 			+ resetCooldown(player, MagicAbility.COMEDIC_ASSISTANT)
+			+ resetCooldown(player, MagicAbility.PLUS_ULTRA)
 			+ resetCooldown(player, MagicAbility.HERCULES_BURDEN_OF_THE_SKY)
 			+ resetCooldown(player, MagicAbility.SAGITTARIUS_ASTRAL_ARROW)
 			+ resetCooldown(player, MagicAbility.ORIONS_GAMBIT)
@@ -10553,13 +11575,20 @@ public final class MagicAbilityManager {
 	}
 
 	public static void clearLockedAbilityState(ServerPlayerEntity player, MagicAbility ability) {
-		if (player == null || ability != MagicAbility.COMEDIC_ASSISTANT) {
+		if (player == null) {
 			return;
 		}
 
-		clearComedicAssistantState(player.getUuid());
-		COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(player.getUuid());
-		clearComedicAssistantCaneImpactState(player.getUuid());
+		if (ability == MagicAbility.COMEDIC_ASSISTANT) {
+			clearComedicAssistantState(player.getUuid());
+			COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(player.getUuid());
+			clearComedicAssistantCaneImpactState(player.getUuid());
+			return;
+		}
+
+		if (ability == MagicAbility.PLUS_ULTRA) {
+			clearPlusUltraRuntimeState(player, true);
+		}
 	}
 
 	public static void clearAllRuntimeState(ServerPlayerEntity player) {
@@ -10569,6 +11598,7 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		clearPlusUltraRuntimeState(player, true);
 		setActiveAbility(player, MagicAbility.NONE);
 		player.setCameraEntity(player);
 		MagicPlayerData.clearDomainClashUi(player);
@@ -10603,6 +11633,9 @@ public final class MagicAbilityManager {
 		COMEDIC_ASSISTANT_ARMED_STATES.remove(playerId);
 		COMEDIC_ASSISTANT_PARROT_CARRY_STATES.remove(playerId);
 		clearComedicAssistantCaneImpactState(playerId);
+		PLUS_ULTRA_COOLDOWN_END_TICK.remove(playerId);
+		PLUS_ULTRA_LAST_OUTLINED_PLAYERS.remove(playerId);
+		PLUS_ULTRA_DAMAGE_SCALING_GUARD.remove(playerId);
 		HERCULES_COOLDOWN_END_TICK.remove(playerId);
 		SAGITTARIUS_COOLDOWN_END_TICK.remove(playerId);
 		ORIONS_GAMBIT_COOLDOWN_END_TICK.remove(playerId);
@@ -10714,6 +11747,24 @@ public final class MagicAbilityManager {
 		if (domainStateChanged) {
 			persistDomainRuntimeState(server);
 		}
+	}
+
+	private static void onPlayerDisconnect(ServerPlayerEntity player) {
+		if (player == null) {
+			return;
+		}
+
+		MinecraftServer server = player.getEntityWorld().getServer();
+		if (server == null) {
+			return;
+		}
+
+		if (PLUS_ULTRA_STATES.containsKey(player.getUuid()) || activeAbility(player) == MagicAbility.PLUS_ULTRA) {
+			endPlusUltra(player, server.getTicks(), PlusUltraEndMode.FULL, false);
+			return;
+		}
+
+		clearPlusUltraRuntimeState(player, false);
 	}
 
 	private static boolean clearCapturedDomainState(UUID playerId) {
@@ -11083,6 +12134,190 @@ public final class MagicAbilityManager {
 			this.reason = reason;
 			this.sendFeedback = sendFeedback;
 		}
+	}
+
+	private enum PlusUltraEndMode {
+		FULL,
+		MANUAL_EARLY,
+		ADMIN_CLEAR
+	}
+
+	private static final class PlusUltraState {
+		private final RegistryKey<World> dimension;
+		private final int startTick;
+		private final int halfwayTick;
+		private final int endTick;
+		private int nextOutlineTick;
+		private int nextTextTick;
+		private final boolean hadAllowFlying;
+		private final boolean hadFlying;
+		private final float hadFlySpeed;
+		private final int overheadTextEndTick;
+		private UUID overheadTextEntityId;
+
+		private PlusUltraState(
+			RegistryKey<World> dimension,
+			int startTick,
+			int halfwayTick,
+			int endTick,
+			int nextOutlineTick,
+			int nextTextTick,
+			boolean hadAllowFlying,
+			boolean hadFlying,
+			float hadFlySpeed,
+			int overheadTextEndTick,
+			UUID overheadTextEntityId
+		) {
+			this.dimension = dimension;
+			this.startTick = startTick;
+			this.halfwayTick = halfwayTick;
+			this.endTick = endTick;
+			this.nextOutlineTick = nextOutlineTick;
+			this.nextTextTick = nextTextTick;
+			this.hadAllowFlying = hadAllowFlying;
+			this.hadFlying = hadFlying;
+			this.hadFlySpeed = hadFlySpeed;
+			this.overheadTextEndTick = overheadTextEndTick;
+			this.overheadTextEntityId = overheadTextEntityId;
+		}
+
+		private RegistryKey<World> dimension() {
+			return dimension;
+		}
+
+		private int startTick() {
+			return startTick;
+		}
+
+		private int halfwayTick() {
+			return halfwayTick;
+		}
+
+		private int endTick() {
+			return endTick;
+		}
+
+		private int nextOutlineTick() {
+			return nextOutlineTick;
+		}
+
+		private void nextOutlineTick(int nextOutlineTick) {
+			this.nextOutlineTick = nextOutlineTick;
+		}
+
+		private int nextTextTick() {
+			return nextTextTick;
+		}
+
+		private void nextTextTick(int nextTextTick) {
+			this.nextTextTick = nextTextTick;
+		}
+
+		private boolean hadAllowFlying() {
+			return hadAllowFlying;
+		}
+
+		private boolean hadFlying() {
+			return hadFlying;
+		}
+
+		private float hadFlySpeed() {
+			return hadFlySpeed;
+		}
+
+		private int overheadTextEndTick() {
+			return overheadTextEndTick;
+		}
+
+		private UUID overheadTextEntityId() {
+			return overheadTextEntityId;
+		}
+
+		private void overheadTextEntityId(UUID overheadTextEntityId) {
+			this.overheadTextEntityId = overheadTextEntityId;
+		}
+	}
+
+	private static final class PlusUltraImpactState {
+		private final RegistryKey<World> dimension;
+		private final UUID casterId;
+		private final int startTick;
+		private final int endTick;
+		private Vec3d lastPosition;
+		private Vec3d lastVelocity;
+		private double lastSpeed;
+		private boolean impacted;
+
+		private PlusUltraImpactState(
+			RegistryKey<World> dimension,
+			UUID casterId,
+			int startTick,
+			int endTick,
+			Vec3d lastPosition,
+			Vec3d lastVelocity,
+			double lastSpeed,
+			boolean impacted
+		) {
+			this.dimension = dimension;
+			this.casterId = casterId;
+			this.startTick = startTick;
+			this.endTick = endTick;
+			this.lastPosition = lastPosition;
+			this.lastVelocity = lastVelocity;
+			this.lastSpeed = Math.max(0.0, lastSpeed);
+			this.impacted = impacted;
+		}
+
+		private RegistryKey<World> dimension() {
+			return dimension;
+		}
+
+		private UUID casterId() {
+			return casterId;
+		}
+
+		private int startTick() {
+			return startTick;
+		}
+
+		private int endTick() {
+			return endTick;
+		}
+
+		private Vec3d lastPosition() {
+			return lastPosition;
+		}
+
+		private void lastPosition(Vec3d lastPosition) {
+			this.lastPosition = lastPosition;
+		}
+
+		private Vec3d lastVelocity() {
+			return lastVelocity;
+		}
+
+		private void lastVelocity(Vec3d lastVelocity) {
+			this.lastVelocity = lastVelocity;
+		}
+
+		private double lastSpeed() {
+			return lastSpeed;
+		}
+
+		private void lastSpeed(double lastSpeed) {
+			this.lastSpeed = Math.max(0.0, lastSpeed);
+		}
+
+		private boolean impacted() {
+			return impacted;
+		}
+
+		private void impacted(boolean impacted) {
+			this.impacted = impacted;
+		}
+	}
+
+	private record PlusUltraImpactHit(Vec3d position, BlockState blockState, Direction side) {
 	}
 
 	private enum ConstellationDomainPhase {

@@ -18,6 +18,7 @@ public enum MagicAbility {
 	WITTY_ONE_LINER(2, MagicSchool.JESTER, "witty_one_liner"),
 	COMEDIC_REWRITE(3, MagicSchool.JESTER, "comedic_rewrite"),
 	COMEDIC_ASSISTANT(4, MagicSchool.JESTER, "comedic_assistant"),
+	PLUS_ULTRA(5, MagicSchool.JESTER, "plus_ultra"),
 	CASSIOPEIA(1, MagicSchool.CONSTELLATION, "cassiopeia"),
 	HERCULES_BURDEN_OF_THE_SKY(2, MagicSchool.CONSTELLATION, "hercules_burden_of_the_sky"),
 	SAGITTARIUS_ASTRAL_ARROW(3, MagicSchool.CONSTELLATION, "sagittarius_astral_arrow"),

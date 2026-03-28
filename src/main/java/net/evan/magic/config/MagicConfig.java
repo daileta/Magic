@@ -299,6 +299,7 @@ public final class MagicConfig {
 		public JesterWittyOneLinerConfig jesterWittyOneLiner = new JesterWittyOneLinerConfig();
 		public JesterComedicRewriteConfig jesterComedicRewrite = new JesterComedicRewriteConfig();
 		public JesterComedicAssistantConfig jesterComedicAssistant = new JesterComedicAssistantConfig();
+		public JesterPlusUltraConfig jesterPlusUltra = new JesterPlusUltraConfig();
 		public ConstellationCassiopeiaConfig constellationCassiopeia = new ConstellationCassiopeiaConfig();
 		public ConstellationHerculesConfig constellationHercules = new ConstellationHerculesConfig();
 		public ConstellationSagittariusConfig constellationSagittarius = new ConstellationSagittariusConfig();
@@ -352,6 +353,9 @@ public final class MagicConfig {
 			if (jesterComedicAssistant == null) {
 				jesterComedicAssistant = new JesterComedicAssistantConfig();
 			}
+			if (jesterPlusUltra == null) {
+				jesterPlusUltra = new JesterPlusUltraConfig();
+			}
 			if (constellationCassiopeia == null) {
 				constellationCassiopeia = new ConstellationCassiopeiaConfig();
 			}
@@ -386,6 +390,7 @@ public final class MagicConfig {
 			jesterWittyOneLiner.normalize();
 			jesterComedicRewrite.normalize();
 			jesterComedicAssistant.normalize();
+			jesterPlusUltra.normalize();
 			constellationCassiopeia.normalize();
 			constellationHercules.normalize();
 			constellationSagittarius.normalize();
@@ -1390,6 +1395,109 @@ public final class MagicConfig {
 			particleCount = Math.max(0, particleCount);
 			soundVolume = Math.max(0.0F, soundVolume);
 			soundPitch = Math.max(0.0F, soundPitch);
+		}
+	}
+
+	public static final class JesterPlusUltraConfig {
+		public double activationCostPercent = 80.0;
+		public int durationTicks = 3 * 60 * 20;
+		public double outlineRadius = 150.0;
+		public int outlineRefreshTicks = 10;
+		public double incomingDamageMultiplier = 0.1;
+		public boolean flightEnabled = true;
+		public boolean elytraPoseWhileFlying = true;
+		public boolean overheadTextEnabled = true;
+		public String overheadText = "No More Jokes.";
+		public int overheadTextRefreshTicks = 2;
+		public int overheadTextDurationTicks = 3 * 20;
+		public double overheadTextVerticalOffset = 2.85;
+		public float flightFlySpeed = 0.12F;
+		public double flightAcceleration = 0.28;
+		public double flightMaxSpeed = 3.75;
+		public double flightVerticalAcceleration = 0.16;
+		public double flightVerticalMaxSpeed = 1.35;
+		public double flightDrag = 0.95;
+		public float meleeBonusDamage = 6.0F;
+		public boolean allowPlayerTargets = true;
+		public boolean allowMobTargets = true;
+		public double flingHorizontalStrength = 5.75;
+		public double flingVerticalStrength = 1.05;
+		public int impactTrackingTicks = 35;
+		public double impactVelocityThreshold = 1.1;
+		public double impactDamageMultiplier = 3.0;
+		public double impactDamageMax = 16.0;
+		public int smokeParticleCount = 16;
+		public double smokeParticleSpread = 0.4;
+		public double smokeParticleSpeed = 0.05;
+		public int hitDustParticleCount = 10;
+		public double hitDustParticleSpread = 0.28;
+		public double hitDustParticleSpeed = 0.02;
+		public int impactParticleCount = 28;
+		public double impactParticleSpread = 0.55;
+		public double impactParticleSpeed = 0.12;
+		public int impactDustParticleCount = 20;
+		public double impactDustParticleSpread = 0.4;
+		public double impactDustParticleSpeed = 0.05;
+		public float impactSoundVolume = 1.0F;
+		public float impactSoundPitch = 0.8F;
+		public int earlyCancelPenaltyDurationTicks = 15 * 20;
+		public int earlyCancelSlownessAmplifier = 0;
+		public int earlyCancelWeaknessAmplifier = 0;
+		public int fullEndPenaltyDurationTicks = 30 * 20;
+		public int fullEndSlownessAmplifier = 1;
+		public int fullEndWeaknessAmplifier = 1;
+		public int earlyCancelCooldownTicks = 15 * 60 * 20;
+		public int fullEndCooldownTicks = 20 * 60 * 20;
+
+		private void normalize() {
+			activationCostPercent = MathHelper.clamp(activationCostPercent, 0.0, 100.0);
+			durationTicks = Math.max(1, durationTicks);
+			outlineRadius = Math.max(0.0, outlineRadius);
+			outlineRefreshTicks = Math.max(1, outlineRefreshTicks);
+			incomingDamageMultiplier = MathHelper.clamp(incomingDamageMultiplier, 0.0, 1.0);
+			if (overheadText == null || overheadText.isBlank()) {
+				overheadText = "No More Jokes.";
+			} else {
+				overheadText = overheadText.trim();
+			}
+			overheadTextRefreshTicks = Math.max(1, overheadTextRefreshTicks);
+			overheadTextDurationTicks = Math.max(0, overheadTextDurationTicks);
+			overheadTextVerticalOffset = Math.max(0.0, overheadTextVerticalOffset);
+			flightFlySpeed = Math.max(0.0F, flightFlySpeed);
+			flightAcceleration = Math.max(0.0, flightAcceleration);
+			flightMaxSpeed = Math.max(0.0, flightMaxSpeed);
+			flightVerticalAcceleration = Math.max(0.0, flightVerticalAcceleration);
+			flightVerticalMaxSpeed = Math.max(0.0, flightVerticalMaxSpeed);
+			flightDrag = MathHelper.clamp(flightDrag, 0.0, 1.0);
+			meleeBonusDamage = Math.max(0.0F, meleeBonusDamage);
+			flingHorizontalStrength = Math.max(0.0, flingHorizontalStrength);
+			flingVerticalStrength = Math.max(0.0, flingVerticalStrength);
+			impactTrackingTicks = Math.max(0, impactTrackingTicks);
+			impactVelocityThreshold = Math.max(0.0, impactVelocityThreshold);
+			impactDamageMultiplier = Math.max(0.0, impactDamageMultiplier);
+			impactDamageMax = Math.max(0.0, impactDamageMax);
+			smokeParticleCount = Math.max(0, smokeParticleCount);
+			smokeParticleSpread = Math.max(0.0, smokeParticleSpread);
+			smokeParticleSpeed = Math.max(0.0, smokeParticleSpeed);
+			hitDustParticleCount = Math.max(0, hitDustParticleCount);
+			hitDustParticleSpread = Math.max(0.0, hitDustParticleSpread);
+			hitDustParticleSpeed = Math.max(0.0, hitDustParticleSpeed);
+			impactParticleCount = Math.max(0, impactParticleCount);
+			impactParticleSpread = Math.max(0.0, impactParticleSpread);
+			impactParticleSpeed = Math.max(0.0, impactParticleSpeed);
+			impactDustParticleCount = Math.max(0, impactDustParticleCount);
+			impactDustParticleSpread = Math.max(0.0, impactDustParticleSpread);
+			impactDustParticleSpeed = Math.max(0.0, impactDustParticleSpeed);
+			impactSoundVolume = Math.max(0.0F, impactSoundVolume);
+			impactSoundPitch = Math.max(0.0F, impactSoundPitch);
+			earlyCancelPenaltyDurationTicks = Math.max(0, earlyCancelPenaltyDurationTicks);
+			earlyCancelSlownessAmplifier = Math.max(-1, earlyCancelSlownessAmplifier);
+			earlyCancelWeaknessAmplifier = Math.max(-1, earlyCancelWeaknessAmplifier);
+			fullEndPenaltyDurationTicks = Math.max(0, fullEndPenaltyDurationTicks);
+			fullEndSlownessAmplifier = Math.max(-1, fullEndSlownessAmplifier);
+			fullEndWeaknessAmplifier = Math.max(-1, fullEndWeaknessAmplifier);
+			earlyCancelCooldownTicks = Math.max(0, earlyCancelCooldownTicks);
+			fullEndCooldownTicks = Math.max(0, fullEndCooldownTicks);
 		}
 	}
 
