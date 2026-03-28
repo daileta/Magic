@@ -323,6 +323,7 @@ public final class MagicAbilityManager {
 		3.0F,
 		15.2,
 		0.9,
+		6,
 		45,
 		0.75,
 		3.5,
@@ -5945,11 +5946,31 @@ public final class MagicAbilityManager {
 
 	private static void launchTarget(LivingEntity target, Vec3d direction, double horizontalVelocity, double verticalVelocity) {
 		Vec3d launchDirection = normalizedHorizontalDirection(direction, target instanceof ServerPlayerEntity player ? player : null);
-		target.setVelocity(launchDirection.x * horizontalVelocity, verticalVelocity, launchDirection.z * horizontalVelocity);
+		applyForcedVelocity(target, new Vec3d(launchDirection.x * horizontalVelocity, verticalVelocity, launchDirection.z * horizontalVelocity));
+	}
+
+	private static void applyForcedVelocity(LivingEntity target, Vec3d velocity) {
+		target.setVelocity(velocity);
+		target.setOnGround(false);
+		target.fallDistance = 0.0F;
 		target.velocityDirty = true;
 		if (target instanceof ServerPlayerEntity playerTarget) {
+			playerTarget.networkHandler.requestTeleport(playerTarget.getX(), playerTarget.getY(), playerTarget.getZ(), playerTarget.getYaw(), playerTarget.getPitch());
 			playerTarget.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(playerTarget.getId(), playerTarget.getVelocity()));
 		}
+	}
+
+	private static void forceTargetPositionAndVelocity(ServerWorld world, LivingEntity target, Vec3d targetPos, Vec3d velocity) {
+		if (target.hasVehicle()) {
+			target.stopRiding();
+		}
+
+		if (target instanceof ServerPlayerEntity playerTarget) {
+			playerTarget.teleport(world, targetPos.x, targetPos.y, targetPos.z, Set.<PositionFlag>of(), playerTarget.getYaw(), playerTarget.getPitch(), false);
+		} else {
+			target.requestTeleport(targetPos.x, targetPos.y, targetPos.z);
+		}
+		applyForcedVelocity(target, velocity);
 	}
 
 	private static Vec3d entityPosition(Entity entity) {
@@ -5970,6 +5991,8 @@ public final class MagicAbilityManager {
 				attacker.getUuid(),
 				currentTick,
 				currentTick + COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageTrackingTicks(),
+				currentTick + COMEDIC_ASSISTANT_GIANT_CANE_YANK.launchControlTicks(),
+				target.getVelocity(),
 				entityPosition(target),
 				target.getVelocity(),
 				target.getVelocity().length()
@@ -6282,24 +6305,26 @@ public final class MagicAbilityManager {
 	}
 
 	private static void updateComedicAssistantCaneImpactStates(MinecraftServer server, int currentTick) {
-		Iterator<Map.Entry<UUID, ComedicAssistantCaneImpactState>> iterator = COMEDIC_ASSISTANT_CANE_IMPACT_STATES.entrySet().iterator();
-		while (iterator.hasNext()) {
-			Map.Entry<UUID, ComedicAssistantCaneImpactState> entry = iterator.next();
+		List<Map.Entry<UUID, ComedicAssistantCaneImpactState>> entries = new ArrayList<>(COMEDIC_ASSISTANT_CANE_IMPACT_STATES.entrySet());
+		for (Map.Entry<UUID, ComedicAssistantCaneImpactState> entry : entries) {
 			ComedicAssistantCaneImpactState state = entry.getValue();
+			if (COMEDIC_ASSISTANT_CANE_IMPACT_STATES.get(entry.getKey()) != state) {
+				continue;
+			}
 			ServerWorld world = server.getWorld(state.dimension());
 			if (world == null) {
-				iterator.remove();
+				COMEDIC_ASSISTANT_CANE_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
 			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
-				iterator.remove();
+				COMEDIC_ASSISTANT_CANE_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
 			if (currentTick > state.endTick()) {
-				iterator.remove();
+				COMEDIC_ASSISTANT_CANE_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
@@ -6310,24 +6335,38 @@ public final class MagicAbilityManager {
 				continue;
 			}
 
-			boolean collidedWithBlock = hasComedicAssistantCaneBlockImpact(target, world, state);
-			if (collidedWithBlock) {
-				Vec3d targetPosition = entityPosition(target);
-				double impactSpeed = Math.max(
-					Math.max(state.lastSpeed(), state.lastVelocity().length()),
-					Math.max(target.getVelocity().length(), targetPosition.subtract(state.lastPosition()).length())
-				);
+			PlusUltraImpactHit impact = detectVelocityImpact(
+				target,
+				world,
+				state.lastPosition(),
+				state.lastVelocity(),
+				state.lastSpeed(),
+				COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageThreshold()
+			);
+			if (impact != null) {
+				double impactSpeed = trackedImpactSpeed(target, state.lastPosition(), state.lastVelocity(), state.lastSpeed());
 				double damageAmount = Math.min(
 					COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageMax(),
 					Math.max(0.0, impactSpeed - COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageThreshold()) * COMEDIC_ASSISTANT_GIANT_CANE_YANK.velocityDamageMultiplier()
 				);
 				if (damageAmount > 0.0) {
 					dealTrackedMagicDamage(target, state.casterId(), world.getDamageSources().flyIntoWall(), (float) damageAmount);
+					spawnComedicAssistantCaneImpactParticles(world, impact);
+					playConfiguredSound(
+						world,
+						impact.position(),
+						SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY,
+						Math.max(0.0F, COMEDIC_ASSISTANT_GIANT_CANE_YANK.soundVolume() * 0.9F),
+						Math.max(0.1F, COMEDIC_ASSISTANT_GIANT_CANE_YANK.soundPitch() * 0.85F)
+					);
 				}
-				iterator.remove();
+				COMEDIC_ASSISTANT_CANE_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
+			if (currentTick <= state.forceEndTick()) {
+				applyForcedVelocity(target, state.forcedVelocity());
+			}
 			state.lastPosition(entityPosition(target));
 			state.lastVelocity(target.getVelocity());
 			state.lastSpeed(target.getVelocity().length());
@@ -6335,29 +6374,31 @@ public final class MagicAbilityManager {
 	}
 
 	private static void updatePlusUltraImpactStates(MinecraftServer server, int currentTick) {
-		Iterator<Map.Entry<UUID, PlusUltraImpactState>> iterator = PLUS_ULTRA_IMPACT_STATES.entrySet().iterator();
-		while (iterator.hasNext()) {
-			Map.Entry<UUID, PlusUltraImpactState> entry = iterator.next();
+		List<Map.Entry<UUID, PlusUltraImpactState>> entries = new ArrayList<>(PLUS_ULTRA_IMPACT_STATES.entrySet());
+		for (Map.Entry<UUID, PlusUltraImpactState> entry : entries) {
 			PlusUltraImpactState state = entry.getValue();
+			if (PLUS_ULTRA_IMPACT_STATES.get(entry.getKey()) != state) {
+				continue;
+			}
 			ServerWorld world = server.getWorld(state.dimension());
 			if (world == null) {
-				iterator.remove();
+				PLUS_ULTRA_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
 			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
-				iterator.remove();
+				PLUS_ULTRA_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
 			if (currentTick > state.endTick()) {
-				iterator.remove();
+				PLUS_ULTRA_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
 			if (state.impacted()) {
-				iterator.remove();
+				PLUS_ULTRA_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
@@ -6370,22 +6411,18 @@ public final class MagicAbilityManager {
 
 			PlusUltraImpactHit impact = detectPlusUltraImpact(target, world, state);
 			if (impact != null) {
-				Vec3d targetPosition = entityPosition(target);
-				double impactSpeed = Math.max(
-					Math.max(state.lastSpeed(), state.lastVelocity().length()),
-					Math.max(target.getVelocity().length(), targetPosition.subtract(state.lastPosition()).length())
-				);
+				double impactSpeed = trackedImpactSpeed(target, state.lastPosition(), state.lastVelocity(), state.lastSpeed());
 				double damageAmount = Math.min(
 					PLUS_ULTRA_IMPACT_DAMAGE_MAX,
 					Math.max(0.0, impactSpeed - PLUS_ULTRA_IMPACT_VELOCITY_THRESHOLD) * PLUS_ULTRA_IMPACT_DAMAGE_MULTIPLIER
 				);
 				if (damageAmount > 0.0) {
 					dealTrackedMagicDamage(target, state.casterId(), world.getDamageSources().flyIntoWall(), (float) damageAmount);
+					spawnPlusUltraImpactParticles(world, impact);
+					playConfiguredSound(world, impact.position(), SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY, PLUS_ULTRA_IMPACT_SOUND_VOLUME, PLUS_ULTRA_IMPACT_SOUND_PITCH);
 				}
 				state.impacted(true);
-				spawnPlusUltraImpactParticles(world, impact);
-				playConfiguredSound(world, impact.position(), SoundEvents.ITEM_MACE_SMASH_GROUND_HEAVY, PLUS_ULTRA_IMPACT_SOUND_VOLUME, PLUS_ULTRA_IMPACT_SOUND_PITCH);
-				iterator.remove();
+				PLUS_ULTRA_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
 
@@ -6395,77 +6432,56 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private static boolean hasComedicAssistantCaneBlockImpact(LivingEntity target, ServerWorld world, ComedicAssistantCaneImpactState state) {
-		if (target.isInsideWall() || target.horizontalCollision || target.verticalCollision || target.groundCollision) {
-			return true;
-		}
-
-		Vec3d targetPosition = entityPosition(target);
-		Vec3d movement = targetPosition.subtract(state.lastPosition());
-		Vec3d sweepVector = movement.lengthSquared() > 1.0E-4 ? movement : state.lastVelocity();
-		if (sweepVector.lengthSquared() <= 1.0E-4) {
-			return false;
-		}
-
-		Box previousBox = target.getBoundingBox().offset(state.lastPosition().subtract(targetPosition));
-		Box sweptBox = previousBox.stretch(sweepVector).expand(0.15);
-		if (world.getBlockCollisions(target, sweptBox).iterator().hasNext()) {
-			return true;
-		}
-
-		double lowerSampleY = 0.1;
-		double middleSampleY = MathHelper.clamp(target.getHeight() * 0.5, 0.2, Math.max(0.2, target.getHeight() - 0.15));
-		double upperSampleY = Math.max(middleSampleY, target.getHeight() - 0.15);
-		Vec3d horizontalSweep = new Vec3d(sweepVector.x, 0.0, sweepVector.z);
-		Vec3d sideOffset = horizontalSweep.lengthSquared() > 1.0E-4
-			? new Vec3d(-horizontalSweep.z, 0.0, horizontalSweep.x).normalize().multiply(Math.max(0.2, target.getWidth() * 0.45))
-			: Vec3d.ZERO;
-		return comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, lowerSampleY, Vec3d.ZERO)
-			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, middleSampleY, Vec3d.ZERO)
-			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, middleSampleY, sideOffset)
-			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, middleSampleY, sideOffset.multiply(-1.0))
-			|| comedicAssistantCaneRaycastHitsBlock(world, target, state.lastPosition(), targetPosition, upperSampleY, Vec3d.ZERO);
-	}
-
-	private static boolean comedicAssistantCaneRaycastHitsBlock(ServerWorld world, Entity entity, Vec3d startPos, Vec3d endPos, double yOffset, Vec3d lateralOffset) {
-		Vec3d start = startPos.add(lateralOffset).add(0.0, yOffset, 0.0);
-		Vec3d end = endPos.add(lateralOffset).add(0.0, yOffset, 0.0);
-		if (start.squaredDistanceTo(end) <= 1.0E-6) {
-			return false;
-		}
-
-		BlockHitResult hitResult = world.raycast(
-			new RaycastContext(start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity)
-		);
-		return hitResult.getType() == HitResult.Type.BLOCK;
-	}
-
 	private static PlusUltraImpactHit detectPlusUltraImpact(LivingEntity target, ServerWorld world, PlusUltraImpactState state) {
+		return detectVelocityImpact(target, world, state.lastPosition(), state.lastVelocity(), state.lastSpeed(), PLUS_ULTRA_IMPACT_VELOCITY_THRESHOLD);
+	}
+
+	private static double trackedImpactSpeed(LivingEntity target, Vec3d lastPosition, Vec3d lastVelocity, double lastSpeed) {
 		Vec3d targetPosition = entityPosition(target);
-		Vec3d movement = targetPosition.subtract(state.lastPosition());
-		Vec3d sweepVector = movement.lengthSquared() > 1.0E-4 ? movement : state.lastVelocity();
+		return Math.max(
+			Math.max(lastSpeed, lastVelocity.length()),
+			Math.max(target.getVelocity().length(), targetPosition.subtract(lastPosition).length())
+		);
+	}
+
+	private static PlusUltraImpactHit detectVelocityImpact(
+		LivingEntity target,
+		ServerWorld world,
+		Vec3d lastPosition,
+		Vec3d lastVelocity,
+		double lastSpeed,
+		double impactVelocityThreshold
+	) {
+		Vec3d targetPosition = entityPosition(target);
+		Vec3d movement = targetPosition.subtract(lastPosition);
+		Vec3d sweepVector = movement.lengthSquared() > 1.0E-4 ? movement : lastVelocity;
 		if (sweepVector.lengthSquared() <= 1.0E-4) {
+			return null;
+		}
+
+		double impactSpeed = trackedImpactSpeed(target, lastPosition, lastVelocity, lastSpeed);
+		if (impactSpeed < impactVelocityThreshold) {
 			return null;
 		}
 
 		double currentSpeed = Math.max(target.getVelocity().length(), movement.length());
 		boolean collidedWithBlock = target.isInsideWall() || target.horizontalCollision || target.verticalCollision || target.groundCollision;
-		boolean slowedHard = state.lastSpeed() >= PLUS_ULTRA_IMPACT_VELOCITY_THRESHOLD
-			&& currentSpeed <= Math.max(0.2, state.lastSpeed() * 0.35);
-		Vec3d traceEndPos = movement.lengthSquared() > 1.0E-4 ? targetPosition : state.lastPosition().add(sweepVector);
-		BlockHitResult raycastHit = findPlusUltraImpactBlockHit(world, target, state.lastPosition(), traceEndPos, sweepVector);
+		boolean slowedHard = lastSpeed >= impactVelocityThreshold
+			&& currentSpeed <= Math.max(0.2, lastSpeed * 0.35);
+		Vec3d traceEndPos = movement.lengthSquared() > 1.0E-4 ? targetPosition : lastPosition.add(sweepVector);
+		BlockHitResult raycastHit = findPlusUltraImpactBlockHit(world, target, lastPosition, traceEndPos, sweepVector);
 		if (raycastHit != null) {
 			return plusUltraImpactHit(world, raycastHit);
 		}
 
-		PlusUltraImpactHit sweptImpact = sweptPlusUltraImpactHit(target, world, state.lastPosition(), traceEndPos, sweepVector);
+		PlusUltraImpactHit sweptImpact = sweptPlusUltraImpactHit(target, world, lastPosition, traceEndPos, sweepVector);
 		if (sweptImpact != null && (collidedWithBlock || slowedHard || movement.lengthSquared() > 1.0E-4)) {
 			return sweptImpact;
 		}
 
 		if (!collidedWithBlock) {
-			Box previousBox = target.getBoundingBox().offset(state.lastPosition().subtract(targetPosition));
-			Box sweptBox = previousBox.stretch(traceEndPos.subtract(state.lastPosition())).expand(0.15);
+			Box previousBox = target.getBoundingBox().offset(lastPosition.subtract(targetPosition));
+			Box sweptBox = previousBox.stretch(traceEndPos.subtract(lastPosition)).expand(0.15);
 			if (!world.getBlockCollisions(target, sweptBox).iterator().hasNext()) {
 				if (!slowedHard) {
 					return null;
@@ -6660,6 +6676,41 @@ public final class MagicAbilityManager {
 	}
 
 	private static void spawnPlusUltraImpactParticles(ServerWorld world, PlusUltraImpactHit impact) {
+		spawnVelocityImpactParticles(
+			world,
+			impact,
+			PLUS_ULTRA_IMPACT_PARTICLE_COUNT,
+			PLUS_ULTRA_IMPACT_PARTICLE_SPREAD,
+			PLUS_ULTRA_IMPACT_PARTICLE_SPEED,
+			PLUS_ULTRA_IMPACT_DUST_PARTICLE_COUNT,
+			PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD,
+			PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPEED
+		);
+	}
+
+	private static void spawnComedicAssistantCaneImpactParticles(ServerWorld world, PlusUltraImpactHit impact) {
+		spawnVelocityImpactParticles(
+			world,
+			impact,
+			Math.max(10, COMEDIC_ASSISTANT_GIANT_CANE_YANK.particleCount() * 2),
+			0.46,
+			0.12,
+			Math.max(8, COMEDIC_ASSISTANT_GIANT_CANE_YANK.particleCount() + 4),
+			0.34,
+			0.06
+		);
+	}
+
+	private static void spawnVelocityImpactParticles(
+		ServerWorld world,
+		PlusUltraImpactHit impact,
+		int blockParticleCount,
+		double blockParticleSpread,
+		double blockParticleSpeed,
+		int dustParticleCount,
+		double dustParticleSpread,
+		double dustParticleSpeed
+	) {
 		if (impact == null) {
 			return;
 		}
@@ -6670,41 +6721,41 @@ public final class MagicAbilityManager {
 		double impactX = emissionCenter.x;
 		double impactY = emissionCenter.y;
 		double impactZ = emissionCenter.z;
-		double spreadX = impact.side().getAxis() == Direction.Axis.X ? 0.08 : PLUS_ULTRA_IMPACT_PARTICLE_SPREAD;
-		double spreadY = impact.side().getAxis() == Direction.Axis.Y ? 0.08 : Math.max(0.12, PLUS_ULTRA_IMPACT_PARTICLE_SPREAD * 0.55);
-		double spreadZ = impact.side().getAxis() == Direction.Axis.Z ? 0.08 : PLUS_ULTRA_IMPACT_PARTICLE_SPREAD;
+		double spreadX = impact.side().getAxis() == Direction.Axis.X ? 0.08 : blockParticleSpread;
+		double spreadY = impact.side().getAxis() == Direction.Axis.Y ? 0.08 : Math.max(0.12, blockParticleSpread * 0.55);
+		double spreadZ = impact.side().getAxis() == Direction.Axis.Z ? 0.08 : blockParticleSpread;
 		world.spawnParticles(
 			new BlockStateParticleEffect(ParticleTypes.BLOCK, particleState),
 			impactX,
 			impactY,
 			impactZ,
-			PLUS_ULTRA_IMPACT_PARTICLE_COUNT,
+			blockParticleCount,
 			spreadX,
 			spreadY,
 			spreadZ,
-			PLUS_ULTRA_IMPACT_PARTICLE_SPEED
+			blockParticleSpeed
 		);
 		world.spawnParticles(
 			ParticleTypes.CLOUD,
 			impactX,
 			impactY,
 			impactZ,
-			Math.max(4, PLUS_ULTRA_IMPACT_PARTICLE_COUNT / 4),
+			Math.max(4, blockParticleCount / 4),
 			Math.max(0.04, spreadX * 0.85),
 			Math.max(0.08, spreadY * 0.85),
 			Math.max(0.04, spreadZ * 0.85),
-			Math.max(0.02, PLUS_ULTRA_IMPACT_PARTICLE_SPEED * 0.35)
+			Math.max(0.02, blockParticleSpeed * 0.35)
 		);
 		world.spawnParticles(
 			ParticleTypes.DUST_PLUME,
 			impactX,
 			impactY,
 			impactZ,
-			PLUS_ULTRA_IMPACT_DUST_PARTICLE_COUNT,
-			impact.side().getAxis() == Direction.Axis.X ? 0.08 : PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD,
-			impact.side().getAxis() == Direction.Axis.Y ? 0.08 : Math.max(0.12, PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD * 0.45),
-			impact.side().getAxis() == Direction.Axis.Z ? 0.08 : PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPREAD,
-			PLUS_ULTRA_IMPACT_DUST_PARTICLE_SPEED
+			dustParticleCount,
+			impact.side().getAxis() == Direction.Axis.X ? 0.08 : dustParticleSpread,
+			impact.side().getAxis() == Direction.Axis.Y ? 0.08 : Math.max(0.12, dustParticleSpread * 0.45),
+			impact.side().getAxis() == Direction.Axis.Z ? 0.08 : dustParticleSpread,
+			dustParticleSpeed
 		);
 	}
 
@@ -6725,19 +6776,22 @@ public final class MagicAbilityManager {
 				continue;
 			}
 
+			double remainingLift = Math.max(0.0, state.targetY() - target.getY());
+			double upwardVelocity = Math.min(state.settings().upwardVelocity(), Math.max(0.45, remainingLift));
+			double liftStep = Math.min(1.5, Math.max(0.2, upwardVelocity));
 			if (
 				currentTick >= state.endTick()
 				|| target.getY() >= state.targetY() - 0.75
-				|| !world.isSpaceEmpty(target, target.getBoundingBox().offset(0.0, Math.min(1.5, Math.max(0.2, state.settings().upwardVelocity())), 0.0))
+				|| !world.isSpaceEmpty(target, target.getBoundingBox().offset(0.0, liftStep, 0.0))
 			) {
 				releaseComedicAssistantCarry(target, state.settings());
 				iterator.remove();
 				continue;
 			}
 
-			double remainingLift = Math.max(0.0, state.targetY() - target.getY());
-			double upwardVelocity = Math.min(state.settings().upwardVelocity(), Math.max(0.45, remainingLift));
-			target.setVelocity(target.getVelocity().x * 0.18, upwardVelocity, target.getVelocity().z * 0.18);
+			Vec3d nextVelocity = new Vec3d(target.getVelocity().x * 0.18, upwardVelocity, target.getVelocity().z * 0.18);
+			double nextY = Math.min(state.targetY(), target.getY() + upwardVelocity);
+			forceTargetPositionAndVelocity(world, target, new Vec3d(target.getX(), nextY, target.getZ()), nextVelocity);
 			target.fallDistance = 0.0F;
 			if (state.settings().applyGlowing()) {
 				refreshStatusEffect(target, StatusEffects.GLOWING, Math.max(2, state.settings().glowingDurationTicks()), 0, true, false, true);
@@ -6771,7 +6825,7 @@ public final class MagicAbilityManager {
 		if (downwardVelocity <= 0.0) {
 			return;
 		}
-		target.setVelocity(target.getVelocity().x * 0.12, -downwardVelocity, target.getVelocity().z * 0.12);
+		applyForcedVelocity(target, new Vec3d(target.getVelocity().x * 0.12, -downwardVelocity, target.getVelocity().z * 0.12));
 	}
 
 	private static double resolveComedicAssistantCarryTargetY(LivingEntity target, ServerWorld world, double liftHeight) {
@@ -7493,6 +7547,7 @@ public final class MagicAbilityManager {
 			Math.max(0.0F, config.bonusDamage),
 			Math.max(0.0, config.horizontalLaunch),
 			Math.max(0.0, config.verticalLaunch),
+			Math.max(0, config.launchControlTicks),
 			Math.max(0, config.velocityDamageTrackingTicks),
 			Math.max(0.0, config.velocityDamageThreshold),
 			Math.max(0.0, config.velocityDamageMultiplier),
@@ -12881,6 +12936,8 @@ public final class MagicAbilityManager {
 		private final UUID casterId;
 		private final int startTick;
 		private final int endTick;
+		private final int forceEndTick;
+		private final Vec3d forcedVelocity;
 		private Vec3d lastPosition;
 		private Vec3d lastVelocity;
 		private double lastSpeed;
@@ -12890,6 +12947,8 @@ public final class MagicAbilityManager {
 			UUID casterId,
 			int startTick,
 			int endTick,
+			int forceEndTick,
+			Vec3d forcedVelocity,
 			Vec3d lastPosition,
 			Vec3d lastVelocity,
 			double lastSpeed
@@ -12898,6 +12957,8 @@ public final class MagicAbilityManager {
 			this.casterId = casterId;
 			this.startTick = startTick;
 			this.endTick = endTick;
+			this.forceEndTick = forceEndTick;
+			this.forcedVelocity = forcedVelocity;
 			this.lastPosition = lastPosition;
 			this.lastVelocity = lastVelocity;
 			this.lastSpeed = Math.max(0.0, lastSpeed);
@@ -12917,6 +12978,14 @@ public final class MagicAbilityManager {
 
 		private int endTick() {
 			return endTick;
+		}
+
+		private int forceEndTick() {
+			return forceEndTick;
+		}
+
+		private Vec3d forcedVelocity() {
+			return forcedVelocity;
 		}
 
 		private Vec3d lastPosition() {
@@ -13253,6 +13322,7 @@ public final class MagicAbilityManager {
 		float bonusDamage,
 		double horizontalLaunch,
 		double verticalLaunch,
+		int launchControlTicks,
 		int velocityDamageTrackingTicks,
 		double velocityDamageThreshold,
 		double velocityDamageMultiplier,
@@ -13272,6 +13342,7 @@ public final class MagicAbilityManager {
 			float bonusDamage,
 			double horizontalLaunch,
 			double verticalLaunch,
+			int launchControlTicks,
 			int velocityDamageTrackingTicks,
 			double velocityDamageThreshold,
 			double velocityDamageMultiplier,
@@ -13291,6 +13362,7 @@ public final class MagicAbilityManager {
 				bonusDamage,
 				horizontalLaunch,
 				verticalLaunch,
+				launchControlTicks,
 				velocityDamageTrackingTicks,
 				velocityDamageThreshold,
 				velocityDamageMultiplier,

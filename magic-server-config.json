@@ -394,6 +394,7 @@
       "bonusDamage": 3.0,
       "horizontalLaunch": 15.2,
       "verticalLaunch": 0.9,
+      "launchControlTicks": 6,
       "velocityDamageTrackingTicks": 45,
       "velocityDamageThreshold": 0.75,
       "velocityDamageMultiplier": 3.5,

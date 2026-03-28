@@ -1149,6 +1149,7 @@ public final class MagicConfig {
 			config.bonusDamage = 3.0F;
 			config.horizontalLaunch = 15.2;
 			config.verticalLaunch = 0.9;
+			config.launchControlTicks = 6;
 			config.velocityDamageTrackingTicks = 45;
 			config.velocityDamageThreshold = 0.75;
 			config.velocityDamageMultiplier = 3.5;
@@ -1365,6 +1366,7 @@ public final class MagicConfig {
 		public float bonusDamage = 0.0F;
 		public double horizontalLaunch = 0.0;
 		public double verticalLaunch = 0.0;
+		public int launchControlTicks = 0;
 		public int velocityDamageTrackingTicks = 0;
 		public double velocityDamageThreshold = 0.0;
 		public double velocityDamageMultiplier = 0.0;
@@ -1383,6 +1385,7 @@ public final class MagicConfig {
 			bonusDamage = Math.max(0.0F, bonusDamage);
 			horizontalLaunch = Math.max(0.0, horizontalLaunch);
 			verticalLaunch = Math.max(0.0, verticalLaunch);
+			launchControlTicks = Math.max(0, launchControlTicks);
 			velocityDamageTrackingTicks = Math.max(0, velocityDamageTrackingTicks);
 			velocityDamageThreshold = Math.max(0.0, velocityDamageThreshold);
 			velocityDamageMultiplier = Math.max(0.0, velocityDamageMultiplier);
