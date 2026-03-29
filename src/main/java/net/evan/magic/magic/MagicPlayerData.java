@@ -111,6 +111,41 @@ public final class MagicPlayerData {
 			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
 	);
 
+	private static final AttachmentType<Boolean> FROST_STAGE_ACTIVE = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "frost_stage_active"),
+		builder -> builder
+			.initializer(() -> false)
+			.syncWith(PacketCodecs.BOOLEAN, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> FROST_STAGE = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "frost_stage"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> FROST_HIGHEST_UNLOCKED_STAGE = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "frost_highest_unlocked_stage"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> FROST_STAGE_PROGRESS_TICKS = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "frost_stage_progress_ticks"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> FROST_STAGE_REQUIRED_TICKS = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "frost_stage_required_ticks"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
 	private MagicPlayerData() {
 	}
 
@@ -151,6 +186,7 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, DOMAIN_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, GREED_COINS, 0, 0);
+		clearFrostStageHud(player);
 	}
 
 	public static void clear(PlayerEntity player) {
@@ -168,6 +204,7 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, DOMAIN_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, GREED_COINS, 0, 0);
+		clearFrostStageHud(player);
 	}
 
 	public static int getMana(PlayerEntity player) {
@@ -308,6 +345,51 @@ public final class MagicPlayerData {
 	public static void setGreedCoinUnits(PlayerEntity player, int coinUnits) {
 		AttachmentTarget target = target(player);
 		setAttachedIfChanged(target, GREED_COINS, Math.max(0, coinUnits), 0);
+	}
+
+	public static boolean isFrostStageActive(PlayerEntity player) {
+		return target(player).getAttachedOrElse(FROST_STAGE_ACTIVE, false);
+	}
+
+	public static int getFrostStage(PlayerEntity player) {
+		return MathHelper.clamp(target(player).getAttachedOrElse(FROST_STAGE, 0), 0, 3);
+	}
+
+	public static int getFrostHighestUnlockedStage(PlayerEntity player) {
+		return MathHelper.clamp(target(player).getAttachedOrElse(FROST_HIGHEST_UNLOCKED_STAGE, 0), 0, 3);
+	}
+
+	public static int getFrostStageProgressTicks(PlayerEntity player) {
+		return Math.max(0, target(player).getAttachedOrElse(FROST_STAGE_PROGRESS_TICKS, 0));
+	}
+
+	public static int getFrostStageRequiredTicks(PlayerEntity player) {
+		return Math.max(0, target(player).getAttachedOrElse(FROST_STAGE_REQUIRED_TICKS, 0));
+	}
+
+	public static void setFrostStageHud(
+		PlayerEntity player,
+		boolean active,
+		int currentStage,
+		int highestUnlockedStage,
+		int progressTicks,
+		int requiredTicks
+	) {
+		AttachmentTarget target = target(player);
+		setAttachedIfChanged(target, FROST_STAGE_ACTIVE, active, false);
+		setAttachedIfChanged(target, FROST_STAGE, MathHelper.clamp(currentStage, 0, 3), 0);
+		setAttachedIfChanged(target, FROST_HIGHEST_UNLOCKED_STAGE, MathHelper.clamp(highestUnlockedStage, 0, 3), 0);
+		setAttachedIfChanged(target, FROST_STAGE_PROGRESS_TICKS, Math.max(0, progressTicks), 0);
+		setAttachedIfChanged(target, FROST_STAGE_REQUIRED_TICKS, Math.max(0, requiredTicks), 0);
+	}
+
+	public static void clearFrostStageHud(PlayerEntity player) {
+		AttachmentTarget target = target(player);
+		setAttachedIfChanged(target, FROST_STAGE_ACTIVE, false, false);
+		setAttachedIfChanged(target, FROST_STAGE, 0, 0);
+		setAttachedIfChanged(target, FROST_HIGHEST_UNLOCKED_STAGE, 0, 0);
+		setAttachedIfChanged(target, FROST_STAGE_PROGRESS_TICKS, 0, 0);
+		setAttachedIfChanged(target, FROST_STAGE_REQUIRED_TICKS, 0, 0);
 	}
 
 	private static AttachmentTarget target(PlayerEntity player) {

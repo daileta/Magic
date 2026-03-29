@@ -806,6 +806,16 @@
     "stagedModeCooldownTicks": 600,
     "stageAdvanceCooldownTicks": 0,
     "stageAttackCooldownTicks": 0,
+    "hud": {
+      "timerEnabled": true,
+      "readyTextEnabled": true,
+      "showFinalStageText": true,
+      "timerLabelFormat": "Stage %stage% in %time%",
+      "readyLabelFormat": "Stage %stage% Ready",
+      "finalStageText": "Final Stage",
+      "textColorHex": "#BFEFFF",
+      "outlineColorHex": "#0A1C29"
+    },
     "progression": {
       "stageTwoUnlockTicks": 2400,
       "stageThreeUnlockTicks": 3600,
@@ -862,7 +872,11 @@
       "overcastSpeedBlocksPerSecond": 2.5,
       "instantKillEnabled": true,
       "setbackChancePercent": 10.0,
-      "particleSpacing": 0.35
+      "particleSpacing": 0.35,
+      "terrainFollowStepSize": 0.25,
+      "groundSearchDownBlocks": 5,
+      "groundSearchUpBlocks": 2,
+      "eruptionSegmentSpacing": 0.25
     },
     "stageTwoSlam": {
       "radius": 5.0,
@@ -870,7 +884,10 @@
       "trueDamage": 3.0,
       "manaCostPercent": 45.0,
       "setbackChancePercent": 10.0,
-      "particleCount": 18
+      "particleCount": 42,
+      "groundRingRadius": 5.0,
+      "hazeDensity": 24,
+      "shardVelocity": 0.26
     },
     "stageThreeSlam": {
       "radius": 10.0,
@@ -878,7 +895,10 @@
       "trueDamage": 7.0,
       "manaCostPercent": 45.0,
       "setbackChancePercent": 0.0,
-      "particleCount": 18
+      "particleCount": 68,
+      "groundRingRadius": 10.0,
+      "hazeDensity": 36,
+      "shardVelocity": 0.38
     },
     "debuff": {
       "intervalTicks": 20,
@@ -903,7 +923,16 @@
       "postBurstMagicBlockedMessage": "You are so cold a white haze clouds your mind",
       "cooldownTicks": 36000,
       "manaRegenBlockedTicks": 36000,
-      "whiteParticleCount": 18
+      "whiteParticleCount": 18,
+      "ascentVortexEnabled": true,
+      "vortexHeightBlocks": 5.5,
+      "vortexBaseRadius": 0.4,
+      "vortexTopRadius": 2.25,
+      "vortexRingCount": 6,
+      "burstParticleCount": 140,
+      "burstShardSpeed": 0.42,
+      "burstHazeDensity": 96,
+      "groundShockRingRadius": 12.0
     },
     "domain": {
       "radius": 25,

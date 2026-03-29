@@ -115,6 +115,7 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
 import net.minecraft.world.RaycastContext;
@@ -2098,6 +2099,7 @@ public final class MagicAbilityManager {
 		if (belowFreezingCooldownRemaining(player, currentTick) <= 0) {
 			BELOW_FREEZING_COOLDOWN_END_TICK.remove(playerId);
 		}
+		syncFrostStageHud(player);
 		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.BELOW_FREEZING.displayName()), true);
 	}
 
@@ -2130,6 +2132,7 @@ public final class MagicAbilityManager {
 		}
 		spawnFrostStageParticles(player, state.currentStage);
 		progressFrostStageUnlocks(player, state);
+		syncFrostStageHud(player);
 	}
 
 	private static void endFrostStagedMode(
@@ -2157,6 +2160,7 @@ public final class MagicAbilityManager {
 		if (startCooldown) {
 			startAbilityCooldownFromNow(playerId, MagicAbility.BELOW_FREEZING, currentTick);
 		}
+		MagicPlayerData.clearFrostStageHud(player);
 		if (sendDeactivatedMessage) {
 			player.sendMessage(Text.translatable("message.magic.ability.deactivated", MagicAbility.BELOW_FREEZING.displayName()), true);
 		}
@@ -2172,6 +2176,7 @@ public final class MagicAbilityManager {
 		if (FROST_ASCENT_COOLDOWN_TICKS > 0) {
 			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.FROST_ASCENT, currentTick);
 		}
+		syncFrostStageHud(player);
 		player.sendMessage(Text.translatable("message.magic.frost.stage_advanced", state.currentStage), true);
 		return true;
 	}
@@ -2191,6 +2196,7 @@ public final class MagicAbilityManager {
 		}
 
 		Vec3d direction = player.getRotationVector();
+		direction = new Vec3d(direction.x, 0.0, direction.z);
 		if (direction.lengthSquared() <= 1.0E-6) {
 			float yawRadians = player.getYaw() * MathHelper.RADIANS_PER_DEGREE;
 			direction = new Vec3d(-MathHelper.sin(yawRadians), 0.0, MathHelper.cos(yawRadians));
@@ -2204,7 +2210,7 @@ public final class MagicAbilityManager {
 			new FrostSpikeWaveState(
 				player.getUuid(),
 				player.getEntityWorld().getRegistryKey(),
-				player.getEyePos(),
+				new Vec3d(player.getX(), player.getY() + 0.1, player.getZ()),
 				direction,
 				FROST_CONFIG.rangedAttack.range,
 				(overcast ? FROST_CONFIG.rangedAttack.overcastSpeedBlocksPerSecond : FROST_CONFIG.rangedAttack.speedBlocksPerSecond) / TICKS_PER_SECOND,
@@ -2246,7 +2252,7 @@ public final class MagicAbilityManager {
 			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.PLANCK_HEAT, currentTick);
 		}
 		if (player.getEntityWorld() instanceof ServerWorld world) {
-			spawnFrostSlamParticles(world, player, slamConfig.radius, slamConfig.particleCount, state.currentStage == 3);
+			spawnFrostSlamParticles(world, player, slamConfig, state.currentStage == 3);
 			world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 1.1F, state.currentStage == 3 ? 0.45F : 0.8F);
 		}
 		for (LivingEntity target : findLivingTargetsAround(player, slamConfig.radius)) {
@@ -2320,7 +2326,7 @@ public final class MagicAbilityManager {
 			: FROST_CONFIG.maximum.floatHeightBlocks / Math.max(1, FROST_CONFIG.maximum.windupDurationTicks);
 		double nextY = Math.min(targetY, player.getY() + risePerTick);
 		teleportDomainEntity(player, player.getX(), nextY, player.getZ(), player.getYaw(), player.getPitch());
-		spawnFrostMaximumParticles(world, player, FROST_CONFIG.maximum.whiteParticleCount);
+		spawnFrostMaximumParticles(world, player, state, currentTick);
 		double fearRadius = FROST_CONFIG.domain.radius * FROST_CONFIG.maximum.fearRadiusMultiplierFromDomainRadius;
 		Box fearBox = player.getBoundingBox().expand(fearRadius);
 		Predicate<Entity> filter = entity -> entity instanceof LivingEntity living && living.isAlive() && entity != player;
@@ -2368,6 +2374,17 @@ public final class MagicAbilityManager {
 						currentTick
 					)
 				);
+				world.spawnParticles(
+					new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
+					otherPlayer.getX(),
+					otherPlayer.getBodyY(0.5),
+					otherPlayer.getZ(),
+					22,
+					0.38,
+					0.72,
+					0.38,
+					0.05
+				);
 			}
 			if (entity instanceof LivingEntity living && isFrostEnemy(player, living)) {
 				state.pendingHelplessTargets.put(
@@ -2376,9 +2393,9 @@ public final class MagicAbilityManager {
 				);
 			}
 		}
-		world.spawnParticles(ParticleTypes.SNOWFLAKE, player.getX(), player.getBodyY(0.5), player.getZ(), 120, burstRadius * 0.3, 1.2, burstRadius * 0.3, 0.12);
-		world.spawnParticles(ParticleTypes.WHITE_ASH, player.getX(), player.getBodyY(0.5), player.getZ(), 90, burstRadius * 0.25, 0.9, burstRadius * 0.25, 0.08);
+		spawnFrostMaximumBurstParticles(world, player, burstRadius);
 		world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 1.4F, 0.4F);
+		world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_AMETHYST_CLUSTER_BREAK, SoundCategory.PLAYERS, 1.1F, 0.55F);
 		world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_WITHER_SHOOT, SoundCategory.PLAYERS, 1.0F, 0.6F);
 	}
 
@@ -2491,6 +2508,7 @@ public final class MagicAbilityManager {
 			state.highestUnlockedStage = Math.min(state.currentStage, 3);
 			state.progressTicks = nextProgress;
 		}
+		syncFrostStageHud(player);
 		player.sendMessage(Text.translatable("message.magic.frost.stage_setback", state.currentStage), true);
 	}
 
@@ -2587,6 +2605,7 @@ public final class MagicAbilityManager {
 			state.highestUnlockedStage = Math.min(3, state.currentStage + 1);
 			caster.sendMessage(Text.translatable("message.magic.frost.stage_unlocked", state.highestUnlockedStage), true);
 		}
+		syncFrostStageHud(caster);
 	}
 
 	private static void applyFrostFreeze(LivingEntity target, UUID casterId, int expiresTick) {
@@ -2619,29 +2638,49 @@ public final class MagicAbilityManager {
 			}
 			double previousTravel = state.travelled;
 			double intendedTravel = Math.min(state.range, previousTravel + state.speedPerTick);
-			Vec3d segmentStart = state.origin.add(state.direction.multiply(previousTravel));
-			Vec3d segmentEnd = state.origin.add(state.direction.multiply(intendedTravel));
-			BlockHitResult blockHit = world.raycast(
-				new RaycastContext(segmentStart, segmentEnd, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, caster)
+			state.travelled = intendedTravel;
+			double segmentSpacing = Math.max(
+				FROST_CONFIG.rangedAttack.terrainFollowStepSize,
+				FROST_CONFIG.rangedAttack.eruptionSegmentSpacing
 			);
-			if (blockHit.getType() == HitResult.Type.BLOCK) {
-				segmentEnd = blockHit.getPos();
-				state.travelled = state.range;
-			} else {
-				state.travelled = intendedTravel;
-			}
-			spawnParticleBeam(world, segmentStart, segmentEnd, ParticleTypes.SNOWFLAKE, FROST_CONFIG.rangedAttack.particleSpacing);
-			spawnParticleBeam(world, segmentStart, segmentEnd, ParticleTypes.WHITE_ASH, FROST_CONFIG.rangedAttack.particleSpacing);
-			for (LivingEntity target : collectLivingEntitiesAlongBeam(caster, segmentStart, segmentEnd, state.width * 0.5)) {
-				if (!state.hitTargets.add(target.getUuid())) {
+			while (state.nextEruptionDistance <= intendedTravel + 1.0E-6) {
+				Vec3d samplePoint = new Vec3d(
+					state.origin.x + state.direction.x * state.nextEruptionDistance,
+					state.terrainSearchY,
+					state.origin.z + state.direction.z * state.nextEruptionDistance
+				);
+				Vec3d groundAnchor = findFrostGroundAnchor(
+					world,
+					samplePoint,
+					FROST_CONFIG.rangedAttack.groundSearchUpBlocks,
+					FROST_CONFIG.rangedAttack.groundSearchDownBlocks
+				);
+				if (groundAnchor == null) {
+					state.consecutiveGroundMisses++;
+					state.nextEruptionDistance += segmentSpacing;
+					if (state.consecutiveGroundMisses >= 5) {
+						state.travelled = state.range;
+						break;
+					}
 					continue;
 				}
-				applyFrostActionDamage(caster, target, state.damage, state.overcast, FrostKillProgressType.RANGED);
-				if (!state.overcast) {
-					applyFrostStageHitEffects(caster, target, currentTick);
+				state.consecutiveGroundMisses = 0;
+				state.terrainSearchY = groundAnchor.y + 0.8;
+				spawnFrostGroundSpikeEruption(world, groundAnchor, state.direction, state.width, state.overcast, state.stage);
+				Vec3d hitStart = groundAnchor.add(0.0, 0.45, 0.0).subtract(state.direction.multiply(segmentSpacing * 0.5));
+				Vec3d hitEnd = groundAnchor.add(0.0, 0.45, 0.0).add(state.direction.multiply(segmentSpacing * 0.5));
+				for (LivingEntity target : collectLivingEntitiesAlongBeam(caster, hitStart, hitEnd, Math.max(0.4, state.width * 0.5))) {
+					if (!state.hitTargets.add(target.getUuid())) {
+						continue;
+					}
+					applyFrostActionDamage(caster, target, state.damage, state.overcast, FrostKillProgressType.RANGED);
+					if (!state.overcast) {
+						applyFrostStageHitEffects(caster, target, currentTick);
+					}
 				}
+				state.nextEruptionDistance += segmentSpacing;
 			}
-			if (state.travelled >= state.range) {
+			if (state.travelled >= state.range || state.nextEruptionDistance > state.range + segmentSpacing) {
 				iterator.remove();
 			}
 		}
@@ -2851,28 +2890,396 @@ public final class MagicAbilityManager {
 		world.spawnParticles(ParticleTypes.SNOWFLAKE, x, y, z, snowCount, 0.4 + stage * 0.1, 0.6, 0.4 + stage * 0.1, 0.015);
 	}
 
-	private static void spawnFrostSlamParticles(ServerWorld world, LivingEntity caster, double radius, int particleCount, boolean erupting) {
-		if (particleCount <= 0) {
+	private static void spawnFrostSlamParticles(
+		ServerWorld world,
+		LivingEntity caster,
+		MagicConfig.FrostSlamConfig slamConfig,
+		boolean erupting
+	) {
+		if (slamConfig.particleCount <= 0 && slamConfig.hazeDensity <= 0) {
 			return;
 		}
-		double y = caster.getY() + 0.1;
-		for (int i = 0; i < particleCount; i++) {
-			double fraction = i / (double) Math.max(1, particleCount);
-			double angle = fraction * Math.PI * 2.0;
-			double ringRadius = erupting ? radius * caster.getRandom().nextDouble() : radius * fraction;
-			double x = caster.getX() + Math.cos(angle) * ringRadius;
-			double z = caster.getZ() + Math.sin(angle) * ringRadius;
-			world.spawnParticles(ParticleTypes.SNOWFLAKE, x, y, z, 2, 0.08, 0.12, 0.08, 0.02);
-			world.spawnParticles(FROST_SHARD_PARTICLE, x, y, z, 1, 0.06, 0.14, 0.06, 0.0);
+
+		Vec3d centerAnchor = findFrostGroundAnchor(world, new Vec3d(caster.getX(), caster.getY() + 1.0, caster.getZ()), 3, 6);
+		if (centerAnchor == null) {
+			centerAnchor = new Vec3d(caster.getX(), caster.getY(), caster.getZ());
+		}
+		double ringRadius = slamConfig.groundRingRadius > 0.0 ? slamConfig.groundRingRadius : slamConfig.radius;
+		spawnFrostGroundHaze(world, centerAnchor, Math.max(1.0, ringRadius), slamConfig.hazeDensity);
+		spawnFrostGroundShockRing(world, centerAnchor, Math.max(0.75, ringRadius), erupting ? 26 : 18, 0.08);
+		int anchors = Math.max(10, slamConfig.particleCount / 2);
+		for (int i = 0; i < anchors; i++) {
+			double angle = Math.PI * 2.0 * i / anchors;
+			double radiusFraction = erupting ? Math.sqrt((i + 1.0) / anchors) : (0.35 + 0.65 * ((i + 1.0) / anchors));
+			double sampleRadius = Math.min(slamConfig.radius, ringRadius) * radiusFraction;
+			Vec3d samplePoint = new Vec3d(
+				caster.getX() + Math.cos(angle) * sampleRadius,
+				centerAnchor.y + 0.8,
+				caster.getZ() + Math.sin(angle) * sampleRadius
+			);
+			Vec3d anchor = findFrostGroundAnchor(world, samplePoint, 3, 7);
+			if (anchor == null) {
+				continue;
+			}
+			spawnFrostSlamEruptionAt(world, anchor, angle, slamConfig.shardVelocity, erupting ? 4 : 3, erupting);
+		}
+		int fanCount = erupting ? 10 : 7;
+		for (int i = 0; i < fanCount; i++) {
+			double angle = Math.PI * 2.0 * i / fanCount;
+			Vec3d fanAnchor = findFrostGroundAnchor(
+				world,
+				new Vec3d(
+					caster.getX() + Math.cos(angle) * Math.max(0.7, ringRadius * 0.55),
+					centerAnchor.y + 0.6,
+					caster.getZ() + Math.sin(angle) * Math.max(0.7, ringRadius * 0.55)
+				),
+				3,
+				7
+			);
+			if (fanAnchor == null) {
+				continue;
+			}
+			spawnFrostShardFan(world, fanAnchor, angle, slamConfig.shardVelocity * 1.2, erupting);
 		}
 	}
 
-	private static void spawnFrostMaximumParticles(ServerWorld world, LivingEntity caster, int particleCount) {
-		if (particleCount <= 0) {
+	private static void spawnFrostMaximumParticles(
+		ServerWorld world,
+		LivingEntity caster,
+		FrostMaximumState state,
+		int currentTick
+	) {
+		if (FROST_CONFIG.maximum.whiteParticleCount > 0) {
+			world.spawnParticles(
+				ParticleTypes.SNOWFLAKE,
+				caster.getX(),
+				caster.getBodyY(0.5),
+				caster.getZ(),
+				FROST_CONFIG.maximum.whiteParticleCount,
+				0.5,
+				0.85,
+				0.5,
+				0.03
+			);
+			world.spawnParticles(
+				ParticleTypes.WHITE_ASH,
+				caster.getX(),
+				caster.getBodyY(0.5),
+				caster.getZ(),
+				FROST_CONFIG.maximum.whiteParticleCount,
+				0.4,
+				0.8,
+				0.4,
+				0.02
+			);
+		}
+		if (!FROST_CONFIG.maximum.ascentVortexEnabled) {
 			return;
 		}
-		world.spawnParticles(ParticleTypes.SNOWFLAKE, caster.getX(), caster.getBodyY(0.5), caster.getZ(), particleCount, 0.7, 1.0, 0.7, 0.05);
-		world.spawnParticles(ParticleTypes.WHITE_ASH, caster.getX(), caster.getBodyY(0.5), caster.getZ(), particleCount, 0.6, 0.9, 0.6, 0.03);
+
+		double elapsedTicks = Math.max(0.0, currentTick - (state.windupEndTick - Math.max(1, FROST_CONFIG.maximum.windupDurationTicks)));
+		double progress = FROST_CONFIG.maximum.windupDurationTicks <= 0
+			? 1.0
+			: MathHelper.clamp(elapsedTicks / Math.max(1.0, FROST_CONFIG.maximum.windupDurationTicks), 0.0, 1.0);
+		double vortexHeight = Math.max(0.8, Math.min(FROST_CONFIG.maximum.vortexHeightBlocks, (caster.getY() - state.baseY) + 1.2));
+		int ringCount = Math.max(1, FROST_CONFIG.maximum.vortexRingCount);
+		double spinBase = currentTick * 0.24;
+		for (int ringIndex = 0; ringIndex < ringCount; ringIndex++) {
+			double heightFraction = ringCount == 1 ? 0.0 : ringIndex / (double) (ringCount - 1);
+			double localY = vortexHeight * heightFraction;
+			double radius = MathHelper.lerp(
+				heightFraction,
+				FROST_CONFIG.maximum.vortexBaseRadius * (0.35 + progress * 0.65),
+				FROST_CONFIG.maximum.vortexTopRadius * Math.max(0.2, progress)
+			);
+			int points = 6 + ringIndex * 2;
+			for (int pointIndex = 0; pointIndex < points; pointIndex++) {
+				double angle = spinBase * (1.0 + heightFraction * 0.8) + Math.PI * 2.0 * pointIndex / points + ringIndex * 0.42;
+				double x = caster.getX() + Math.cos(angle) * radius;
+				double y = state.baseY + 0.1 + localY;
+				double z = caster.getZ() + Math.sin(angle) * radius;
+				double swirlVelocity = 0.04 + 0.02 * heightFraction;
+				double velocityX = -Math.sin(angle) * swirlVelocity;
+				double velocityY = 0.04 + 0.03 * progress;
+				double velocityZ = Math.cos(angle) * swirlVelocity;
+				world.spawnParticles(ParticleTypes.WHITE_ASH, x, y, z, 0, velocityX * 0.55, velocityY * 0.7, velocityZ * 0.55, 1.0);
+				if ((pointIndex + ringIndex) % 2 == 0) {
+					world.spawnParticles(ParticleTypes.SNOWFLAKE, x, y, z, 0, velocityX * 0.8, velocityY, velocityZ * 0.8, 1.0);
+				}
+				if (heightFraction > 0.2) {
+					world.spawnParticles(FROST_SHARD_PARTICLE, x, y, z, 0, velocityX * 0.4, velocityY * 1.1, velocityZ * 0.4, 1.0);
+				}
+			}
+		}
+		Vec3d groundAnchor = findFrostGroundAnchor(world, new Vec3d(caster.getX(), state.baseY + 1.0, caster.getZ()), 2, 5);
+		if (groundAnchor != null) {
+			spawnFrostGroundHaze(world, groundAnchor, Math.max(1.0, FROST_CONFIG.maximum.vortexBaseRadius + progress), FROST_CONFIG.maximum.whiteParticleCount / 2);
+		}
+	}
+
+	private static void syncFrostStageHud(ServerPlayerEntity player) {
+		if (player == null || MagicPlayerData.getSchool(player) != MagicSchool.FROST) {
+			if (player != null) {
+				MagicPlayerData.clearFrostStageHud(player);
+			}
+			return;
+		}
+
+		FrostStageState state = FROST_STAGE_STATES.get(player.getUuid());
+		if (state == null || activeAbility(player) != MagicAbility.BELOW_FREEZING || state.dimension != player.getEntityWorld().getRegistryKey()) {
+			MagicPlayerData.clearFrostStageHud(player);
+			return;
+		}
+
+		int requiredTicks = frostProgressRequirementTicks(state.currentStage);
+		int progressTicks = requiredTicks > 0 ? Math.min(state.progressTicks, requiredTicks) : 0;
+		MagicPlayerData.setFrostStageHud(
+			player,
+			true,
+			state.currentStage,
+			state.highestUnlockedStage,
+			progressTicks,
+			requiredTicks
+		);
+	}
+
+	private static FrostStageState ensureAdminFrostStageState(ServerPlayerEntity player) {
+		if (player == null || MagicPlayerData.getSchool(player) != MagicSchool.FROST) {
+			return null;
+		}
+
+		UUID playerId = player.getUuid();
+		clearFrostMaximumState(player, false);
+		FROST_MANA_REGEN_BLOCKED_END_TICK.remove(playerId);
+		BELOW_FREEZING_COOLDOWN_END_TICK.remove(playerId);
+		FROST_ASCENT_COOLDOWN_END_TICK.remove(playerId);
+		PLANCK_HEAT_COOLDOWN_END_TICK.remove(playerId);
+		FrostStageState state = FROST_STAGE_STATES.get(playerId);
+		if (state == null) {
+			state = new FrostStageState(player.getEntityWorld().getRegistryKey(), 1, 1, 0);
+			FROST_STAGE_STATES.put(playerId, state);
+		}
+		state.dimension = player.getEntityWorld().getRegistryKey();
+		state.currentStage = MathHelper.clamp(state.currentStage, 1, 3);
+		state.highestUnlockedStage = MathHelper.clamp(Math.max(state.currentStage, state.highestUnlockedStage), 1, 3);
+		state.progressTicks = Math.max(0, state.progressTicks);
+		removeFrostStageCasterBuffs(player);
+		setActiveAbility(player, MagicAbility.BELOW_FREEZING);
+		MagicPlayerData.setDepletedRecoveryMode(player, false);
+		return state;
+	}
+
+	private static Vec3d findFrostGroundAnchor(ServerWorld world, Vec3d samplePoint, int searchUpBlocks, int searchDownBlocks) {
+		BlockPos basePos = BlockPos.ofFloored(samplePoint.x, samplePoint.y, samplePoint.z);
+		for (int offset = searchUpBlocks; offset >= -searchDownBlocks; offset--) {
+			BlockPos floorPos = basePos.up(offset);
+			VoxelShape floorShape = world.getBlockState(floorPos).getCollisionShape(world, floorPos);
+			if (floorShape.isEmpty()) {
+				continue;
+			}
+			BlockPos abovePos = floorPos.up();
+			if (!world.getBlockState(abovePos).getCollisionShape(world, abovePos).isEmpty()) {
+				continue;
+			}
+			double surfaceY = floorPos.getY() + floorShape.getMax(Direction.Axis.Y);
+			return new Vec3d(samplePoint.x, surfaceY, samplePoint.z);
+		}
+		return null;
+	}
+
+	private static void spawnFrostGroundSpikeEruption(
+		ServerWorld world,
+		Vec3d groundAnchor,
+		Vec3d direction,
+		double width,
+		boolean overcast,
+		int stage
+	) {
+		Vec3d forward = new Vec3d(direction.x, 0.0, direction.z);
+		if (forward.lengthSquared() <= 1.0E-6) {
+			forward = new Vec3d(1.0, 0.0, 0.0);
+		} else {
+			forward = forward.normalize();
+		}
+		Vec3d side = new Vec3d(-forward.z, 0.0, forward.x);
+		double halfWidth = Math.max(0.16, width * 0.45);
+		double lateralSpacing = Math.max(0.08, FROST_CONFIG.rangedAttack.particleSpacing * 0.5);
+		int columns = overcast ? 5 : stage >= 3 ? 4 : 3;
+		world.spawnParticles(
+			new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
+			groundAnchor.x,
+			groundAnchor.y + 0.03,
+			groundAnchor.z,
+			overcast ? 8 : 5,
+			halfWidth * 0.4,
+			0.03,
+			halfWidth * 0.4,
+			0.04
+		);
+		spawnFrostGroundShockRing(world, groundAnchor, Math.max(0.35, halfWidth), 6, 0.03);
+		for (int column = 0; column < columns; column++) {
+			double offsetFraction = columns == 1 ? 0.0 : column / (double) (columns - 1) * 2.0 - 1.0;
+			Vec3d start = groundAnchor.add(side.multiply(offsetFraction * Math.min(halfWidth * 0.55, lateralSpacing * Math.max(1, columns - 1))));
+			double lift = (overcast ? 0.42 : 0.24) + stage * 0.03 + Math.abs(offsetFraction) * 0.02;
+			world.spawnParticles(FROST_SHARD_PARTICLE, start.x, start.y + 0.04, start.z, 0, forward.x * 0.04, lift, forward.z * 0.04, 1.0);
+			world.spawnParticles(ParticleTypes.SNOWFLAKE, start.x, start.y + 0.03, start.z, 0, forward.x * 0.025, lift * 0.85, forward.z * 0.025, 1.0);
+			world.spawnParticles(ParticleTypes.WHITE_ASH, start.x, start.y + 0.02, start.z, 0, forward.x * 0.015, lift * 0.55, forward.z * 0.015, 1.0);
+		}
+	}
+
+	private static void spawnFrostSlamEruptionAt(
+		ServerWorld world,
+		Vec3d anchor,
+		double angle,
+		double shardVelocity,
+		int shardBursts,
+		boolean erupting
+	) {
+		Vec3d outward = new Vec3d(Math.cos(angle), 0.0, Math.sin(angle));
+		Vec3d side = new Vec3d(-outward.z, 0.0, outward.x);
+		world.spawnParticles(
+			new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
+			anchor.x,
+			anchor.y + 0.03,
+			anchor.z,
+			erupting ? 6 : 4,
+			0.12,
+			0.03,
+			0.12,
+			0.03
+		);
+		for (int burst = 0; burst < shardBursts; burst++) {
+			double sideOffset = shardBursts == 1 ? 0.0 : burst / (double) (shardBursts - 1) * 2.0 - 1.0;
+			Vec3d start = anchor.add(side.multiply(sideOffset * 0.14));
+			double velocityX = outward.x * (0.05 + shardVelocity * 0.35) + side.x * sideOffset * 0.05;
+			double velocityY = shardVelocity + (erupting ? 0.18 : 0.12) + burst * 0.02;
+			double velocityZ = outward.z * (0.05 + shardVelocity * 0.35) + side.z * sideOffset * 0.05;
+			world.spawnParticles(FROST_SHARD_PARTICLE, start.x, start.y + 0.04, start.z, 0, velocityX, velocityY, velocityZ, 1.0);
+			world.spawnParticles(ParticleTypes.SNOWFLAKE, start.x, start.y + 0.03, start.z, 0, velocityX * 0.72, velocityY * 0.85, velocityZ * 0.72, 1.0);
+			world.spawnParticles(ParticleTypes.WHITE_ASH, start.x, start.y + 0.02, start.z, 0, velocityX * 0.45, velocityY * 0.55, velocityZ * 0.45, 1.0);
+		}
+	}
+
+	private static void spawnFrostShardFan(ServerWorld world, Vec3d anchor, double angle, double speed, boolean erupting) {
+		for (int index = -1; index <= 1; index++) {
+			double spreadAngle = angle + index * 0.28;
+			double velocityX = Math.cos(spreadAngle) * speed * 0.42;
+			double velocityY = speed + (erupting ? 0.14 : 0.08) + Math.abs(index) * 0.02;
+			double velocityZ = Math.sin(spreadAngle) * speed * 0.42;
+			world.spawnParticles(FROST_SHARD_PARTICLE, anchor.x, anchor.y + 0.04, anchor.z, 0, velocityX, velocityY, velocityZ, 1.0);
+			world.spawnParticles(ParticleTypes.SNOWFLAKE, anchor.x, anchor.y + 0.03, anchor.z, 0, velocityX * 0.7, velocityY * 0.8, velocityZ * 0.7, 1.0);
+		}
+	}
+
+	private static void spawnFrostGroundShockRing(ServerWorld world, Vec3d center, double radius, int points, double liftVelocity) {
+		if (radius <= 0.0 || points <= 0) {
+			return;
+		}
+		for (int pointIndex = 0; pointIndex < points; pointIndex++) {
+			double angle = Math.PI * 2.0 * pointIndex / points;
+			double x = center.x + Math.cos(angle) * radius;
+			double z = center.z + Math.sin(angle) * radius;
+			double velocityX = Math.cos(angle) * 0.08;
+			double velocityZ = Math.sin(angle) * 0.08;
+			world.spawnParticles(ParticleTypes.WHITE_ASH, x, center.y + 0.03, z, 0, velocityX, liftVelocity, velocityZ, 1.0);
+			if (pointIndex % 2 == 0) {
+				world.spawnParticles(ParticleTypes.SNOWFLAKE, x, center.y + 0.03, z, 0, velocityX * 0.9, liftVelocity * 0.8, velocityZ * 0.9, 1.0);
+			}
+		}
+	}
+
+	private static void spawnFrostGroundHaze(ServerWorld world, Vec3d center, double radius, int density) {
+		if (density <= 0) {
+			return;
+		}
+		world.spawnParticles(ParticleTypes.CLOUD, center.x, center.y + 0.05, center.z, density, radius * 0.35, 0.06, radius * 0.35, 0.01);
+		world.spawnParticles(ParticleTypes.WHITE_ASH, center.x, center.y + 0.04, center.z, density, radius * 0.38, 0.08, radius * 0.38, 0.008);
+	}
+
+	private static void spawnFrostMaximumBurstParticles(ServerWorld world, LivingEntity caster, double burstRadius) {
+		double centerX = caster.getX();
+		double centerY = caster.getBodyY(0.5);
+		double centerZ = caster.getZ();
+		if (FROST_CONFIG.maximum.burstHazeDensity > 0) {
+			world.spawnParticles(
+				ParticleTypes.WHITE_ASH,
+				centerX,
+				centerY,
+				centerZ,
+				FROST_CONFIG.maximum.burstHazeDensity,
+				burstRadius * 0.22,
+				1.25,
+				burstRadius * 0.22,
+				0.12
+			);
+			world.spawnParticles(
+				ParticleTypes.CLOUD,
+				centerX,
+				centerY,
+				centerZ,
+				Math.max(12, FROST_CONFIG.maximum.burstHazeDensity / 2),
+				burstRadius * 0.18,
+				0.75,
+				burstRadius * 0.18,
+				0.08
+			);
+		}
+		if (FROST_CONFIG.maximum.burstParticleCount > 0) {
+			world.spawnParticles(
+				ParticleTypes.SNOWFLAKE,
+				centerX,
+				centerY,
+				centerZ,
+				FROST_CONFIG.maximum.burstParticleCount,
+				burstRadius * 0.24,
+				1.15,
+				burstRadius * 0.24,
+				0.14
+			);
+			world.spawnParticles(
+				new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
+				centerX,
+				centerY,
+				centerZ,
+				Math.max(24, FROST_CONFIG.maximum.burstParticleCount / 5),
+				burstRadius * 0.12,
+				0.8,
+				burstRadius * 0.12,
+				0.18
+			);
+		}
+		world.spawnParticles(ParticleTypes.GLOW, centerX, centerY, centerZ, 24, 0.2, 0.2, 0.2, 0.02);
+		int spokes = Math.max(18, FROST_CONFIG.maximum.burstParticleCount / 4);
+		for (int spokeIndex = 0; spokeIndex < spokes; spokeIndex++) {
+			double angle = Math.PI * 2.0 * spokeIndex / spokes;
+			double startRadius = 0.45 + (spokeIndex % 4) * 0.08;
+			double startX = centerX + Math.cos(angle) * startRadius;
+			double startZ = centerZ + Math.sin(angle) * startRadius;
+			double shardSpeed = FROST_CONFIG.maximum.burstShardSpeed * (0.8 + (spokeIndex % 3) * 0.15);
+			double velocityX = Math.cos(angle) * shardSpeed;
+			double velocityY = 0.12 + (spokeIndex % 4) * 0.03;
+			double velocityZ = Math.sin(angle) * shardSpeed;
+			world.spawnParticles(FROST_SHARD_PARTICLE, startX, centerY, startZ, 0, velocityX, velocityY, velocityZ, 1.0);
+			world.spawnParticles(ParticleTypes.SNOWFLAKE, startX, centerY, startZ, 0, velocityX * 0.75, velocityY * 0.8, velocityZ * 0.75, 1.0);
+			world.spawnParticles(ParticleTypes.WHITE_ASH, startX, centerY, startZ, 0, velocityX * 0.55, velocityY * 0.55, velocityZ * 0.55, 1.0);
+		}
+		Vec3d groundAnchor = findFrostGroundAnchor(world, new Vec3d(centerX, caster.getY() + 1.0, centerZ), 3, 7);
+		if (groundAnchor != null) {
+			double ringRadius = Math.min(burstRadius, FROST_CONFIG.maximum.groundShockRingRadius);
+			spawnFrostGroundHaze(world, groundAnchor, Math.max(1.0, ringRadius), Math.max(14, FROST_CONFIG.maximum.burstHazeDensity / 3));
+			spawnFrostGroundShockRing(world, groundAnchor, Math.max(1.0, ringRadius), 40, 0.05);
+			world.spawnParticles(
+				new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
+				groundAnchor.x,
+				groundAnchor.y + 0.03,
+				groundAnchor.z,
+				30,
+				ringRadius * 0.45,
+				0.05,
+				ringRadius * 0.45,
+				0.06
+			);
+		}
 	}
 
 	private static boolean isFrostEnemy(ServerPlayerEntity caster, LivingEntity target) {
@@ -9217,6 +9624,67 @@ public final class MagicAbilityManager {
 		return true;
 	}
 
+	public static int setFrostStage(ServerPlayerEntity player, int stage) {
+		FrostStageState state = ensureAdminFrostStageState(player);
+		if (state == null) {
+			return 0;
+		}
+
+		int clampedStage = MathHelper.clamp(stage, 1, 3);
+		state.currentStage = clampedStage;
+		state.highestUnlockedStage = clampedStage;
+		state.progressTicks = 0;
+		syncFrostStageHud(player);
+		return 1;
+	}
+
+	public static int clearFrostStage(ServerPlayerEntity player) {
+		if (player == null || MagicPlayerData.getSchool(player) != MagicSchool.FROST || player.getEntityWorld().getServer() == null) {
+			return 0;
+		}
+
+		endFrostStagedMode(player, player.getEntityWorld().getServer().getTicks(), FrostStageEndReason.CLEAR_ALL, false, false);
+		return 1;
+	}
+
+	public static int advanceFrostStageForTesting(ServerPlayerEntity player) {
+		FrostStageState state = ensureAdminFrostStageState(player);
+		if (state == null || state.currentStage >= 3) {
+			return 0;
+		}
+
+		state.currentStage = Math.min(3, state.currentStage + 1);
+		state.highestUnlockedStage = Math.max(state.highestUnlockedStage, state.currentStage);
+		state.progressTicks = 0;
+		syncFrostStageHud(player);
+		return 1;
+	}
+
+	public static int setFrostStageProgressSeconds(ServerPlayerEntity player, int seconds) {
+		FrostStageState state = ensureAdminFrostStageState(player);
+		if (state == null) {
+			return 0;
+		}
+
+		int requirement = frostProgressRequirementTicks(state.currentStage);
+		if (requirement <= 0) {
+			state.progressTicks = 0;
+			state.highestUnlockedStage = Math.max(state.highestUnlockedStage, state.currentStage);
+			syncFrostStageHud(player);
+			return 1;
+		}
+
+		int progressTicks = MathHelper.clamp(Math.max(0, seconds) * TICKS_PER_SECOND, 0, requirement);
+		state.progressTicks = progressTicks;
+		if (progressTicks >= requirement) {
+			state.highestUnlockedStage = Math.min(3, state.currentStage + 1);
+		} else {
+			state.highestUnlockedStage = state.currentStage;
+		}
+		syncFrostStageHud(player);
+		return 1;
+	}
+
 	private static boolean activeAbilityPreventsManaRegen(MagicAbility activeAbility) {
 		return switch (activeAbility) {
 			case NONE -> false;
@@ -13743,6 +14211,9 @@ public final class MagicAbilityManager {
 		private final int stage;
 		private final boolean overcast;
 		private double travelled;
+		private double nextEruptionDistance;
+		private double terrainSearchY;
+		private int consecutiveGroundMisses;
 		private final Set<UUID> hitTargets;
 
 		private FrostSpikeWaveState(
@@ -13768,6 +14239,9 @@ public final class MagicAbilityManager {
 			this.stage = stage;
 			this.overcast = overcast;
 			this.travelled = 0.0;
+			this.nextEruptionDistance = 0.0;
+			this.terrainSearchY = origin.y + 0.8;
+			this.consecutiveGroundMisses = 0;
 			this.hitTargets = new HashSet<>();
 		}
 	}

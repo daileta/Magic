@@ -1,6 +1,7 @@
 package net.evan.magic.client;
 
 import net.evan.magic.Magic;
+import net.evan.magic.config.MagicConfig;
 import net.evan.magic.magic.MagicPlayerData;
 import net.evan.magic.magic.MagicSchool;
 import net.evan.magic.magic.ability.MagicAbility;
@@ -47,6 +48,7 @@ public final class ManaHudOverlay {
 	private static final int OUTLINE_COLOR = 0xFF000000;
 	private static final int DOMAIN_TIMER_SECONDARY_COLOR = 0xFFF7D76E;
 	private static final int FROST_COLOR = 0x66CCFF;
+	private static final int FROST_OUTLINE_COLOR = 0xFF0A1C29;
 	private static final int LOVE_COLOR = 0xFF77CC;
 	private static final int BURNING_PASSION_COLOR = 0xFF8A3D;
 	private static final int JESTER_COLOR = 0xFFD54A;
@@ -108,6 +110,7 @@ public final class ManaHudOverlay {
 		int y = drawContext.getScaledWindowHeight() - 63;
 		renderDomainTimerOverlay(drawContext, client);
 		renderDomainClashHud(drawContext, client, x, y);
+		renderFrostStageHud(drawContext, client, x + BAR_WIDTH / 2, y - (MagicPlayerData.isDomainClashActive(client.player) ? 18 : 10));
 		drawContext.drawGuiTexture(RenderPipelines.GUI_TEXTURED, WITHER_BAR_BACKGROUND, x, y, BAR_WIDTH, BAR_HEIGHT);
 
 		if (filledWidth > 0) {
@@ -302,6 +305,36 @@ public final class ManaHudOverlay {
 		renderInstructions(drawContext, client, centerX, centerY, instructionVisibility / 100.0F);
 	}
 
+	private static void renderFrostStageHud(DrawContext drawContext, MinecraftClient client, int centerX, int y) {
+		if (client.player == null || MagicPlayerData.getSchool(client.player) != MagicSchool.FROST) {
+			return;
+		}
+		if (!MagicPlayerData.isFrostStageActive(client.player)) {
+			return;
+		}
+
+		MagicConfig.FrostHudConfig hud = MagicConfig.get().frost.hud;
+		int currentStage = MagicPlayerData.getFrostStage(client.player);
+		int highestUnlockedStage = MagicPlayerData.getFrostHighestUnlockedStage(client.player);
+		int progressTicks = MagicPlayerData.getFrostStageProgressTicks(client.player);
+		int requiredTicks = MagicPlayerData.getFrostStageRequiredTicks(client.player);
+		Text line = frostStageHudText(hud, currentStage, highestUnlockedStage, progressTicks, requiredTicks);
+		if (line == null) {
+			return;
+		}
+
+		drawCenteredScaledOutlinedText(
+			drawContext,
+			client,
+			line.copy().formatted(Formatting.BOLD),
+			centerX,
+			y,
+			1.0F,
+			parseHexColor(hud.textColorHex, FROST_COLOR),
+			parseHexColor(hud.outlineColorHex, FROST_OUTLINE_COLOR)
+		);
+	}
+
 	private static void renderInstructions(DrawContext drawContext, MinecraftClient client, int centerX, int centerY, float alpha) {
 		Text[] lines = {
 			Text.translatable("overlay.magic.domain_clash.instructions.line1"),
@@ -384,6 +417,42 @@ public final class ManaHudOverlay {
 			INSTRUCTION_SCALE,
 			withAlpha(INSTRUCTION_COLOR, alpha),
 			withAlpha(OUTLINE_COLOR, alpha)
+		);
+	}
+
+	private static Text frostStageHudText(
+		MagicConfig.FrostHudConfig hud,
+		int currentStage,
+		int highestUnlockedStage,
+		int progressTicks,
+		int requiredTicks
+	) {
+		if (currentStage >= 3) {
+			if (!hud.showFinalStageText) {
+				return null;
+			}
+			String fallback = Text.translatable("overlay.magic.frost.stage.final").getString();
+			return Text.literal(hud.finalStageText.isBlank() ? fallback : hud.finalStageText);
+		}
+
+		int nextStage = Math.min(3, currentStage + 1);
+		if (highestUnlockedStage > currentStage) {
+			if (!hud.readyTextEnabled) {
+				return null;
+			}
+			String fallback = Text.translatable("overlay.magic.frost.stage.ready", nextStage).getString();
+			return Text.literal(formatHudLabel(hud.readyLabelFormat, nextStage, null, fallback));
+		}
+
+		if (!hud.timerEnabled || requiredTicks <= 0) {
+			return null;
+		}
+
+		int remainingTicks = Math.max(0, requiredTicks - progressTicks);
+		String timeText = formatRemainingTime(remainingTicks);
+		String fallback = Text.translatable("overlay.magic.frost.stage.timer", nextStage, timeText).getString();
+		return Text.literal(
+			formatHudLabel(hud.timerLabelFormat, nextStage, timeText, fallback)
 		);
 	}
 
@@ -545,6 +614,53 @@ public final class ManaHudOverlay {
 	private static int withAlpha(int rgbColor, float alpha) {
 		int alphaChannel = MathHelper.clamp(Math.round(alpha * 255.0F), 0, 255);
 		return (alphaChannel << 24) | (rgbColor & 0x00FFFFFF);
+	}
+
+	private static String formatRemainingTime(int remainingTicks) {
+		int totalSeconds = Math.max(0, (remainingTicks + 19) / 20);
+		int minutes = totalSeconds / 60;
+		int seconds = totalSeconds % 60;
+		return minutes + ":" + (seconds < 10 ? "0" + seconds : Integer.toString(seconds));
+	}
+
+	private static String formatHudLabel(String template, int stage, String time, String fallback) {
+		if (template == null || template.isBlank()) {
+			return fallback;
+		}
+		String value = template.replace("%stage%", Integer.toString(stage)).replace("%time%", time == null ? "" : time);
+		if (value.contains("%s")) {
+			try {
+				if (time == null) {
+					value = value.formatted(stage);
+				} else {
+					value = value.formatted(stage, time);
+				}
+			} catch (RuntimeException exception) {
+				return fallback;
+			}
+		}
+		return value.isBlank() ? fallback : value;
+	}
+
+	private static int parseHexColor(String rawColor, int fallbackColor) {
+		if (rawColor == null || rawColor.isBlank()) {
+			return fallbackColor;
+		}
+		String normalized = rawColor.trim();
+		if (normalized.startsWith("#")) {
+			normalized = normalized.substring(1);
+		}
+		if (normalized.startsWith("0x") || normalized.startsWith("0X")) {
+			normalized = normalized.substring(2);
+		}
+		if (normalized.length() != 6) {
+			return fallbackColor;
+		}
+		try {
+			return Integer.parseInt(normalized, 16);
+		} catch (NumberFormatException exception) {
+			return fallbackColor;
+		}
 	}
 
 	private static void resetDomainClashVisualState() {

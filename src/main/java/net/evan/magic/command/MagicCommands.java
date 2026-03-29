@@ -2,6 +2,7 @@ package net.evan.magic.command;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import java.util.ArrayList;
@@ -96,6 +97,85 @@ public final class MagicCommands {
 						CommandManager.literal("testing")
 							.then(testingModeLiteral("enable", true))
 							.then(testingModeLiteral("disable", false))
+					)
+					.then(
+						CommandManager.literal("frost")
+							.then(
+								CommandManager.literal("stage")
+									.then(
+										CommandManager.literal("set")
+											.then(
+												CommandManager.argument("stage", IntegerArgumentType.integer(1, 3))
+													.executes(context ->
+														setFrostStageForSelf(
+															context.getSource(),
+															IntegerArgumentType.getInteger(context, "stage")
+														)
+													)
+													.then(
+														CommandManager.argument("targets", EntityArgumentType.players())
+															.executes(context ->
+																setFrostStage(
+																	context.getSource(),
+																	EntityArgumentType.getPlayers(context, "targets"),
+																	IntegerArgumentType.getInteger(context, "stage")
+																)
+															)
+													)
+											)
+									)
+									.then(
+										CommandManager.literal("clear")
+											.executes(context -> clearFrostStageForSelf(context.getSource()))
+											.then(
+												CommandManager.argument("targets", EntityArgumentType.players())
+													.executes(context ->
+														clearFrostStage(
+															context.getSource(),
+															EntityArgumentType.getPlayers(context, "targets")
+														)
+													)
+											)
+									)
+									.then(
+										CommandManager.literal("next")
+											.executes(context -> advanceFrostStageForSelf(context.getSource()))
+											.then(
+												CommandManager.argument("targets", EntityArgumentType.players())
+													.executes(context ->
+														advanceFrostStage(
+															context.getSource(),
+															EntityArgumentType.getPlayers(context, "targets")
+														)
+													)
+											)
+									)
+									.then(
+										CommandManager.literal("progress")
+											.then(
+												CommandManager.literal("set")
+													.then(
+														CommandManager.argument("seconds", IntegerArgumentType.integer(0))
+															.executes(context ->
+																setFrostStageProgressForSelf(
+																	context.getSource(),
+																	IntegerArgumentType.getInteger(context, "seconds")
+																)
+															)
+															.then(
+																CommandManager.argument("targets", EntityArgumentType.players())
+																	.executes(context ->
+																		setFrostStageProgress(
+																			context.getSource(),
+																			EntityArgumentType.getPlayers(context, "targets"),
+																			IntegerArgumentType.getInteger(context, "seconds")
+																		)
+																	)
+															)
+													)
+											)
+									)
+							)
 					)
 					.then(
 						CommandManager.literal("greed")
@@ -282,6 +362,22 @@ public final class MagicCommands {
 		return addGreedCoins(source, List.of(source.getPlayerOrThrow()), amount);
 	}
 
+	private static int setFrostStageForSelf(ServerCommandSource source, int stage) throws CommandSyntaxException {
+		return setFrostStage(source, List.of(source.getPlayerOrThrow()), stage);
+	}
+
+	private static int clearFrostStageForSelf(ServerCommandSource source) throws CommandSyntaxException {
+		return clearFrostStage(source, List.of(source.getPlayerOrThrow()));
+	}
+
+	private static int advanceFrostStageForSelf(ServerCommandSource source) throws CommandSyntaxException {
+		return advanceFrostStage(source, List.of(source.getPlayerOrThrow()));
+	}
+
+	private static int setFrostStageProgressForSelf(ServerCommandSource source, int seconds) throws CommandSyntaxException {
+		return setFrostStageProgress(source, List.of(source.getPlayerOrThrow()), seconds);
+	}
+
 	private static int resetAll(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
 		int resetCount = 0;
 		for (ServerPlayerEntity target : targets) {
@@ -410,6 +506,78 @@ public final class MagicCommands {
 				)
 			);
 		}
+		return updatedTargets.size();
+	}
+
+	private static int setFrostStage(ServerCommandSource source, Collection<ServerPlayerEntity> targets, int stage) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setFrostStage(target, stage) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.frost.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendFrostStageSetFeedback(source, updatedTargets, stage);
+		return updatedTargets.size();
+	}
+
+	private static int clearFrostStage(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.clearFrostStage(target) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.frost.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendFrostStageClearFeedback(source, updatedTargets);
+		return updatedTargets.size();
+	}
+
+	private static int advanceFrostStage(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.advanceFrostStageForTesting(target) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.frost.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendFrostStageNextFeedback(source, updatedTargets);
+		return updatedTargets.size();
+	}
+
+	private static int setFrostStageProgress(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int seconds
+	) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setFrostStageProgressSeconds(target, seconds) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.frost.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendFrostStageProgressFeedback(source, updatedTargets, seconds);
 		return updatedTargets.size();
 	}
 
@@ -543,6 +711,78 @@ public final class MagicCommands {
 
 		source.sendFeedback(
 			() -> Text.translatable("command.magic.greed.coins.add.multiple", formattedAmount, targets.size()),
+			true
+		);
+	}
+
+	private static void sendFrostStageSetFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int stage
+	) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.frost.stage.set.single", stage, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.frost.stage.set.multiple", stage, targets.size()),
+			true
+		);
+	}
+
+	private static void sendFrostStageClearFeedback(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.frost.stage.clear.single", target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.frost.stage.clear.multiple", targets.size()),
+			true
+		);
+	}
+
+	private static void sendFrostStageNextFeedback(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.frost.stage.next.single", target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.frost.stage.next.multiple", targets.size()),
+			true
+		);
+	}
+
+	private static void sendFrostStageProgressFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int seconds
+	) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.frost.stage.progress.set.single", seconds, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.frost.stage.progress.set.multiple", seconds, targets.size()),
 			true
 		);
 	}

@@ -2251,6 +2251,7 @@ public final class MagicConfig {
 		public int stagedModeCooldownTicks = 600;
 		public int stageAdvanceCooldownTicks = 0;
 		public int stageAttackCooldownTicks = 0;
+		public FrostHudConfig hud = new FrostHudConfig();
 		public FrostProgressConfig progression = new FrostProgressConfig();
 		public FrostStageConfig stageOne = defaultStageOne();
 		public FrostStageConfig stageTwo = defaultStageTwo();
@@ -2263,6 +2264,9 @@ public final class MagicConfig {
 		public FrostDomainConfig domain = new FrostDomainConfig();
 
 		private void normalize() {
+			if (hud == null) {
+				hud = new FrostHudConfig();
+			}
 			if (progression == null) {
 				progression = new FrostProgressConfig();
 			}
@@ -2298,6 +2302,7 @@ public final class MagicConfig {
 			stagedModeCooldownTicks = Math.max(0, stagedModeCooldownTicks);
 			stageAdvanceCooldownTicks = Math.max(0, stageAdvanceCooldownTicks);
 			stageAttackCooldownTicks = Math.max(0, stageAttackCooldownTicks);
+			hud.normalize();
 			progression.normalize();
 			stageOne.normalize();
 			stageTwo.normalize();
@@ -2349,6 +2354,10 @@ public final class MagicConfig {
 			config.trueDamage = 3.0F;
 			config.manaCostPercent = 45.0;
 			config.setbackChancePercent = 10.0;
+			config.particleCount = 42;
+			config.groundRingRadius = 5.0;
+			config.hazeDensity = 24;
+			config.shardVelocity = 0.26;
 			return config;
 		}
 
@@ -2359,7 +2368,40 @@ public final class MagicConfig {
 			config.trueDamage = 7.0F;
 			config.manaCostPercent = 45.0;
 			config.setbackChancePercent = 0.0;
+			config.particleCount = 68;
+			config.groundRingRadius = 10.0;
+			config.hazeDensity = 36;
+			config.shardVelocity = 0.38;
 			return config;
+		}
+	}
+
+	public static final class FrostHudConfig {
+		public boolean timerEnabled = true;
+		public boolean readyTextEnabled = true;
+		public boolean showFinalStageText = true;
+		public String timerLabelFormat = "Stage %stage% in %time%";
+		public String readyLabelFormat = "Stage %stage% Ready";
+		public String finalStageText = "Final Stage";
+		public String textColorHex = "#BFEFFF";
+		public String outlineColorHex = "#0A1C29";
+
+		private void normalize() {
+			if (timerLabelFormat == null) {
+				timerLabelFormat = "Stage %stage% in %time%";
+			}
+			if (readyLabelFormat == null) {
+				readyLabelFormat = "Stage %stage% Ready";
+			}
+			if (finalStageText == null) {
+				finalStageText = "Final Stage";
+			}
+			if (textColorHex == null) {
+				textColorHex = "#BFEFFF";
+			}
+			if (outlineColorHex == null) {
+				outlineColorHex = "#0A1C29";
+			}
 		}
 	}
 
@@ -2416,6 +2458,10 @@ public final class MagicConfig {
 		public boolean instantKillEnabled = true;
 		public double setbackChancePercent = 10.0;
 		public double particleSpacing = 0.35;
+		public double terrainFollowStepSize = 0.25;
+		public int groundSearchDownBlocks = 5;
+		public int groundSearchUpBlocks = 2;
+		public double eruptionSegmentSpacing = 0.25;
 
 		private void normalize() {
 			width = Math.max(0.1, width);
@@ -2428,6 +2474,10 @@ public final class MagicConfig {
 			overcastSpeedBlocksPerSecond = Math.max(0.1, overcastSpeedBlocksPerSecond);
 			setbackChancePercent = MathHelper.clamp(setbackChancePercent, 0.0, 100.0);
 			particleSpacing = Math.max(0.1, particleSpacing);
+			terrainFollowStepSize = Math.max(0.05, terrainFollowStepSize);
+			groundSearchDownBlocks = Math.max(0, groundSearchDownBlocks);
+			groundSearchUpBlocks = Math.max(0, groundSearchUpBlocks);
+			eruptionSegmentSpacing = Math.max(0.1, eruptionSegmentSpacing);
 		}
 	}
 
@@ -2438,6 +2488,9 @@ public final class MagicConfig {
 		public double manaCostPercent = 0.0;
 		public double setbackChancePercent = 0.0;
 		public int particleCount = 18;
+		public double groundRingRadius = 0.0;
+		public int hazeDensity = 12;
+		public double shardVelocity = 0.24;
 
 		private void normalize() {
 			radius = Math.max(0.0, radius);
@@ -2446,6 +2499,9 @@ public final class MagicConfig {
 			manaCostPercent = MathHelper.clamp(manaCostPercent, 0.0, 100.0);
 			setbackChancePercent = MathHelper.clamp(setbackChancePercent, 0.0, 100.0);
 			particleCount = Math.max(0, particleCount);
+			groundRingRadius = Math.max(0.0, groundRingRadius);
+			hazeDensity = Math.max(0, hazeDensity);
+			shardVelocity = Math.max(0.0, shardVelocity);
 		}
 	}
 
@@ -2480,6 +2536,15 @@ public final class MagicConfig {
 		public int cooldownTicks = 30 * 60 * 20;
 		public int manaRegenBlockedTicks = 30 * 60 * 20;
 		public int whiteParticleCount = 18;
+		public boolean ascentVortexEnabled = true;
+		public double vortexHeightBlocks = 5.5;
+		public double vortexBaseRadius = 0.4;
+		public double vortexTopRadius = 2.25;
+		public int vortexRingCount = 6;
+		public int burstParticleCount = 140;
+		public double burstShardSpeed = 0.42;
+		public int burstHazeDensity = 96;
+		public double groundShockRingRadius = 12.0;
 
 		private void normalize() {
 			windupDurationTicks = Math.max(0, windupDurationTicks);
@@ -2499,6 +2564,14 @@ public final class MagicConfig {
 			cooldownTicks = Math.max(0, cooldownTicks);
 			manaRegenBlockedTicks = Math.max(0, manaRegenBlockedTicks);
 			whiteParticleCount = Math.max(0, whiteParticleCount);
+			vortexHeightBlocks = Math.max(0.1, vortexHeightBlocks);
+			vortexBaseRadius = Math.max(0.0, vortexBaseRadius);
+			vortexTopRadius = Math.max(vortexBaseRadius, vortexTopRadius);
+			vortexRingCount = Math.max(1, vortexRingCount);
+			burstParticleCount = Math.max(0, burstParticleCount);
+			burstShardSpeed = Math.max(0.0, burstShardSpeed);
+			burstHazeDensity = Math.max(0, burstHazeDensity);
+			groundShockRingRadius = Math.max(0.0, groundShockRingRadius);
 		}
 	}
 
