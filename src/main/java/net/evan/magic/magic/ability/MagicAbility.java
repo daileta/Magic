@@ -6,8 +6,9 @@ import net.minecraft.text.Text;
 public enum MagicAbility {
 	NONE(0, MagicSchool.NONE, "none"),
 	BELOW_FREEZING(1, MagicSchool.FROST, "below_freezing"),
-	ABSOLUTE_ZERO(2, MagicSchool.FROST, "absolute_zero"),
+	FROST_ASCENT(2, MagicSchool.FROST, "frost_ascent"),
 	PLANCK_HEAT(3, MagicSchool.FROST, "planck_heat"),
+	ABSOLUTE_ZERO(4, MagicSchool.FROST, "absolute_zero"),
 	FROST_DOMAIN_EXPANSION(5, MagicSchool.FROST, "frost_domain_expansion"),
 	LOVE_AT_FIRST_SIGHT(1, MagicSchool.LOVE, "love_at_first_sight"),
 	TILL_DEATH_DO_US_PART(2, MagicSchool.LOVE, "till_death_do_us_part"),

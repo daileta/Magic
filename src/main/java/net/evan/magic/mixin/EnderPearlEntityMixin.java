@@ -16,7 +16,10 @@ public abstract class EnderPearlEntityMixin {
 	private void magic$cancelDomainEscapeTeleport(HitResult hitResult, CallbackInfo ci) {
 		EnderPearlEntity self = (EnderPearlEntity) (Object) this;
 		Entity owner = self.getOwner();
-		if (!(owner instanceof LivingEntity livingOwner) || !MagicAbilityManager.isEntityCapturedByDomain(livingOwner)) {
+		if (!(owner instanceof LivingEntity livingOwner)) {
+			return;
+		}
+		if (!MagicAbilityManager.isEntityCapturedByDomain(livingOwner) && !MagicAbilityManager.shouldBlockFrostTeleport(livingOwner)) {
 			return;
 		}
 

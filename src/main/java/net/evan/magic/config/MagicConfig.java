@@ -306,6 +306,7 @@ public final class MagicConfig {
 		public ConstellationOrionConfig constellationOrion = new ConstellationOrionConfig();
 		public ConstellationDomainConfig constellationDomain = new ConstellationDomainConfig();
 		public GreedConfig greed = new GreedConfig();
+		public FrostConfig frost = new FrostConfig();
 		public PowderedSnowEffectConfig powderedSnowEffect = new PowderedSnowEffectConfig();
 		public DomainClashConfig domainClash = new DomainClashConfig();
 		public AbilityAccessConfig abilityAccess = new AbilityAccessConfig();
@@ -374,6 +375,9 @@ public final class MagicConfig {
 			if (greed == null) {
 				greed = new GreedConfig();
 			}
+			if (frost == null) {
+				frost = new FrostConfig();
+			}
 			if (powderedSnowEffect == null) {
 				powderedSnowEffect = new PowderedSnowEffectConfig();
 			}
@@ -397,6 +401,7 @@ public final class MagicConfig {
 			constellationOrion.normalize();
 			constellationDomain.normalize();
 			greed.normalize();
+			frost.normalize();
 			domainControl.normalize();
 			domainClash.normalize();
 			abilityAccess.normalize();
@@ -2239,6 +2244,308 @@ public final class MagicConfig {
 	public static final class PowderedSnowEffectConfig {
 		public int damageIntervalTicks = 20;
 		public boolean dealDamageOnInitialApplication = true;
+	}
+
+	public static final class FrostConfig {
+		public double stagedModeForceEndThresholdPercent = 30.0;
+		public int stagedModeCooldownTicks = 600;
+		public int stageAdvanceCooldownTicks = 0;
+		public int stageAttackCooldownTicks = 0;
+		public FrostProgressConfig progression = new FrostProgressConfig();
+		public FrostStageConfig stageOne = defaultStageOne();
+		public FrostStageConfig stageTwo = defaultStageTwo();
+		public FrostStageConfig stageThree = defaultStageThree();
+		public FrostRangedAttackConfig rangedAttack = new FrostRangedAttackConfig();
+		public FrostSlamConfig stageTwoSlam = defaultStageTwoSlam();
+		public FrostSlamConfig stageThreeSlam = defaultStageThreeSlam();
+		public FrostDebuffConfig debuff = new FrostDebuffConfig();
+		public FrostMaximumConfig maximum = new FrostMaximumConfig();
+		public FrostDomainConfig domain = new FrostDomainConfig();
+
+		private void normalize() {
+			if (progression == null) {
+				progression = new FrostProgressConfig();
+			}
+			if (stageOne == null) {
+				stageOne = defaultStageOne();
+			}
+			if (stageTwo == null) {
+				stageTwo = defaultStageTwo();
+			}
+			if (stageThree == null) {
+				stageThree = defaultStageThree();
+			}
+			if (rangedAttack == null) {
+				rangedAttack = new FrostRangedAttackConfig();
+			}
+			if (stageTwoSlam == null) {
+				stageTwoSlam = defaultStageTwoSlam();
+			}
+			if (stageThreeSlam == null) {
+				stageThreeSlam = defaultStageThreeSlam();
+			}
+			if (debuff == null) {
+				debuff = new FrostDebuffConfig();
+			}
+			if (maximum == null) {
+				maximum = new FrostMaximumConfig();
+			}
+			if (domain == null) {
+				domain = new FrostDomainConfig();
+			}
+
+			stagedModeForceEndThresholdPercent = MathHelper.clamp(stagedModeForceEndThresholdPercent, 0.0, 100.0);
+			stagedModeCooldownTicks = Math.max(0, stagedModeCooldownTicks);
+			stageAdvanceCooldownTicks = Math.max(0, stageAdvanceCooldownTicks);
+			stageAttackCooldownTicks = Math.max(0, stageAttackCooldownTicks);
+			progression.normalize();
+			stageOne.normalize();
+			stageTwo.normalize();
+			stageThree.normalize();
+			rangedAttack.normalize();
+			stageTwoSlam.normalize();
+			stageThreeSlam.normalize();
+			debuff.normalize();
+			maximum.normalize();
+			domain.normalize();
+		}
+
+		private static FrostStageConfig defaultStageOne() {
+			FrostStageConfig config = new FrostStageConfig();
+			config.auraRadius = 1.0;
+			config.onHitDebuffDurationTicks = 3 * 20;
+			config.resistanceAmplifier = 0;
+			config.onHitFrostDamagePerTick = 2.0F;
+			return config;
+		}
+
+		private static FrostStageConfig defaultStageTwo() {
+			FrostStageConfig config = new FrostStageConfig();
+			config.onHitDebuffDurationTicks = 5 * 20;
+			config.resistanceAmplifier = 2;
+			config.slownessAmplifier = 2;
+			config.onHitSlownessAmplifier = 2;
+			config.onHitFrostDamagePerTick = 1.5F;
+			return config;
+		}
+
+		private static FrostStageConfig defaultStageThree() {
+			FrostStageConfig config = new FrostStageConfig();
+			config.onHitDebuffDurationTicks = 7 * 20;
+			config.resistanceAmplifier = 2;
+			config.slownessAmplifier = 3;
+			config.onHitSlownessAmplifier = 3;
+			config.onHitBlindnessAmplifier = 0;
+			config.onHitFrostDamagePerTick = 2.0F;
+			config.enableMaxHealthMultiplier = true;
+			config.maxHealthMultiplier = 2.0;
+			return config;
+		}
+
+		private static FrostSlamConfig defaultStageTwoSlam() {
+			FrostSlamConfig config = new FrostSlamConfig();
+			config.radius = 5.0;
+			config.freezeDurationTicks = 2 * 20;
+			config.trueDamage = 3.0F;
+			config.manaCostPercent = 45.0;
+			config.setbackChancePercent = 10.0;
+			return config;
+		}
+
+		private static FrostSlamConfig defaultStageThreeSlam() {
+			FrostSlamConfig config = new FrostSlamConfig();
+			config.radius = 10.0;
+			config.freezeDurationTicks = 5 * 20;
+			config.trueDamage = 7.0F;
+			config.manaCostPercent = 45.0;
+			config.setbackChancePercent = 0.0;
+			return config;
+		}
+	}
+
+	public static final class FrostProgressConfig {
+		public int stageTwoUnlockTicks = 2 * 60 * 20;
+		public int stageThreeUnlockTicks = 3 * 60 * 20;
+		public int rangedKillProgressTicks = 2 * 60 * 20;
+		public int slamKillProgressTicks = 60 * 20;
+		public boolean clearUnlocksOnEnd = true;
+		public boolean discardExcessProgress = true;
+		public boolean resetProgressOnSetback = true;
+
+		private void normalize() {
+			stageTwoUnlockTicks = Math.max(1, stageTwoUnlockTicks);
+			stageThreeUnlockTicks = Math.max(1, stageThreeUnlockTicks);
+			rangedKillProgressTicks = Math.max(0, rangedKillProgressTicks);
+			slamKillProgressTicks = Math.max(0, slamKillProgressTicks);
+		}
+	}
+
+	public static final class FrostStageConfig {
+		public double auraRadius = 0.0;
+		public int onHitDebuffDurationTicks = 0;
+		public int resistanceAmplifier = -1;
+		public int slownessAmplifier = -1;
+		public int onHitSlownessAmplifier = -1;
+		public int onHitBlindnessAmplifier = -1;
+		public float onHitFrostDamagePerTick = 0.0F;
+		public boolean cleanseCommonNegatives = true;
+		public boolean enableMaxHealthMultiplier = false;
+		public double maxHealthMultiplier = 1.0;
+
+		private void normalize() {
+			auraRadius = Math.max(0.0, auraRadius);
+			onHitDebuffDurationTicks = Math.max(0, onHitDebuffDurationTicks);
+			resistanceAmplifier = Math.max(-1, resistanceAmplifier);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			onHitSlownessAmplifier = Math.max(-1, onHitSlownessAmplifier);
+			onHitBlindnessAmplifier = Math.max(-1, onHitBlindnessAmplifier);
+			onHitFrostDamagePerTick = Math.max(0.0F, onHitFrostDamagePerTick);
+			maxHealthMultiplier = Math.max(1.0, maxHealthMultiplier);
+		}
+	}
+
+	public static final class FrostRangedAttackConfig {
+		public double width = 1.0;
+		public double range = 40.0;
+		public double speedBlocksPerSecond = 1.5;
+		public float baseDamage = 5.0F;
+		public double normalManaCostPercent = 25.0;
+		public double overcastChancePercent = 20.0;
+		public double overcastManaCostPercent = 75.0;
+		public double overcastSpeedBlocksPerSecond = 2.5;
+		public boolean instantKillEnabled = true;
+		public double setbackChancePercent = 10.0;
+		public double particleSpacing = 0.35;
+
+		private void normalize() {
+			width = Math.max(0.1, width);
+			range = Math.max(1.0, range);
+			speedBlocksPerSecond = Math.max(0.1, speedBlocksPerSecond);
+			baseDamage = Math.max(0.0F, baseDamage);
+			normalManaCostPercent = MathHelper.clamp(normalManaCostPercent, 0.0, 100.0);
+			overcastChancePercent = MathHelper.clamp(overcastChancePercent, 0.0, 100.0);
+			overcastManaCostPercent = MathHelper.clamp(overcastManaCostPercent, 0.0, 100.0);
+			overcastSpeedBlocksPerSecond = Math.max(0.1, overcastSpeedBlocksPerSecond);
+			setbackChancePercent = MathHelper.clamp(setbackChancePercent, 0.0, 100.0);
+			particleSpacing = Math.max(0.1, particleSpacing);
+		}
+	}
+
+	public static final class FrostSlamConfig {
+		public double radius = 0.0;
+		public int freezeDurationTicks = 0;
+		public float trueDamage = 0.0F;
+		public double manaCostPercent = 0.0;
+		public double setbackChancePercent = 0.0;
+		public int particleCount = 18;
+
+		private void normalize() {
+			radius = Math.max(0.0, radius);
+			freezeDurationTicks = Math.max(0, freezeDurationTicks);
+			trueDamage = Math.max(0.0F, trueDamage);
+			manaCostPercent = MathHelper.clamp(manaCostPercent, 0.0, 100.0);
+			setbackChancePercent = MathHelper.clamp(setbackChancePercent, 0.0, 100.0);
+			particleCount = Math.max(0, particleCount);
+		}
+	}
+
+	public static final class FrostDebuffConfig {
+		public int intervalTicks = 20;
+		public float baseDamagePerTick = 2.0F;
+		public boolean refreshDurationOnReapply = true;
+		public boolean stackDamageOnReapply = false;
+		public boolean damageOnInitialApplication = true;
+		public boolean bypassTotems = false;
+		public int visualFrozenTicks = 180;
+
+		private void normalize() {
+			intervalTicks = Math.max(1, intervalTicks);
+			baseDamagePerTick = Math.max(0.0F, baseDamagePerTick);
+			visualFrozenTicks = Math.max(0, visualFrozenTicks);
+		}
+	}
+
+	public static final class FrostMaximumConfig {
+		public boolean enabled = true;
+		public int windupDurationTicks = 10 * 20;
+		public double fearRadiusMultiplierFromDomainRadius = 1.0;
+		public double burstRadiusMultiplierFromDomainRadius = 2.0;
+		public double floatHeightBlocks = 5.0;
+		public int packedIceDurationTicks = 3 * 20;
+		public int suffocationDamageIntervalTicks = 20;
+		public float suffocationDamagePerInterval = 4.0F;
+		public int postBurstFreezeDurationTicks = 30 * 20;
+		public String windupMagicBlockedMessage = "The White Haze forming freezes you in fear";
+		public String postBurstMagicBlockedMessage = "You are so cold a white haze clouds your mind";
+		public int cooldownTicks = 30 * 60 * 20;
+		public int manaRegenBlockedTicks = 30 * 60 * 20;
+		public int whiteParticleCount = 18;
+
+		private void normalize() {
+			windupDurationTicks = Math.max(0, windupDurationTicks);
+			fearRadiusMultiplierFromDomainRadius = Math.max(0.0, fearRadiusMultiplierFromDomainRadius);
+			burstRadiusMultiplierFromDomainRadius = Math.max(0.0, burstRadiusMultiplierFromDomainRadius);
+			floatHeightBlocks = Math.max(0.0, floatHeightBlocks);
+			packedIceDurationTicks = Math.max(0, packedIceDurationTicks);
+			suffocationDamageIntervalTicks = Math.max(1, suffocationDamageIntervalTicks);
+			suffocationDamagePerInterval = Math.max(0.0F, suffocationDamagePerInterval);
+			postBurstFreezeDurationTicks = Math.max(0, postBurstFreezeDurationTicks);
+			if (windupMagicBlockedMessage == null) {
+				windupMagicBlockedMessage = "";
+			}
+			if (postBurstMagicBlockedMessage == null) {
+				postBurstMagicBlockedMessage = "";
+			}
+			cooldownTicks = Math.max(0, cooldownTicks);
+			manaRegenBlockedTicks = Math.max(0, manaRegenBlockedTicks);
+			whiteParticleCount = Math.max(0, whiteParticleCount);
+		}
+	}
+
+	public static final class FrostDomainConfig {
+		public int radius = 25;
+		public int height = 25;
+		public int shellThickness = 1;
+		public int cooldownTicks = 60 * 20;
+		public int startupTicks = 0;
+		public int pulseIntervalTicks = 6 * 20;
+		public int pulseDurationTicks = 6 * 20;
+		public int blindnessPulseDurationTicks = 20;
+		public int freezePulseDurationTicks = 20;
+		public int totalDurationTicks = 60 * 20;
+		public int finalExecutionDelayTicks = 0;
+		public boolean applySlowness = true;
+		public int slownessBaseAmplifier = 0;
+		public int slownessAmplifierPerPulse = 1;
+		public boolean applyFrost = true;
+		public float frostDamagePerTick = 2.0F;
+		public boolean applyBlindness = true;
+		public boolean applyFreeze = true;
+		public boolean finalExecutionEnabled = true;
+		public boolean finalExecutionBypassTotems = true;
+		public int executionParticleCount = 32;
+		public float executionSoundVolume = 1.0F;
+		public float executionSoundPitch = 0.9F;
+
+		private void normalize() {
+			radius = Math.max(1, radius);
+			height = Math.max(1, height);
+			shellThickness = Math.max(1, shellThickness);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			startupTicks = Math.max(0, startupTicks);
+			pulseIntervalTicks = Math.max(1, pulseIntervalTicks);
+			pulseDurationTicks = Math.max(0, pulseDurationTicks);
+			blindnessPulseDurationTicks = Math.max(0, blindnessPulseDurationTicks);
+			freezePulseDurationTicks = Math.max(0, freezePulseDurationTicks);
+			totalDurationTicks = Math.max(1, totalDurationTicks);
+			finalExecutionDelayTicks = Math.max(0, finalExecutionDelayTicks);
+			slownessBaseAmplifier = Math.max(-1, slownessBaseAmplifier);
+			slownessAmplifierPerPulse = Math.max(0, slownessAmplifierPerPulse);
+			frostDamagePerTick = Math.max(0.0F, frostDamagePerTick);
+			executionParticleCount = Math.max(0, executionParticleCount);
+			executionSoundVolume = Math.max(0.0F, executionSoundVolume);
+			executionSoundPitch = Math.max(0.0F, executionSoundPitch);
+		}
 	}
 
 	public static final class DomainClashConfig {

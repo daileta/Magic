@@ -801,6 +801,136 @@
       }
     }
   },
+  "frost": {
+    "stagedModeForceEndThresholdPercent": 30.0,
+    "stagedModeCooldownTicks": 600,
+    "stageAdvanceCooldownTicks": 0,
+    "stageAttackCooldownTicks": 0,
+    "progression": {
+      "stageTwoUnlockTicks": 2400,
+      "stageThreeUnlockTicks": 3600,
+      "rangedKillProgressTicks": 2400,
+      "slamKillProgressTicks": 1200,
+      "clearUnlocksOnEnd": true,
+      "discardExcessProgress": true,
+      "resetProgressOnSetback": true
+    },
+    "stageOne": {
+      "auraRadius": 1.0,
+      "onHitDebuffDurationTicks": 60,
+      "resistanceAmplifier": 0,
+      "slownessAmplifier": -1,
+      "onHitSlownessAmplifier": -1,
+      "onHitBlindnessAmplifier": -1,
+      "onHitFrostDamagePerTick": 2.0,
+      "cleanseCommonNegatives": true,
+      "enableMaxHealthMultiplier": false,
+      "maxHealthMultiplier": 1.0
+    },
+    "stageTwo": {
+      "auraRadius": 0.0,
+      "onHitDebuffDurationTicks": 100,
+      "resistanceAmplifier": 2,
+      "slownessAmplifier": 2,
+      "onHitSlownessAmplifier": 2,
+      "onHitBlindnessAmplifier": -1,
+      "onHitFrostDamagePerTick": 1.5,
+      "cleanseCommonNegatives": true,
+      "enableMaxHealthMultiplier": false,
+      "maxHealthMultiplier": 1.0
+    },
+    "stageThree": {
+      "auraRadius": 0.0,
+      "onHitDebuffDurationTicks": 140,
+      "resistanceAmplifier": 2,
+      "slownessAmplifier": 3,
+      "onHitSlownessAmplifier": 3,
+      "onHitBlindnessAmplifier": 0,
+      "onHitFrostDamagePerTick": 2.0,
+      "cleanseCommonNegatives": true,
+      "enableMaxHealthMultiplier": true,
+      "maxHealthMultiplier": 2.0
+    },
+    "rangedAttack": {
+      "width": 1.0,
+      "range": 40.0,
+      "speedBlocksPerSecond": 1.5,
+      "baseDamage": 5.0,
+      "normalManaCostPercent": 25.0,
+      "overcastChancePercent": 20.0,
+      "overcastManaCostPercent": 75.0,
+      "overcastSpeedBlocksPerSecond": 2.5,
+      "instantKillEnabled": true,
+      "setbackChancePercent": 10.0,
+      "particleSpacing": 0.35
+    },
+    "stageTwoSlam": {
+      "radius": 5.0,
+      "freezeDurationTicks": 40,
+      "trueDamage": 3.0,
+      "manaCostPercent": 45.0,
+      "setbackChancePercent": 10.0,
+      "particleCount": 18
+    },
+    "stageThreeSlam": {
+      "radius": 10.0,
+      "freezeDurationTicks": 100,
+      "trueDamage": 7.0,
+      "manaCostPercent": 45.0,
+      "setbackChancePercent": 0.0,
+      "particleCount": 18
+    },
+    "debuff": {
+      "intervalTicks": 20,
+      "baseDamagePerTick": 2.0,
+      "refreshDurationOnReapply": true,
+      "stackDamageOnReapply": false,
+      "damageOnInitialApplication": true,
+      "bypassTotems": false,
+      "visualFrozenTicks": 180
+    },
+    "maximum": {
+      "enabled": true,
+      "windupDurationTicks": 200,
+      "fearRadiusMultiplierFromDomainRadius": 1.0,
+      "burstRadiusMultiplierFromDomainRadius": 2.0,
+      "floatHeightBlocks": 5.0,
+      "packedIceDurationTicks": 60,
+      "suffocationDamageIntervalTicks": 20,
+      "suffocationDamagePerInterval": 4.0,
+      "postBurstFreezeDurationTicks": 600,
+      "windupMagicBlockedMessage": "The White Haze forming freezes you in fear",
+      "postBurstMagicBlockedMessage": "You are so cold a white haze clouds your mind",
+      "cooldownTicks": 36000,
+      "manaRegenBlockedTicks": 36000,
+      "whiteParticleCount": 18
+    },
+    "domain": {
+      "radius": 25,
+      "height": 25,
+      "shellThickness": 1,
+      "cooldownTicks": 1200,
+      "startupTicks": 0,
+      "pulseIntervalTicks": 120,
+      "pulseDurationTicks": 120,
+      "blindnessPulseDurationTicks": 20,
+      "freezePulseDurationTicks": 20,
+      "totalDurationTicks": 1200,
+      "finalExecutionDelayTicks": 0,
+      "applySlowness": true,
+      "slownessBaseAmplifier": 0,
+      "slownessAmplifierPerPulse": 1,
+      "applyFrost": true,
+      "frostDamagePerTick": 2.0,
+      "applyBlindness": true,
+      "applyFreeze": true,
+      "finalExecutionEnabled": true,
+      "finalExecutionBypassTotems": true,
+      "executionParticleCount": 32,
+      "executionSoundVolume": 1.0,
+      "executionSoundPitch": 0.9
+    }
+  },
   "powderedSnowEffect": {
     "damageIntervalTicks": 20,
     "dealDamageOnInitialApplication": true
