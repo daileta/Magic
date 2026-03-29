@@ -2383,8 +2383,8 @@ public final class MagicConfig {
 		public String timerLabelFormat = "Stage %stage% in %time%";
 		public String readyLabelFormat = "Stage %stage% Ready";
 		public String finalStageText = "Final Stage";
-		public String textColorHex = "#BFEFFF";
-		public String outlineColorHex = "#0A1C29";
+		public String textColorHex = "#FFFFFF";
+		public String outlineColorHex = "#000000";
 
 		private void normalize() {
 			if (timerLabelFormat == null) {
@@ -2397,10 +2397,10 @@ public final class MagicConfig {
 				finalStageText = "Final Stage";
 			}
 			if (textColorHex == null) {
-				textColorHex = "#BFEFFF";
+				textColorHex = "#FFFFFF";
 			}
 			if (outlineColorHex == null) {
-				outlineColorHex = "#0A1C29";
+				outlineColorHex = "#000000";
 			}
 		}
 	}

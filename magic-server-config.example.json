@@ -813,8 +813,8 @@
       "timerLabelFormat": "Stage %stage% in %time%",
       "readyLabelFormat": "Stage %stage% Ready",
       "finalStageText": "Final Stage",
-      "textColorHex": "#BFEFFF",
-      "outlineColorHex": "#0A1C29"
+      "textColorHex": "#FFFFFF",
+      "outlineColorHex": "#000000"
     },
     "progression": {
       "stageTwoUnlockTicks": 2400,

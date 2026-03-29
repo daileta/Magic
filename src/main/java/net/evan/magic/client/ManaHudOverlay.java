@@ -46,9 +46,11 @@ public final class ManaHudOverlay {
 	private static final int INSTRUCTION_LINE_SPACING = 14;
 	private static final int INSTRUCTION_COLOR = 0xFFFF3A3A;
 	private static final int OUTLINE_COLOR = 0xFF000000;
+	private static final int FROST_DOMAIN_TIMER_COLOR = 0x00FFFF;
 	private static final int DOMAIN_TIMER_SECONDARY_COLOR = 0xFFF7D76E;
 	private static final int FROST_COLOR = 0x66CCFF;
-	private static final int FROST_OUTLINE_COLOR = 0xFF0A1C29;
+	private static final int FROST_HUD_TEXT_COLOR = 0xFFFFFF;
+	private static final int FROST_OUTLINE_COLOR = 0xFF000000;
 	private static final int LOVE_COLOR = 0xFF77CC;
 	private static final int BURNING_PASSION_COLOR = 0xFF8A3D;
 	private static final int JESTER_COLOR = 0xFFD54A;
@@ -212,19 +214,35 @@ public final class ManaHudOverlay {
 		int centerX = drawContext.getScaledWindowWidth() / 2;
 		int remainingSeconds = MagicPlayerData.getDomainTimerSeconds(client.player);
 		boolean paused = MagicPlayerData.isDomainClashActive(client.player);
+		boolean frostDomainTimer = ability == MagicAbility.FROST_DOMAIN_EXPANSION;
 		Text timerLine = paused
-			? Text.translatable("overlay.magic.domain.timer.paused", ability.displayName(), remainingSeconds).formatted(Formatting.BOLD)
-			: Text.translatable("overlay.magic.domain.timer", ability.displayName(), remainingSeconds).formatted(Formatting.BOLD);
-		drawCenteredScaledOutlinedText(
-			drawContext,
-			client,
-			timerLine,
-			centerX,
-			DOMAIN_TIMER_Y,
-			DOMAIN_TIMER_SCALE,
-			colorForSchool(ability.school()),
-			OUTLINE_COLOR
-		);
+			? Text.translatable("overlay.magic.domain.timer.paused", ability.displayName(), remainingSeconds)
+			: Text.translatable("overlay.magic.domain.timer", ability.displayName(), remainingSeconds);
+		if (!frostDomainTimer) {
+			timerLine = timerLine.copy().formatted(Formatting.BOLD);
+		}
+		if (frostDomainTimer) {
+			drawCenteredScaledText(
+				drawContext,
+				client,
+				timerLine,
+				centerX,
+				DOMAIN_TIMER_Y,
+				DOMAIN_TIMER_SCALE,
+				FROST_DOMAIN_TIMER_COLOR
+			);
+		} else {
+			drawCenteredScaledOutlinedText(
+				drawContext,
+				client,
+				timerLine,
+				centerX,
+				DOMAIN_TIMER_Y,
+				DOMAIN_TIMER_SCALE,
+				colorForSchool(ability.school()),
+				OUTLINE_COLOR
+			);
+		}
 
 		int secondarySeconds = MagicPlayerData.getDomainSecondaryTimerSeconds(client.player);
 		if (secondarySeconds <= 0) {
@@ -330,7 +348,7 @@ public final class ManaHudOverlay {
 			centerX,
 			y,
 			1.0F,
-			parseHexColor(hud.textColorHex, FROST_COLOR),
+			parseHexColor(hud.textColorHex, FROST_HUD_TEXT_COLOR),
 			parseHexColor(hud.outlineColorHex, FROST_OUTLINE_COLOR)
 		);
 	}
@@ -473,6 +491,25 @@ public final class ManaHudOverlay {
 		int drawX = Math.round((centerX - (lineWidth * scale) / 2.0F) / scale);
 		int drawY = Math.round(y / scale);
 		drawOutlinedText(drawContext, client, text, drawX, drawY, textColor, outlineColor);
+		matrices.popMatrix();
+	}
+
+	private static void drawCenteredScaledText(
+		DrawContext drawContext,
+		MinecraftClient client,
+		Text text,
+		int centerX,
+		int y,
+		float scale,
+		int textColor
+	) {
+		int lineWidth = client.textRenderer.getWidth(text);
+		var matrices = drawContext.getMatrices();
+		matrices.pushMatrix();
+		matrices.scale(scale, scale);
+		int drawX = Math.round((centerX - (lineWidth * scale) / 2.0F) / scale);
+		int drawY = Math.round(y / scale);
+		drawContext.drawText(client.textRenderer, text, drawX, drawY, textColor, false);
 		matrices.popMatrix();
 	}
 

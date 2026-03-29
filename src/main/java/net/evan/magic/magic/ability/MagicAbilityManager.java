@@ -2152,7 +2152,7 @@ public final class MagicAbilityManager {
 				FROST_STAGE_STATES.remove(playerId);
 			}
 		}
-		clearFrostEffectsByCaster(playerId, false);
+		clearFrostEffectsByCaster(playerId, false, player.getEntityWorld().getServer());
 		removeFrostStageCasterBuffs(player);
 		if (activeAbility(player) == MagicAbility.BELOW_FREEZING) {
 			setActiveAbility(player, MagicAbility.NONE);
@@ -2240,7 +2240,9 @@ public final class MagicAbilityManager {
 			return false;
 		}
 
-		MagicConfig.FrostSlamConfig slamConfig = state.currentStage == 2 ? FROST_CONFIG.stageTwoSlam : FROST_CONFIG.stageThreeSlam;
+		int slamStage = MathHelper.clamp(state.currentStage, 2, 3);
+		MagicConfig.FrostSlamConfig slamConfig = slamStage == 3 ? FROST_CONFIG.stageThreeSlam : FROST_CONFIG.stageTwoSlam;
+		float slamDamage = slamConfig.trueDamage;
 		int manaCost = (int) Math.ceil(manaFromPercentExact(slamConfig.manaCostPercent));
 		if (!canSpendAbilityCost(player, manaCost)) {
 			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
@@ -2252,18 +2254,18 @@ public final class MagicAbilityManager {
 			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.PLANCK_HEAT, currentTick);
 		}
 		if (player.getEntityWorld() instanceof ServerWorld world) {
-			spawnFrostSlamParticles(world, player, slamConfig, state.currentStage == 3);
-			world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 1.1F, state.currentStage == 3 ? 0.45F : 0.8F);
+			spawnFrostSlamParticles(world, player, slamConfig, slamStage == 3);
+			world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 1.1F, slamStage == 3 ? 0.45F : 0.8F);
 		}
 		for (LivingEntity target : findLivingTargetsAround(player, slamConfig.radius)) {
 			if (target == player || !target.isAlive()) {
 				continue;
 			}
-			applyFrostActionDamage(player, target, slamConfig.trueDamage, false, FrostKillProgressType.SLAM);
+			applyFrostActionDamage(player, target, slamDamage, false, FrostKillProgressType.SLAM);
 			applyFrostStageHitEffects(player, target, currentTick);
 			applyFrostFreeze(target, player.getUuid(), currentTick + slamConfig.freezeDurationTicks);
 		}
-		if (state.currentStage == 2 && player.getRandom().nextDouble() * 100.0 < slamConfig.setbackChancePercent) {
+		if (slamStage == 2 && player.getRandom().nextDouble() * 100.0 < slamConfig.setbackChancePercent) {
 			applyFrostSetback(player, 1);
 		}
 		if (isBelowFrostThreshold(player)) {
@@ -2361,24 +2363,28 @@ public final class MagicAbilityManager {
 		Box burstBox = player.getBoundingBox().expand(burstRadius);
 		Predicate<Entity> filter = entity -> entity instanceof LivingEntity living && living.isAlive() && entity != player;
 		for (Entity entity : player.getEntityWorld().getOtherEntities(player, burstBox, filter)) {
-			if (entity instanceof ServerPlayerEntity otherPlayer && !otherPlayer.isSpectator()) {
-				FROST_PACKED_ICE_TARGETS.put(
-					otherPlayer.getUuid(),
-					new FrostPackedIceState(
-						otherPlayer.getEntityWorld().getRegistryKey(),
-						player.getUuid(),
-						otherPlayer.getX(),
-						otherPlayer.getY(),
-						otherPlayer.getZ(),
-						currentTick + FROST_CONFIG.maximum.packedIceDurationTicks,
-						currentTick
-					)
+			if (entity instanceof LivingEntity livingTarget) {
+				if (livingTarget instanceof PlayerEntity spectatorCheck && spectatorCheck.isSpectator()) {
+					continue;
+				}
+				FrostPackedIceState packedIceState = new FrostPackedIceState(
+					livingTarget.getEntityWorld().getRegistryKey(),
+					player.getUuid(),
+					livingTarget.getX(),
+					livingTarget.getY(),
+					livingTarget.getZ(),
+					currentTick + FROST_CONFIG.maximum.packedIceDurationTicks,
+					currentTick,
+					Math.max(0.7, livingTarget.getWidth() * 0.85),
+					Math.max(1.4, livingTarget.getHeight() + 0.4)
 				);
+				spawnFrostPackedIceEncasement(world, livingTarget, packedIceState);
+				FROST_PACKED_ICE_TARGETS.put(livingTarget.getUuid(), packedIceState);
 				world.spawnParticles(
 					new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
-					otherPlayer.getX(),
-					otherPlayer.getBodyY(0.5),
-					otherPlayer.getZ(),
+					livingTarget.getX(),
+					livingTarget.getBodyY(0.5),
+					livingTarget.getZ(),
 					22,
 					0.38,
 					0.72,
@@ -2436,12 +2442,21 @@ public final class MagicAbilityManager {
 		if (player == null) {
 			return;
 		}
+		MinecraftServer server = player.getEntityWorld().getServer();
 		if (clearCooldown) {
 			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.ABSOLUTE_ZERO, player.getEntityWorld().getServer().getTicks());
 		}
 		FROST_MAXIMUM_STATES.remove(player.getUuid());
 		FROST_MAXIMUM_FEAR_TARGETS.entrySet().removeIf(entry -> player.getUuid().equals(entry.getValue().casterId));
-		FROST_PACKED_ICE_TARGETS.entrySet().removeIf(entry -> player.getUuid().equals(entry.getValue().casterId));
+		Iterator<Map.Entry<UUID, FrostPackedIceState>> iterator = FROST_PACKED_ICE_TARGETS.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, FrostPackedIceState> entry = iterator.next();
+			if (!player.getUuid().equals(entry.getValue().casterId)) {
+				continue;
+			}
+			clearFrostPackedIceEncasement(server, entry.getValue(), false);
+			iterator.remove();
+		}
 		FROST_HELPLESS_TARGETS.entrySet().removeIf(entry -> player.getUuid().equals(entry.getValue().casterId));
 		if (activeAbility(player) == MagicAbility.ABSOLUTE_ZERO) {
 			setActiveAbility(player, MagicAbility.NONE);
@@ -2740,26 +2755,18 @@ public final class MagicAbilityManager {
 			FrostPackedIceState state = entry.getValue();
 			ServerWorld world = server.getWorld(state.dimension);
 			if (world == null) {
+				clearFrostPackedIceEncasement(server, state, false);
 				iterator.remove();
 				continue;
 			}
 			Entity entity = world.getEntity(entry.getKey());
 			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+				clearFrostPackedIceEncasement(world, state, false);
 				iterator.remove();
 				continue;
 			}
-			if (currentTick > state.expiresTick) {
-				world.spawnParticles(
-					new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
-					target.getX(),
-					target.getBodyY(0.5),
-					target.getZ(),
-					18,
-					0.45,
-					0.8,
-					0.45,
-					0.08
-				);
+			if (currentTick >= state.expiresTick) {
+				clearFrostPackedIceEncasement(world, state, true);
 				world.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.9F, 0.7F);
 				iterator.remove();
 				continue;
@@ -2811,14 +2818,32 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private static void clearFrostEffectsByCaster(UUID casterId, boolean clearMaximumEffects) {
+	private static void clearFrostEffectsByCaster(UUID casterId, boolean clearMaximumEffects, MinecraftServer server) {
 		FROST_SPIKE_WAVES.removeIf(state -> casterId.equals(state.casterId));
 		FROSTBITTEN_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
 		FROST_FROZEN_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
 		if (clearMaximumEffects) {
 			FROST_MAXIMUM_FEAR_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
-			FROST_PACKED_ICE_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
+			Iterator<Map.Entry<UUID, FrostPackedIceState>> iterator = FROST_PACKED_ICE_TARGETS.entrySet().iterator();
+			while (iterator.hasNext()) {
+				Map.Entry<UUID, FrostPackedIceState> entry = iterator.next();
+				if (!casterId.equals(entry.getValue().casterId)) {
+					continue;
+				}
+				clearFrostPackedIceEncasement(server, entry.getValue(), false);
+				iterator.remove();
+			}
 			FROST_HELPLESS_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
+		}
+	}
+
+	private static void clearFrostControlledTargetState(UUID targetId, MinecraftServer server) {
+		FROST_FROZEN_TARGETS.remove(targetId);
+		FROST_MAXIMUM_FEAR_TARGETS.remove(targetId);
+		FROST_HELPLESS_TARGETS.remove(targetId);
+		FrostPackedIceState packedIceState = FROST_PACKED_ICE_TARGETS.remove(targetId);
+		if (packedIceState != null) {
+			clearFrostPackedIceEncasement(server, packedIceState, false);
 		}
 	}
 
@@ -3280,6 +3305,106 @@ public final class MagicAbilityManager {
 				0.06
 			);
 		}
+	}
+
+	private static void spawnFrostPackedIceEncasement(ServerWorld world, LivingEntity target, FrostPackedIceState state) {
+		if (world == null) {
+			return;
+		}
+		state.encasementDisplayIds.clear();
+		double centerX = state.lockedX;
+		double centerY = state.lockedY + state.shellHeight * 0.5;
+		double centerZ = state.lockedZ;
+		double sideRadius = state.shellRadius;
+		double lowerY = -state.shellHeight * 0.28;
+		double middleY = 0.0;
+		double upperY = state.shellHeight * 0.28;
+		double topY = state.shellHeight * 0.56;
+		Vec3d[] offsets = {
+			new Vec3d(0.0, lowerY, 0.0),
+			new Vec3d(0.0, topY, 0.0),
+			new Vec3d(0.0, middleY, sideRadius),
+			new Vec3d(0.0, middleY, -sideRadius),
+			new Vec3d(sideRadius, middleY, 0.0),
+			new Vec3d(-sideRadius, middleY, 0.0),
+			new Vec3d(sideRadius * 0.72, upperY, sideRadius * 0.72),
+			new Vec3d(-sideRadius * 0.72, upperY, sideRadius * 0.72),
+			new Vec3d(sideRadius * 0.72, upperY, -sideRadius * 0.72),
+			new Vec3d(-sideRadius * 0.72, upperY, -sideRadius * 0.72),
+			new Vec3d(sideRadius * 0.72, lowerY * 0.35, sideRadius * 0.72),
+			new Vec3d(-sideRadius * 0.72, lowerY * 0.35, sideRadius * 0.72),
+			new Vec3d(sideRadius * 0.72, lowerY * 0.35, -sideRadius * 0.72),
+			new Vec3d(-sideRadius * 0.72, lowerY * 0.35, -sideRadius * 0.72)
+		};
+		float displayScale = (float) MathHelper.clamp(Math.max(0.92, Math.min(1.18, Math.max(target.getWidth(), 0.9))), 0.92, 1.18);
+		for (Vec3d offset : offsets) {
+			DisplayEntity.BlockDisplayEntity display = new DisplayEntity.BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
+			display.refreshPositionAndAngles(centerX + offset.x, centerY + offset.y, centerZ + offset.z, 0.0F, 0.0F);
+			((BlockDisplayEntityAccessorMixin) display).magic$setBlockState(Blocks.PACKED_ICE.getDefaultState());
+			((DisplayEntityAccessorMixin) display).magic$setTeleportDuration(1);
+			((DisplayEntityAccessorMixin) display).magic$setInterpolationDuration(1);
+			((DisplayEntityAccessorMixin) display).magic$setDisplayWidth(displayScale);
+			((DisplayEntityAccessorMixin) display).magic$setDisplayHeight(displayScale);
+			((DisplayEntityAccessorMixin) display).magic$setViewRange(2.5F);
+			display.setNoGravity(true);
+			display.setSilent(true);
+			display.setInvulnerable(true);
+			if (world.spawnEntity(display)) {
+				state.encasementDisplayIds.add(display.getUuid());
+			}
+		}
+	}
+
+	private static void clearFrostPackedIceEncasement(MinecraftServer server, FrostPackedIceState state, boolean spawnBreakEffects) {
+		if (server == null || state == null) {
+			return;
+		}
+		ServerWorld world = server.getWorld(state.dimension);
+		if (world != null) {
+			clearFrostPackedIceEncasement(world, state, spawnBreakEffects);
+		}
+	}
+
+	private static void clearFrostPackedIceEncasement(ServerWorld world, FrostPackedIceState state, boolean spawnBreakEffects) {
+		if (world == null || state == null) {
+			return;
+		}
+		boolean spawnedBreak = false;
+		for (UUID displayId : state.encasementDisplayIds) {
+			Entity displayEntity = world.getEntity(displayId);
+			if (displayEntity == null) {
+				continue;
+			}
+			if (spawnBreakEffects) {
+				world.spawnParticles(
+					new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
+					displayEntity.getX(),
+					displayEntity.getY(),
+					displayEntity.getZ(),
+					10,
+					0.12,
+					0.12,
+					0.12,
+					0.06
+				);
+				spawnedBreak = true;
+			}
+			displayEntity.discard();
+		}
+		if (spawnBreakEffects && !spawnedBreak) {
+			world.spawnParticles(
+				new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.PACKED_ICE.getDefaultState()),
+				state.lockedX,
+				state.lockedY + state.shellHeight * 0.5,
+				state.lockedZ,
+				24,
+				state.shellRadius * 0.8,
+				state.shellHeight * 0.4,
+				state.shellRadius * 0.8,
+				0.08
+			);
+		}
+		state.encasementDisplayIds.clear();
 	}
 
 	private static boolean isFrostEnemy(ServerPlayerEntity caster, LivingEntity target) {
@@ -4041,17 +4166,24 @@ public final class MagicAbilityManager {
 		}
 
 		MinecraftServer server = player.getEntityWorld().getServer();
+		boolean clashActive = DOMAIN_CLASHES_BY_OWNER.containsKey(player.getUuid());
 		ASTRAL_CATACLYSM_DOMAIN_STATES.remove(player.getUuid());
-		endOwnedDomain(player.getUuid(), state, server, server.getTicks());
+		endOwnedDomain(player.getUuid(), state, server, server.getTicks(), !clashActive);
 		persistDomainRuntimeState(server);
 		applyDomainInstabilityPenalty(player);
 		return true;
 	}
 
-	private static void endOwnedDomain(UUID ownerId, DomainExpansionState state, MinecraftServer server, int currentTick) {
+	private static void endOwnedDomain(
+		UUID ownerId,
+		DomainExpansionState state,
+		MinecraftServer server,
+		int currentTick,
+		boolean applySchoolCooldowns
+	) {
 		cancelDomainClash(ownerId, server);
 		restoreDomainExpansion(server, state);
-		startDomainCooldown(ownerId, state.ability, currentTick, state.cooldownMultiplier);
+		applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier, applySchoolCooldowns);
 	}
 
 	private static void restoreDomainExpansion(MinecraftServer server, DomainExpansionState state) {
@@ -4120,7 +4252,7 @@ public final class MagicAbilityManager {
 			}
 			cancelDomainClash(ownerId, server);
 			restoreDomainExpansion(server, state);
-			startDomainCooldown(ownerId, state.ability, currentTick, state.cooldownMultiplier);
+			applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier, true);
 			ASTRAL_CATACLYSM_DOMAIN_STATES.remove(ownerId);
 			iterator.remove();
 			changed = true;
@@ -5976,7 +6108,7 @@ public final class MagicAbilityManager {
 		} else {
 			DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.remove(playerId);
 			if (ownedDomain != null) {
-				endOwnedDomain(playerId, ownedDomain, server, server.getTicks());
+				endOwnedDomain(playerId, ownedDomain, server, server.getTicks(), true);
 				domainStateChanged = true;
 			}
 		}
@@ -12143,6 +12275,27 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static void applyDomainEndCooldowns(
+		UUID playerId,
+		MagicAbility domainAbility,
+		int currentTick,
+		double domainCooldownMultiplier,
+		boolean applySchoolCooldowns
+	) {
+		if (!applySchoolCooldowns) {
+			startDomainCooldown(playerId, domainAbility, currentTick, domainCooldownMultiplier);
+			return;
+		}
+
+		for (MagicAbility ability : abilitiesForSchool(domainAbility.school())) {
+			if (ability == domainAbility) {
+				startDomainCooldown(playerId, ability, currentTick, domainCooldownMultiplier);
+				continue;
+			}
+			startAbilityCooldownFromNow(playerId, ability, currentTick);
+		}
+	}
+
 	private static int domainCooldownTicks(MagicAbility ability) {
 		if (ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
 			return Math.max(0, FROST_DOMAIN_COOLDOWN_TICKS);
@@ -12577,6 +12730,10 @@ public final class MagicAbilityManager {
 		int innerHeight,
 		BlockPos pos
 	) {
+		if (ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
+			return resolveFrostDomainState(shell, pos, centerX, centerZ, baseY, radius, height);
+		}
+
 		if (ability == MagicAbility.ASTRAL_CATACLYSM) {
 			return resolveConstellationDomainState(shell, pos, centerX, centerZ, baseY, height, innerRadius, innerHeight);
 		}
@@ -12592,6 +12749,146 @@ public final class MagicAbilityManager {
 		}
 
 		return resolveLoveDomainInteriorState(pos, roseSide, relativeY, centerX, centerZ, innerRadius, innerHeight);
+	}
+
+	private static BlockState resolveFrostDomainState(
+		boolean shell,
+		BlockPos pos,
+		int centerX,
+		int centerZ,
+		int baseY,
+		int radius,
+		int height
+	) {
+		int relativeY = pos.getY() - baseY;
+		if (relativeY == 0) {
+			return resolveFrostDomainFloorState(pos, centerX, centerZ, radius);
+		}
+		if (!shell) {
+			return resolveFrostDomainInteriorState(pos, relativeY, centerX, centerZ, radius, height);
+		}
+		return resolveFrostDomainShellState(pos, centerX, centerZ, relativeY, height);
+	}
+
+	private static BlockState resolveFrostDomainShellState(
+		BlockPos pos,
+		int centerX,
+		int centerZ,
+		int relativeY,
+		int height
+	) {
+		int dx = Math.abs(pos.getX() - centerX);
+		int dz = Math.abs(pos.getZ() - centerZ);
+		int variant = Math.floorMod(decorHash(pos) + dx * 3 + dz * 5 + relativeY * 7, 12);
+		boolean topLayer = relativeY >= height - 2;
+		if (topLayer) {
+			if (variant < 5) {
+				return Blocks.BLUE_ICE.getDefaultState();
+			}
+			if (variant < 9) {
+				return Blocks.PACKED_ICE.getDefaultState();
+			}
+			return Blocks.ICE.getDefaultState();
+		}
+		if ((dx + dz + relativeY) % 7 == 0) {
+			return Blocks.BLUE_ICE.getDefaultState();
+		}
+		if (variant < 2) {
+			return Blocks.BLUE_ICE.getDefaultState();
+		}
+		if (variant < 8) {
+			return Blocks.PACKED_ICE.getDefaultState();
+		}
+		return Blocks.ICE.getDefaultState();
+	}
+
+	private static BlockState resolveFrostDomainFloorState(BlockPos pos, int centerX, int centerZ, int radius) {
+		int dx = Math.abs(pos.getX() - centerX);
+		int dz = Math.abs(pos.getZ() - centerZ);
+		if (isFrostDomainSnowflakeFloor(dx, dz, radius)) {
+			if (Math.max(dx, dz) <= 1) {
+				return Blocks.BLUE_ICE.getDefaultState();
+			}
+			if ((dx + dz) % 6 == 0 || dx == dz) {
+				return Blocks.WHITE_CONCRETE.getDefaultState();
+			}
+			return Blocks.SNOW_BLOCK.getDefaultState();
+		}
+		int variant = Math.floorMod(decorHash(pos) + dx * 3 + dz * 5, 8);
+		if (variant == 0) {
+			return Blocks.BLUE_ICE.getDefaultState();
+		}
+		if (variant <= 4) {
+			return Blocks.PACKED_ICE.getDefaultState();
+		}
+		return Blocks.ICE.getDefaultState();
+	}
+
+	private static BlockState resolveFrostDomainInteriorState(
+		BlockPos pos,
+		int relativeY,
+		int centerX,
+		int centerZ,
+		int innerRadius,
+		int innerHeight
+	) {
+		if (shouldPlaceFrostDomainLight(pos, relativeY, centerX, centerZ, innerRadius, innerHeight)) {
+			return LOVE_DOMAIN_LIGHT_STATE;
+		}
+		return DOMAIN_INTERIOR_BLOCK_STATE;
+	}
+
+	private static boolean isFrostDomainSnowflakeFloor(int dx, int dz, int radius) {
+		int armReach = Math.max(4, radius - 3);
+		int branchReach = Math.max(2, radius / 2);
+		boolean hub = dx + dz <= 2;
+		boolean axialArm = (dx == 0 && dz <= armReach) || (dz == 0 && dx <= armReach);
+		boolean diagonalArm = dx == dz && dx <= armReach - 1;
+		boolean axialBranch = (
+			dx <= 1
+				&& dz > 1
+				&& dz <= branchReach
+				&& dz % 3 == 0
+		) || (
+			dz <= 1
+				&& dx > 1
+				&& dx <= branchReach
+				&& dx % 3 == 0
+		);
+		boolean diagonalBranch = Math.abs(dx - dz) <= 1 && Math.max(dx, dz) <= branchReach && Math.max(dx, dz) % 3 == 0;
+		int radiusSq = dx * dx + dz * dz;
+		boolean ringAccent = radiusSq >= Math.max(4, (branchReach - 1) * (branchReach - 1))
+			&& radiusSq <= branchReach * branchReach
+			&& (dx == 0 || dz == 0 || dx == dz);
+		return hub || axialArm || diagonalArm || axialBranch || diagonalBranch || ringAccent;
+	}
+
+	private static boolean shouldPlaceFrostDomainLight(
+		BlockPos pos,
+		int relativeY,
+		int centerX,
+		int centerZ,
+		int innerRadius,
+		int innerHeight
+	) {
+		if (relativeY < 1 || relativeY > Math.max(1, innerHeight - 2)) {
+			return false;
+		}
+		if (relativeY != 1 && relativeY % 6 != 1) {
+			return false;
+		}
+
+		int dx = Math.abs(pos.getX() - centerX);
+		int dz = Math.abs(pos.getZ() - centerZ);
+		if (dx + dz <= 1) {
+			return true;
+		}
+		if (dx % 6 != 0 || dz % 6 != 0) {
+			return false;
+		}
+
+		int horizontalDistanceSq = horizontalDistanceSq(pos.getX(), centerX, pos.getZ(), centerZ);
+		return isInsideDomainDome(horizontalDistanceSq, relativeY, innerRadius, innerHeight);
 	}
 
 	private static BlockState resolveConstellationDomainState(
@@ -12802,6 +13099,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static void clearDeathAbilityState(ServerPlayerEntity player) {
+		clearFrostControlledTargetState(player.getUuid(), player.getEntityWorld().getServer());
 		MagicAbility activeAbility = activeAbility(player);
 		boolean martyrsFlameActive = MARTYRS_FLAME_PASSIVE_ENABLED.contains(player.getUuid());
 		if (activeAbility == MagicAbility.NONE && !martyrsFlameActive) {
@@ -13150,7 +13448,7 @@ public final class MagicAbilityManager {
 		if (ability == MagicAbility.BELOW_FREEZING) {
 			boolean removed = BELOW_FREEZING_COOLDOWN_END_TICK.remove(playerId) != null;
 			removed |= FROST_STAGE_STATES.remove(playerId) != null;
-			clearFrostEffectsByCaster(playerId, false);
+			clearFrostEffectsByCaster(playerId, false, player.getEntityWorld().getServer());
 			removeFrostStageCasterBuffs(player);
 			if (activeAbility(player) == MagicAbility.BELOW_FREEZING) {
 				setActiveAbility(player, MagicAbility.NONE);
@@ -13396,7 +13694,8 @@ public final class MagicAbilityManager {
 		FROST_STAGE_STATES.remove(playerId);
 		FROST_MAXIMUM_STATES.remove(playerId);
 		FROST_SPIKE_WAVES.removeIf(state -> playerId.equals(state.casterId));
-		clearFrostEffectsByCaster(playerId, true);
+		clearFrostEffectsByCaster(playerId, true, server);
+		clearFrostControlledTargetState(playerId, server);
 		DOMAIN_CLASH_PENDING_DAMAGE.remove(playerId);
 		MAGIC_DAMAGE_PENDING_ATTACKER.remove(playerId);
 		MAGIC_DAMAGE_PENDING_ATTACKER.entrySet().removeIf(entry -> entry.getValue().equals(playerId));
@@ -13505,6 +13804,8 @@ public final class MagicAbilityManager {
 		if (server == null) {
 			return;
 		}
+
+		clearFrostControlledTargetState(player.getUuid(), server);
 
 		if (PLUS_ULTRA_STATES.containsKey(player.getUuid()) || activeAbility(player) == MagicAbility.PLUS_ULTRA) {
 			endPlusUltra(player, server.getTicks(), PlusUltraEndMode.FULL, false);
@@ -14308,6 +14609,9 @@ public final class MagicAbilityManager {
 		private final double lockedZ;
 		private final int expiresTick;
 		private int nextDamageTick;
+		private final double shellRadius;
+		private final double shellHeight;
+		private final List<UUID> encasementDisplayIds;
 
 		private FrostPackedIceState(
 			RegistryKey<World> dimension,
@@ -14316,7 +14620,9 @@ public final class MagicAbilityManager {
 			double lockedY,
 			double lockedZ,
 			int expiresTick,
-			int nextDamageTick
+			int nextDamageTick,
+			double shellRadius,
+			double shellHeight
 		) {
 			this.dimension = dimension;
 			this.casterId = casterId;
@@ -14325,6 +14631,9 @@ public final class MagicAbilityManager {
 			this.lockedZ = lockedZ;
 			this.expiresTick = expiresTick;
 			this.nextDamageTick = nextDamageTick;
+			this.shellRadius = shellRadius;
+			this.shellHeight = shellHeight;
+			this.encasementDisplayIds = new ArrayList<>();
 		}
 	}
 
