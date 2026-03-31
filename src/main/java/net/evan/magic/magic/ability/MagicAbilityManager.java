@@ -136,8 +136,8 @@ public final class MagicAbilityManager {
 	private static double TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = 3.0;
 	private static int MANIPULATION_ACTIVATION_MANA_COST = 0;
 	private static int MANIPULATION_MANA_DRAIN_PER_SECOND = 0;
-	private static int PASSIVE_MANA_REGEN_PER_SECOND = 10;
-	private static int DEPLETED_RECOVERY_REGEN_PER_SECOND = 5;
+	private static int PASSIVE_MANA_REGEN_PER_SECOND = 2;
+	private static int DEPLETED_RECOVERY_REGEN_PER_SECOND = 1;
 	private static int EFFECT_REFRESH_TICKS = 40;
 	private static double SPOTLIGHT_DETECTION_RANGE = 48.0;
 	private static int SPOTLIGHT_EFFECT_REFRESH_TICKS = 10;
@@ -617,7 +617,7 @@ public final class MagicAbilityManager {
 	private static boolean MANIPULATION_DEBUG_LOGGING = true;
 	private static int DOMAIN_EXPANSION_ACTIVATION_MANA_COST = 0;
 	private static int DOMAIN_EXPANSION_DURATION_TICKS = 60 * TICKS_PER_SECOND;
-	private static int FROST_DOMAIN_COOLDOWN_TICKS = 60 * TICKS_PER_SECOND;
+	private static int FROST_DOMAIN_COOLDOWN_TICKS = 30 * 60 * TICKS_PER_SECOND;
 	private static int LOVE_DOMAIN_COOLDOWN_TICKS = 30 * 60 * TICKS_PER_SECOND;
 	private static int LOVE_AT_FIRST_SIGHT_PARTICLE_INTERVAL_TICKS = 8;
 	private static int LOVE_AT_FIRST_SIGHT_HEART_PARTICLES = 1;
@@ -697,6 +697,7 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, Integer> BELOW_FREEZING_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, Integer> FROST_ASCENT_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, Integer> FROST_MANA_REGEN_BLOCKED_END_TICK = new HashMap<>();
+	private static final Map<UUID, Double> MANA_REGEN_BUFFER = new HashMap<>();
 	private static final Map<UUID, Map<UUID, Integer>> ABSOLUTE_ZERO_NEXT_DAMAGE_TICK = new HashMap<>();
 	private static final Map<UUID, Integer> ABSOLUTE_ZERO_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, Integer> PLANCK_HEAT_COOLDOWN_END_TICK = new HashMap<>();
@@ -829,8 +830,8 @@ public final class MagicAbilityManager {
 		MANIPULATION_ACTIVATION_MANA_COST = Math.max(0, config.mana.emptyEmbraceActivationCost);
 		MANIPULATION_MANA_DRAIN_PER_SECOND = Math.max(0, config.mana.emptyEmbraceDrainPerSecond);
 		DOMAIN_EXPANSION_ACTIVATION_MANA_COST = config.mana.domainExpansionActivationCost;
-		PASSIVE_MANA_REGEN_PER_SECOND = config.mana.passiveRegenPerSecond;
-		DEPLETED_RECOVERY_REGEN_PER_SECOND = config.mana.depletedRecoveryRegenPerSecond;
+		PASSIVE_MANA_REGEN_PER_SECOND = MathHelper.clamp(config.mana.passiveRegenPerSecond, 0, 100);
+		DEPLETED_RECOVERY_REGEN_PER_SECOND = MathHelper.clamp(config.mana.depletedRecoveryRegenPerSecond, 0, 100);
 		PLANCK_HEAT_ACTIVATION_MANA_COST = 0;
 		BELOW_FREEZING_COOLDOWN_TICKS = FROST_CONFIG.stagedModeCooldownTicks;
 		FROST_ASCENT_COOLDOWN_TICKS = FROST_CONFIG.stageAdvanceCooldownTicks;
@@ -2056,6 +2057,18 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		FrostStageState stageState = FROST_STAGE_STATES.get(player.getUuid());
+		if (
+			activeAbility(player) != MagicAbility.BELOW_FREEZING
+			|| stageState == null
+			|| stageState.dimension != player.getEntityWorld().getRegistryKey()
+			|| stageState.currentStage != 3
+			|| frostMaximumUnlockRemainingTicks(stageState) > 0
+		) {
+			player.sendMessage(Text.translatable("message.magic.frost.maximum_not_unlocked"), true);
+			return;
+		}
+
 		activateFrostMaximum(player, currentTick);
 		recordOrionsGambitAbilityUse(player, MagicAbility.ABSOLUTE_ZERO);
 	}
@@ -2088,11 +2101,12 @@ public final class MagicAbilityManager {
 		UUID playerId = player.getUuid();
 		FrostStageState state = FROST_STAGE_STATES.get(playerId);
 		if (state == null) {
-			state = new FrostStageState(player.getEntityWorld().getRegistryKey(), 1, 1, 0);
+			state = new FrostStageState(player.getEntityWorld().getRegistryKey(), 1, 1, 0, 0);
 			FROST_STAGE_STATES.put(playerId, state);
 		} else {
 			state.dimension = player.getEntityWorld().getRegistryKey();
 			state.currentStage = 1;
+			state.stageThreeHoldTicks = 0;
 		}
 		setActiveAbility(player, MagicAbility.BELOW_FREEZING);
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
@@ -2132,6 +2146,7 @@ public final class MagicAbilityManager {
 		}
 		spawnFrostStageParticles(player, state.currentStage);
 		progressFrostStageUnlocks(player, state);
+		progressFrostMaximumUnlock(state);
 		syncFrostStageHud(player);
 	}
 
@@ -2147,6 +2162,7 @@ public final class MagicAbilityManager {
 		if (state != null) {
 			state.currentStage = 1;
 			state.progressTicks = 0;
+			state.stageThreeHoldTicks = 0;
 			state.dimension = player.getEntityWorld().getRegistryKey();
 			if (FROST_CONFIG.progression.clearUnlocksOnEnd || reason == FrostStageEndReason.FORCED_THRESHOLD || reason == FrostStageEndReason.OVERCAST) {
 				FROST_STAGE_STATES.remove(playerId);
@@ -2173,6 +2189,7 @@ public final class MagicAbilityManager {
 		}
 		state.currentStage = Math.min(3, state.currentStage + 1);
 		state.progressTicks = 0;
+		state.stageThreeHoldTicks = 0;
 		if (FROST_ASCENT_COOLDOWN_TICKS > 0) {
 			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.FROST_ASCENT, currentTick);
 		}
@@ -2206,20 +2223,19 @@ public final class MagicAbilityManager {
 		if (PLANCK_HEAT_COOLDOWN_TICKS > 0) {
 			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.PLANCK_HEAT, currentTick);
 		}
-		FROST_SPIKE_WAVES.add(
-			new FrostSpikeWaveState(
-				player.getUuid(),
-				player.getEntityWorld().getRegistryKey(),
-				new Vec3d(player.getX(), player.getY() + 0.1, player.getZ()),
-				direction,
-				FROST_CONFIG.rangedAttack.range,
-				(overcast ? FROST_CONFIG.rangedAttack.overcastSpeedBlocksPerSecond : FROST_CONFIG.rangedAttack.speedBlocksPerSecond) / TICKS_PER_SECOND,
-				FROST_CONFIG.rangedAttack.width,
-				FROST_CONFIG.rangedAttack.baseDamage,
-				state.currentStage,
-				overcast
-			)
+		FrostSpikeWaveState waveState = new FrostSpikeWaveState(
+			player.getUuid(),
+			player.getEntityWorld().getRegistryKey(),
+			new Vec3d(player.getX(), player.getY() + 0.1, player.getZ()),
+			direction,
+			FROST_CONFIG.rangedAttack.range,
+			(overcast ? FROST_CONFIG.rangedAttack.overcastSpeedBlocksPerSecond : FROST_CONFIG.rangedAttack.speedBlocksPerSecond) / TICKS_PER_SECOND,
+			FROST_CONFIG.rangedAttack.width,
+			FROST_CONFIG.rangedAttack.baseDamage,
+			state.currentStage,
+			overcast
 		);
+		FROST_SPIKE_WAVES.add(waveState);
 		if (player.getEntityWorld() instanceof ServerWorld world) {
 			world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.8F, overcast ? 0.5F : 0.9F);
 			world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_BEACON_POWER_SELECT, SoundCategory.PLAYERS, 0.9F, 1.6F);
@@ -2229,8 +2245,10 @@ public final class MagicAbilityManager {
 		}
 		if (overcast) {
 			endFrostStagedMode(player, currentTick, FrostStageEndReason.OVERCAST, true, false);
+			preserveFrostSpikeWave(waveState);
 		} else if (isBelowFrostThreshold(player)) {
 			endFrostStagedMode(player, currentTick, FrostStageEndReason.FORCED_THRESHOLD, true, false);
+			preserveFrostSpikeWave(waveState);
 		}
 	}
 
@@ -2266,10 +2284,7 @@ public final class MagicAbilityManager {
 			applyFrostFreeze(target, player.getUuid(), currentTick + slamConfig.freezeDurationTicks);
 		}
 		if (slamStage == 2 && player.getRandom().nextDouble() * 100.0 < slamConfig.setbackChancePercent) {
-			applyFrostSetback(player, 1);
-		}
-		if (isBelowFrostThreshold(player)) {
-			endFrostStagedMode(player, currentTick, FrostStageEndReason.FORCED_THRESHOLD, true, false);
+			applyFrostSetback(player, 1, slamConfig.setbackProgressPercent);
 		}
 		return true;
 	}
@@ -2514,6 +2529,22 @@ public final class MagicAbilityManager {
 		int nextProgress = FROST_CONFIG.progression.resetProgressOnSetback
 			? 0
 			: Math.min(state.progressTicks, Math.max(0, frostProgressRequirementTicks(Math.max(1, targetStage))));
+		applyFrostSetback(player, targetStage, nextProgress);
+	}
+
+	private static void applyFrostSetback(ServerPlayerEntity player, int targetStage, double progressPercent) {
+		int requirement = Math.max(0, frostProgressRequirementTicks(Math.max(1, targetStage)));
+		int nextProgress = requirement <= 0
+			? 0
+			: MathHelper.clamp((int) Math.round(requirement * (MathHelper.clamp(progressPercent, 0.0, 100.0) / 100.0)), 0, requirement);
+		applyFrostSetback(player, targetStage, nextProgress);
+	}
+
+	private static void applyFrostSetback(ServerPlayerEntity player, int targetStage, int nextProgress) {
+		FrostStageState state = FROST_STAGE_STATES.get(player.getUuid());
+		if (state == null) {
+			return;
+		}
 		if (targetStage <= 1) {
 			state.currentStage = 1;
 			state.highestUnlockedStage = 1;
@@ -2523,6 +2554,7 @@ public final class MagicAbilityManager {
 			state.highestUnlockedStage = Math.min(state.currentStage, 3);
 			state.progressTicks = nextProgress;
 		}
+		state.stageThreeHoldTicks = 0;
 		syncFrostStageHud(player);
 		player.sendMessage(Text.translatable("message.magic.frost.stage_setback", state.currentStage), true);
 	}
@@ -2621,6 +2653,20 @@ public final class MagicAbilityManager {
 			caster.sendMessage(Text.translatable("message.magic.frost.stage_unlocked", state.highestUnlockedStage), true);
 		}
 		syncFrostStageHud(caster);
+	}
+
+	private static void progressFrostMaximumUnlock(FrostStageState state) {
+		if (state == null) {
+			return;
+		}
+		if (state.currentStage != 3) {
+			state.stageThreeHoldTicks = 0;
+			return;
+		}
+		state.stageThreeHoldTicks = Math.min(
+			FROST_CONFIG.progression.maximumUnlockTicks,
+			Math.max(0, state.stageThreeHoldTicks) + 1
+		);
 	}
 
 	private static void applyFrostFreeze(LivingEntity target, UUID casterId, int expiresTick) {
@@ -2837,6 +2883,13 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static void preserveFrostSpikeWave(FrostSpikeWaveState waveState) {
+		if (waveState == null || waveState.travelled >= waveState.range || FROST_SPIKE_WAVES.contains(waveState)) {
+			return;
+		}
+		FROST_SPIKE_WAVES.add(waveState);
+	}
+
 	private static void clearFrostControlledTargetState(UUID targetId, MinecraftServer server) {
 		FROST_FROZEN_TARGETS.remove(targetId);
 		FROST_MAXIMUM_FEAR_TARGETS.remove(targetId);
@@ -2889,6 +2942,13 @@ public final class MagicAbilityManager {
 		};
 	}
 
+	private static int frostMaximumUnlockRemainingTicks(FrostStageState state) {
+		if (state == null || state.currentStage != 3) {
+			return Math.max(0, FROST_CONFIG.progression.maximumUnlockTicks);
+		}
+		return Math.max(0, FROST_CONFIG.progression.maximumUnlockTicks - Math.max(0, state.stageThreeHoldTicks));
+	}
+
 	private static MagicConfig.FrostStageConfig frostStageConfig(int stage) {
 		return switch (stage) {
 			case 2 -> FROST_CONFIG.stageTwo;
@@ -2900,6 +2960,13 @@ public final class MagicAbilityManager {
 	private static boolean isBelowFrostThreshold(ServerPlayerEntity player) {
 		double threshold = MagicPlayerData.MAX_MANA * (FROST_CONFIG.stagedModeForceEndThresholdPercent / 100.0);
 		return MagicPlayerData.getMana(player) < Math.ceil(threshold);
+	}
+
+	private static String formatTicksAsMinutesSeconds(int ticks) {
+		int totalSeconds = Math.max(0, (ticks + TICKS_PER_SECOND - 1) / TICKS_PER_SECOND);
+		int minutes = totalSeconds / 60;
+		int seconds = totalSeconds % 60;
+		return minutes + ":" + (seconds < 10 ? "0" + seconds : Integer.toString(seconds));
 	}
 
 	private static void spawnFrostStageParticles(ServerPlayerEntity player, int stage) {
@@ -3056,8 +3123,15 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		int requiredTicks = frostProgressRequirementTicks(state.currentStage);
-		int progressTicks = requiredTicks > 0 ? Math.min(state.progressTicks, requiredTicks) : 0;
+		int requiredTicks;
+		int progressTicks;
+		if (state.currentStage >= 3 && FROST_CONFIG.maximum.enabled) {
+			requiredTicks = Math.max(0, FROST_CONFIG.progression.maximumUnlockTicks);
+			progressTicks = requiredTicks > 0 ? Math.min(Math.max(0, state.stageThreeHoldTicks), requiredTicks) : 0;
+		} else {
+			requiredTicks = frostProgressRequirementTicks(state.currentStage);
+			progressTicks = requiredTicks > 0 ? Math.min(state.progressTicks, requiredTicks) : 0;
+		}
 		MagicPlayerData.setFrostStageHud(
 			player,
 			true,
@@ -3081,13 +3155,14 @@ public final class MagicAbilityManager {
 		PLANCK_HEAT_COOLDOWN_END_TICK.remove(playerId);
 		FrostStageState state = FROST_STAGE_STATES.get(playerId);
 		if (state == null) {
-			state = new FrostStageState(player.getEntityWorld().getRegistryKey(), 1, 1, 0);
+			state = new FrostStageState(player.getEntityWorld().getRegistryKey(), 1, 1, 0, 0);
 			FROST_STAGE_STATES.put(playerId, state);
 		}
 		state.dimension = player.getEntityWorld().getRegistryKey();
 		state.currentStage = MathHelper.clamp(state.currentStage, 1, 3);
 		state.highestUnlockedStage = MathHelper.clamp(Math.max(state.currentStage, state.highestUnlockedStage), 1, 3);
 		state.progressTicks = Math.max(0, state.progressTicks);
+		state.stageThreeHoldTicks = Math.max(0, state.stageThreeHoldTicks);
 		removeFrostStageCasterBuffs(player);
 		setActiveAbility(player, MagicAbility.BELOW_FREEZING);
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
@@ -5422,6 +5497,7 @@ public final class MagicAbilityManager {
 		BELOW_FREEZING_COOLDOWN_END_TICK.clear();
 		FROST_ASCENT_COOLDOWN_END_TICK.clear();
 		FROST_MANA_REGEN_BLOCKED_END_TICK.clear();
+		MANA_REGEN_BUFFER.clear();
 		MARTYRS_FLAME_PASSIVE_ENABLED.clear();
 		MARTYRS_FLAME_COOLDOWN_END_TICK.clear();
 		MARTYRS_FLAME_DRAIN_BUFFER.clear();
@@ -6086,6 +6162,7 @@ public final class MagicAbilityManager {
 
 		UUID playerId = player.getUuid();
 		MARTYRS_FLAME_BURNING_TARGETS.remove(playerId);
+		MANA_REGEN_BUFFER.remove(playerId);
 		clearDeathAbilityState(player);
 		MagicPlayerData.clearDomainTimer(player);
 		deactivateCassiopeia(player, true);
@@ -6136,6 +6213,7 @@ public final class MagicAbilityManager {
 			TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
 			MARTYRS_FLAME_DRAIN_BUFFER.remove(playerId);
 			ORIONS_GAMBIT_DRAIN_BUFFER.remove(playerId);
+			MANA_REGEN_BUFFER.remove(playerId);
 			LOVE_POWER_ACTIVE_THIS_SECOND.put(playerId, false);
 			MagicPlayerData.setMana(player, MagicPlayerData.MAX_MANA);
 			MagicPlayerData.setDepletedRecoveryMode(player, false);
@@ -6332,12 +6410,30 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		UUID playerId = player.getUuid();
 		boolean depletedMode = MagicPlayerData.isInDepletedRecoveryMode(player);
-		int regenAmount = depletedMode ? DEPLETED_RECOVERY_REGEN_PER_SECOND : PASSIVE_MANA_REGEN_PER_SECOND;
+		if (currentMana >= MagicPlayerData.MAX_MANA) {
+			MANA_REGEN_BUFFER.remove(playerId);
+			if (depletedMode) {
+				MagicPlayerData.setDepletedRecoveryMode(player, false);
+			}
+			return;
+		}
+
+		double regenPercent = depletedMode ? DEPLETED_RECOVERY_REGEN_PER_SECOND : PASSIVE_MANA_REGEN_PER_SECOND;
+		double bufferedRegen = MANA_REGEN_BUFFER.getOrDefault(playerId, 0.0) + manaFromPercentExact(regenPercent);
+		int regenAmount = Math.max(0, (int) Math.floor(bufferedRegen + 1.0E-7));
+		double remainingRegen = Math.max(0.0, bufferedRegen - regenAmount);
+		if (remainingRegen > 1.0E-7) {
+			MANA_REGEN_BUFFER.put(playerId, remainingRegen);
+		} else {
+			MANA_REGEN_BUFFER.remove(playerId);
+		}
 		int nextMana = Math.min(MagicPlayerData.MAX_MANA, currentMana + regenAmount);
 		MagicPlayerData.setMana(player, nextMana);
 
 		if (depletedMode && nextMana >= MagicPlayerData.MAX_MANA) {
+			MANA_REGEN_BUFFER.remove(playerId);
 			MagicPlayerData.setDepletedRecoveryMode(player, false);
 		}
 	}
@@ -9766,6 +9862,7 @@ public final class MagicAbilityManager {
 		state.currentStage = clampedStage;
 		state.highestUnlockedStage = clampedStage;
 		state.progressTicks = 0;
+		state.stageThreeHoldTicks = 0;
 		syncFrostStageHud(player);
 		return 1;
 	}
@@ -9788,6 +9885,7 @@ public final class MagicAbilityManager {
 		state.currentStage = Math.min(3, state.currentStage + 1);
 		state.highestUnlockedStage = Math.max(state.highestUnlockedStage, state.currentStage);
 		state.progressTicks = 0;
+		state.stageThreeHoldTicks = 0;
 		syncFrostStageHud(player);
 		return 1;
 	}
@@ -12788,7 +12886,7 @@ public final class MagicAbilityManager {
 			if (variant < 9) {
 				return Blocks.PACKED_ICE.getDefaultState();
 			}
-			return Blocks.ICE.getDefaultState();
+			return Blocks.PACKED_ICE.getDefaultState();
 		}
 		if ((dx + dz + relativeY) % 7 == 0) {
 			return Blocks.BLUE_ICE.getDefaultState();
@@ -12799,7 +12897,7 @@ public final class MagicAbilityManager {
 		if (variant < 8) {
 			return Blocks.PACKED_ICE.getDefaultState();
 		}
-		return Blocks.ICE.getDefaultState();
+		return Blocks.PACKED_ICE.getDefaultState();
 	}
 
 	private static BlockState resolveFrostDomainFloorState(BlockPos pos, int centerX, int centerZ, int radius) {
@@ -12821,7 +12919,7 @@ public final class MagicAbilityManager {
 		if (variant <= 4) {
 			return Blocks.PACKED_ICE.getDefaultState();
 		}
-		return Blocks.ICE.getDefaultState();
+		return Blocks.PACKED_ICE.getDefaultState();
 	}
 
 	private static BlockState resolveFrostDomainInteriorState(
@@ -13512,6 +13610,7 @@ public final class MagicAbilityManager {
 			removed |= FROST_MAXIMUM_STATES.remove(playerId) != null;
 			clearFrostMaximumState(player, false);
 			FROST_MANA_REGEN_BLOCKED_END_TICK.remove(playerId);
+			MANA_REGEN_BUFFER.remove(playerId);
 			return removed ? 1 : 0;
 		}
 
@@ -13681,6 +13780,7 @@ public final class MagicAbilityManager {
 		ORIONS_GAMBIT_COOLDOWN_END_TICK.remove(playerId);
 		ABSOLUTE_ZERO_COOLDOWN_END_TICK.remove(playerId);
 		FROST_MANA_REGEN_BLOCKED_END_TICK.remove(playerId);
+		MANA_REGEN_BUFFER.remove(playerId);
 		PLANCK_HEAT_COOLDOWN_END_TICK.remove(playerId);
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.remove(playerId);
 		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
@@ -14469,12 +14569,14 @@ public final class MagicAbilityManager {
 		private int currentStage;
 		private int highestUnlockedStage;
 		private int progressTicks;
+		private int stageThreeHoldTicks;
 
-		private FrostStageState(RegistryKey<World> dimension, int currentStage, int highestUnlockedStage, int progressTicks) {
+		private FrostStageState(RegistryKey<World> dimension, int currentStage, int highestUnlockedStage, int progressTicks, int stageThreeHoldTicks) {
 			this.dimension = dimension;
 			this.currentStage = currentStage;
 			this.highestUnlockedStage = highestUnlockedStage;
 			this.progressTicks = progressTicks;
+			this.stageThreeHoldTicks = stageThreeHoldTicks;
 		}
 	}
 

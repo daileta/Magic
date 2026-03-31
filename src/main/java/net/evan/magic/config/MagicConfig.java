@@ -388,6 +388,7 @@ public final class MagicConfig {
 				abilityAccess = new AbilityAccessConfig();
 			}
 
+			mana.normalize();
 			martyrsFlame.normalize();
 			loveAtFirstSight.normalize();
 			jesterSpotlight.normalize();
@@ -423,6 +424,21 @@ public final class MagicConfig {
 		public int passiveRegenPerSecond = 2;
 		public int depletedRecoveryRegenPerSecond = 1;
 		public int planckHeatActivationCost = 75;
+
+		private void normalize() {
+			belowFreezingDrainPerSecond = Math.max(0, belowFreezingDrainPerSecond);
+			absoluteZeroDrainPerSecond = Math.max(0, absoluteZeroDrainPerSecond);
+			loveAtFirstSightIdleDrainPerSecond = Math.max(0, loveAtFirstSightIdleDrainPerSecond);
+			loveAtFirstSightActiveDrainPerSecond = Math.max(0, loveAtFirstSightActiveDrainPerSecond);
+			martyrsFlameDrainPercentPerSecond = MathHelper.clamp(martyrsFlameDrainPercentPerSecond, 0.0, 100.0);
+			tillDeathDoUsPartDrainPercentPerSecond = MathHelper.clamp(tillDeathDoUsPartDrainPercentPerSecond, 0.0, 100.0);
+			emptyEmbraceActivationCost = Math.max(0, emptyEmbraceActivationCost);
+			emptyEmbraceDrainPerSecond = Math.max(0, emptyEmbraceDrainPerSecond);
+			domainExpansionActivationCost = Math.max(0, domainExpansionActivationCost);
+			passiveRegenPerSecond = MathHelper.clamp(passiveRegenPerSecond, 0, 100);
+			depletedRecoveryRegenPerSecond = MathHelper.clamp(depletedRecoveryRegenPerSecond, 0, 100);
+			planckHeatActivationCost = Math.max(0, planckHeatActivationCost);
+		}
 	}
 
 	public static final class TimingConfig {
@@ -451,7 +467,6 @@ public final class MagicConfig {
 		@SerializedName(value = "emptyEmbraceRequestDebounceTicks", alternate = { "manipulationRequestDebounceTicks" })
 		public int emptyEmbraceRequestDebounceTicks = 6;
 		public int domainExpansionDurationTicks = 1200;
-		public int frostDomainCooldownTicks = 36000;
 		public int loveDomainCooldownTicks = 36000;
 		public int domainClashRegenerationRefreshTicks = 40;
 	}
@@ -2354,6 +2369,7 @@ public final class MagicConfig {
 			config.trueDamage = 3.0F;
 			config.manaCostPercent = 45.0;
 			config.setbackChancePercent = 10.0;
+			config.setbackProgressPercent = 50.0;
 			config.particleCount = 42;
 			config.groundRingRadius = 5.0;
 			config.hazeDensity = 24;
@@ -2368,6 +2384,7 @@ public final class MagicConfig {
 			config.trueDamage = 7.0F;
 			config.manaCostPercent = 45.0;
 			config.setbackChancePercent = 0.0;
+			config.setbackProgressPercent = 0.0;
 			config.particleCount = 68;
 			config.groundRingRadius = 10.0;
 			config.hazeDensity = 36;
@@ -2382,6 +2399,8 @@ public final class MagicConfig {
 		public boolean showFinalStageText = true;
 		public String timerLabelFormat = "Stage %stage% in %time%";
 		public String readyLabelFormat = "Stage %stage% Ready";
+		public String maximumTimerLabelFormat = "Maximum in %time%";
+		public String maximumReadyLabelFormat = "Maximum Ready";
 		public String finalStageText = "Final Stage";
 		public String textColorHex = "#FFFFFF";
 		public String outlineColorHex = "#000000";
@@ -2392,6 +2411,12 @@ public final class MagicConfig {
 			}
 			if (readyLabelFormat == null) {
 				readyLabelFormat = "Stage %stage% Ready";
+			}
+			if (maximumTimerLabelFormat == null) {
+				maximumTimerLabelFormat = "Maximum in %time%";
+			}
+			if (maximumReadyLabelFormat == null) {
+				maximumReadyLabelFormat = "Maximum Ready";
 			}
 			if (finalStageText == null) {
 				finalStageText = "Final Stage";
@@ -2489,6 +2514,7 @@ public final class MagicConfig {
 		public float trueDamage = 0.0F;
 		public double manaCostPercent = 0.0;
 		public double setbackChancePercent = 0.0;
+		public double setbackProgressPercent = 0.0;
 		public int particleCount = 18;
 		public double groundRingRadius = 0.0;
 		public int hazeDensity = 12;
@@ -2500,6 +2526,7 @@ public final class MagicConfig {
 			trueDamage = Math.max(0.0F, trueDamage);
 			manaCostPercent = MathHelper.clamp(manaCostPercent, 0.0, 100.0);
 			setbackChancePercent = MathHelper.clamp(setbackChancePercent, 0.0, 100.0);
+			setbackProgressPercent = MathHelper.clamp(setbackProgressPercent, 0.0, 100.0);
 			particleCount = Math.max(0, particleCount);
 			groundRingRadius = Math.max(0.0, groundRingRadius);
 			hazeDensity = Math.max(0, hazeDensity);
@@ -2581,7 +2608,7 @@ public final class MagicConfig {
 		public int radius = 25;
 		public int height = 25;
 		public int shellThickness = 1;
-		public int cooldownTicks = 60 * 20;
+		public int cooldownTicks = 30 * 60 * 20;
 		public int startupTicks = 0;
 		public int pulseIntervalTicks = 6 * 20;
 		public int pulseDurationTicks = 6 * 20;

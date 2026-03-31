@@ -46,11 +46,12 @@ public final class ManaHudOverlay {
 	private static final int INSTRUCTION_LINE_SPACING = 14;
 	private static final int INSTRUCTION_COLOR = 0xFFFF3A3A;
 	private static final int OUTLINE_COLOR = 0xFF000000;
-	private static final int FROST_DOMAIN_TIMER_COLOR = 0x00FFFF;
+	private static final int FROST_DOMAIN_TIMER_COLOR = 0xFF00FFFF;
 	private static final int DOMAIN_TIMER_SECONDARY_COLOR = 0xFFF7D76E;
 	private static final int FROST_COLOR = 0x66CCFF;
 	private static final int FROST_HUD_TEXT_COLOR = 0xFFFFFF;
 	private static final int FROST_OUTLINE_COLOR = 0xFF000000;
+	private static final int FROST_STAGE_HUD_BACKGROUND = 0x70000000;
 	private static final int LOVE_COLOR = 0xFF77CC;
 	private static final int BURNING_PASSION_COLOR = 0xFF8A3D;
 	private static final int JESTER_COLOR = 0xFFD54A;
@@ -112,7 +113,6 @@ public final class ManaHudOverlay {
 		int y = drawContext.getScaledWindowHeight() - 63;
 		renderDomainTimerOverlay(drawContext, client);
 		renderDomainClashHud(drawContext, client, x, y);
-		renderFrostStageHud(drawContext, client, x + BAR_WIDTH / 2, y - (MagicPlayerData.isDomainClashActive(client.player) ? 18 : 10));
 		drawContext.drawGuiTexture(RenderPipelines.GUI_TEXTURED, WITHER_BAR_BACKGROUND, x, y, BAR_WIDTH, BAR_HEIGHT);
 
 		if (filledWidth > 0) {
@@ -136,6 +136,8 @@ public final class ManaHudOverlay {
 		int textY = drawContext.getScaledWindowHeight() - 18;
 		if (school == MagicSchool.GREED) {
 			renderGreedCoins(drawContext, client, textY);
+		} else if (school == MagicSchool.FROST) {
+			renderFrostStageHud(drawContext, client, textY);
 		}
 		drawContext.drawTextWithShadow(client.textRenderer, schoolName, textX, textY, colorForSchool(school));
 	}
@@ -323,34 +325,49 @@ public final class ManaHudOverlay {
 		renderInstructions(drawContext, client, centerX, centerY, instructionVisibility / 100.0F);
 	}
 
-	private static void renderFrostStageHud(DrawContext drawContext, MinecraftClient client, int centerX, int y) {
+	private static void renderFrostStageHud(DrawContext drawContext, MinecraftClient client, int schoolTextY) {
 		if (client.player == null || MagicPlayerData.getSchool(client.player) != MagicSchool.FROST) {
 			return;
 		}
-		if (!MagicPlayerData.isFrostStageActive(client.player)) {
-			return;
-		}
-
 		MagicConfig.FrostHudConfig hud = MagicConfig.get().frost.hud;
 		int currentStage = MagicPlayerData.getFrostStage(client.player);
 		int highestUnlockedStage = MagicPlayerData.getFrostHighestUnlockedStage(client.player);
 		int progressTicks = MagicPlayerData.getFrostStageProgressTicks(client.player);
 		int requiredTicks = MagicPlayerData.getFrostStageRequiredTicks(client.player);
+		if (
+			!MagicPlayerData.isFrostStageActive(client.player)
+			&& currentStage <= 0
+			&& highestUnlockedStage <= 0
+			&& progressTicks <= 0
+			&& requiredTicks <= 0
+		) {
+			return;
+		}
 		Text line = frostStageHudText(hud, currentStage, highestUnlockedStage, progressTicks, requiredTicks);
 		if (line == null) {
 			return;
 		}
 
-		drawCenteredScaledOutlinedText(
-			drawContext,
-			client,
-			line.copy().formatted(Formatting.BOLD),
-			centerX,
-			y,
-			1.0F,
-			parseHexColor(hud.textColorHex, FROST_HUD_TEXT_COLOR),
-			parseHexColor(hud.outlineColorHex, FROST_OUTLINE_COLOR)
+		String displayLine = line.getString();
+		if (displayLine.isBlank()) {
+			return;
+		}
+
+		int lineWidth = client.textRenderer.getWidth(displayLine);
+		int lineX = drawContext.getScaledWindowWidth() - lineWidth - GREED_COINS_MARGIN - GREED_COINS_BOX_PADDING_X;
+		int lineY = schoolTextY - client.textRenderer.fontHeight - GREED_COINS_SCHOOL_GAP;
+		int textColor = withOpaqueAlpha(
+			ensureReadableHudColor(parseHexColor(hud.textColorHex, FROST_HUD_TEXT_COLOR), FROST_HUD_TEXT_COLOR)
 		);
+		int outlineColor = withOpaqueAlpha(parseHexColor(hud.outlineColorHex, FROST_OUTLINE_COLOR));
+		drawContext.fill(
+			lineX - GREED_COINS_BOX_PADDING_X,
+			lineY - GREED_COINS_BOX_PADDING_Y,
+			lineX + lineWidth + GREED_COINS_BOX_PADDING_X,
+			lineY + client.textRenderer.fontHeight + GREED_COINS_BOX_PADDING_Y,
+			FROST_STAGE_HUD_BACKGROUND
+		);
+		drawOutlinedText(drawContext, client, Text.literal(displayLine), lineX, lineY, textColor, outlineColor);
 	}
 
 	private static void renderInstructions(DrawContext drawContext, MinecraftClient client, int centerX, int centerY, float alpha) {
@@ -446,6 +463,22 @@ public final class ManaHudOverlay {
 		int requiredTicks
 	) {
 		if (currentStage >= 3) {
+			if (requiredTicks > 0) {
+				int clampedProgress = Math.min(progressTicks, requiredTicks);
+				if (clampedProgress >= requiredTicks) {
+					if (!hud.readyTextEnabled) {
+						return null;
+					}
+					String fallback = Text.translatable("overlay.magic.frost.maximum.ready").getString();
+					return Text.literal(formatFrostHudText(hud.maximumReadyLabelFormat, fallback, null));
+				}
+				if (!hud.timerEnabled) {
+					return null;
+				}
+				String timeText = formatRemainingTime(Math.max(0, requiredTicks - clampedProgress));
+				String fallback = Text.translatable("overlay.magic.frost.maximum.timer", timeText).getString();
+				return Text.literal(formatFrostHudText(hud.maximumTimerLabelFormat, fallback, timeText));
+			}
 			if (!hud.showFinalStageText) {
 				return null;
 			}
@@ -679,6 +712,21 @@ public final class ManaHudOverlay {
 		return value.isBlank() ? fallback : value;
 	}
 
+	private static String formatFrostHudText(String template, String fallback, String time) {
+		if (template == null || template.isBlank()) {
+			return fallback;
+		}
+		String value = template.replace("%time%", time == null ? "" : time);
+		if (value.contains("%s")) {
+			try {
+				value = time == null ? value.formatted() : value.formatted(time);
+			} catch (RuntimeException exception) {
+				return fallback;
+			}
+		}
+		return value.isBlank() ? fallback : value;
+	}
+
 	private static int parseHexColor(String rawColor, int fallbackColor) {
 		if (rawColor == null || rawColor.isBlank()) {
 			return fallbackColor;
@@ -698,6 +746,20 @@ public final class ManaHudOverlay {
 		} catch (NumberFormatException exception) {
 			return fallbackColor;
 		}
+	}
+
+	private static int ensureReadableHudColor(int color, int fallbackColor) {
+		int red = (color >> 16) & 0xFF;
+		int green = (color >> 8) & 0xFF;
+		int blue = color & 0xFF;
+		if (red + green + blue < 96) {
+			return fallbackColor;
+		}
+		return color;
+	}
+
+	private static int withOpaqueAlpha(int color) {
+		return 0xFF000000 | (color & 0x00FFFFFF);
 	}
 
 	private static void resetDomainClashVisualState() {
@@ -740,7 +802,7 @@ public final class ManaHudOverlay {
 	}
 
 	private static int colorForSchool(MagicSchool school) {
-		return switch (school) {
+		return withOpaqueAlpha(switch (school) {
 			case FROST -> FROST_COLOR;
 			case LOVE -> LOVE_COLOR;
 			case BURNING_PASSION -> BURNING_PASSION_COLOR;
@@ -748,6 +810,6 @@ public final class ManaHudOverlay {
 			case CONSTELLATION -> CONSTELLATION_COLOR;
 			case GREED -> GREED_COLOR;
 			default -> 0xFFFFFF;
-		};
+		});
 	}
 }
