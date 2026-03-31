@@ -451,7 +451,7 @@ public final class MagicConfig {
 		@SerializedName(value = "emptyEmbraceRequestDebounceTicks", alternate = { "manipulationRequestDebounceTicks" })
 		public int emptyEmbraceRequestDebounceTicks = 6;
 		public int domainExpansionDurationTicks = 1200;
-		public int frostDomainCooldownTicks = 1200;
+		public int frostDomainCooldownTicks = 36000;
 		public int loveDomainCooldownTicks = 36000;
 		public int domainClashRegenerationRefreshTicks = 40;
 	}
@@ -2408,6 +2408,7 @@ public final class MagicConfig {
 	public static final class FrostProgressConfig {
 		public int stageTwoUnlockTicks = 2 * 60 * 20;
 		public int stageThreeUnlockTicks = 3 * 60 * 20;
+		public int maximumUnlockTicks = 5 * 60 * 20;
 		public int rangedKillProgressTicks = 2 * 60 * 20;
 		public int slamKillProgressTicks = 60 * 20;
 		public boolean clearUnlocksOnEnd = true;
@@ -2417,6 +2418,7 @@ public final class MagicConfig {
 		private void normalize() {
 			stageTwoUnlockTicks = Math.max(1, stageTwoUnlockTicks);
 			stageThreeUnlockTicks = Math.max(1, stageThreeUnlockTicks);
+			maximumUnlockTicks = Math.max(1, maximumUnlockTicks);
 			rangedKillProgressTicks = Math.max(0, rangedKillProgressTicks);
 			slamKillProgressTicks = Math.max(0, slamKillProgressTicks);
 		}
@@ -2449,12 +2451,12 @@ public final class MagicConfig {
 	public static final class FrostRangedAttackConfig {
 		public double width = 1.0;
 		public double range = 40.0;
-		public double speedBlocksPerSecond = 1.5;
+		public double speedBlocksPerSecond = 5;
 		public float baseDamage = 5.0F;
 		public double normalManaCostPercent = 25.0;
 		public double overcastChancePercent = 20.0;
 		public double overcastManaCostPercent = 75.0;
-		public double overcastSpeedBlocksPerSecond = 2.5;
+		public double overcastSpeedBlocksPerSecond = 15;
 		public boolean instantKillEnabled = true;
 		public double setbackChancePercent = 10.0;
 		public double particleSpacing = 0.35;

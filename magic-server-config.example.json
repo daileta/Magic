@@ -37,7 +37,7 @@
     "emptyEmbraceCooldownTicks": 6000,
     "emptyEmbraceRequestDebounceTicks": 6,
     "domainExpansionDurationTicks": 1200,
-    "frostDomainCooldownTicks": 1200,
+    "frostDomainCooldownTicks": 36000,
     "loveDomainCooldownTicks": 36000,
     "domainClashRegenerationRefreshTicks": 40
   },
