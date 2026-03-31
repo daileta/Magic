@@ -4241,9 +4241,8 @@ public final class MagicAbilityManager {
 		}
 
 		MinecraftServer server = player.getEntityWorld().getServer();
-		boolean clashActive = DOMAIN_CLASHES_BY_OWNER.containsKey(player.getUuid());
 		ASTRAL_CATACLYSM_DOMAIN_STATES.remove(player.getUuid());
-		endOwnedDomain(player.getUuid(), state, server, server.getTicks(), !clashActive);
+		endOwnedDomain(player.getUuid(), state, server, server.getTicks());
 		persistDomainRuntimeState(server);
 		applyDomainInstabilityPenalty(player);
 		return true;
@@ -4253,12 +4252,11 @@ public final class MagicAbilityManager {
 		UUID ownerId,
 		DomainExpansionState state,
 		MinecraftServer server,
-		int currentTick,
-		boolean applySchoolCooldowns
+		int currentTick
 	) {
 		cancelDomainClash(ownerId, server);
 		restoreDomainExpansion(server, state);
-		applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier, applySchoolCooldowns);
+		applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier);
 	}
 
 	private static void restoreDomainExpansion(MinecraftServer server, DomainExpansionState state) {
@@ -4327,7 +4325,7 @@ public final class MagicAbilityManager {
 			}
 			cancelDomainClash(ownerId, server);
 			restoreDomainExpansion(server, state);
-			applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier, true);
+			applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier);
 			ASTRAL_CATACLYSM_DOMAIN_STATES.remove(ownerId);
 			iterator.remove();
 			changed = true;
@@ -4525,7 +4523,7 @@ public final class MagicAbilityManager {
 		DOMAIN_EXPANSIONS.remove(ownerId);
 		cancelDomainClash(ownerId, server);
 		restoreDomainExpansion(server, ownerState);
-		startDomainCooldown(ownerId, ownerState.ability, currentTick, 1.0);
+		applyDomainEndCooldowns(ownerId, ownerState.ability, currentTick, 1.0);
 
 		ServerPlayerEntity ownerPlayer = server.getPlayerManager().getPlayer(ownerId);
 		if (ownerPlayer != null && activeAbility(ownerPlayer) == ownerState.ability) {
@@ -4737,7 +4735,7 @@ public final class MagicAbilityManager {
 			} else {
 				ASTRAL_CATACLYSM_DOMAIN_STATES.remove(clash.challengerId);
 			}
-			startDomainCooldown(clash.ownerId, clash.ownerAbility, currentTick, DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER);
+			applyDomainEndCooldowns(clash.ownerId, clash.ownerAbility, currentTick, DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER);
 			if (owner != null) {
 				setActiveAbility(owner, MagicAbility.NONE);
 				applyDomainClashLoserManaPenalty(owner);
@@ -6185,7 +6183,7 @@ public final class MagicAbilityManager {
 		} else {
 			DomainExpansionState ownedDomain = DOMAIN_EXPANSIONS.remove(playerId);
 			if (ownedDomain != null) {
-				endOwnedDomain(playerId, ownedDomain, server, server.getTicks(), true);
+				endOwnedDomain(playerId, ownedDomain, server, server.getTicks());
 				domainStateChanged = true;
 			}
 		}
@@ -12377,14 +12375,8 @@ public final class MagicAbilityManager {
 		UUID playerId,
 		MagicAbility domainAbility,
 		int currentTick,
-		double domainCooldownMultiplier,
-		boolean applySchoolCooldowns
+		double domainCooldownMultiplier
 	) {
-		if (!applySchoolCooldowns) {
-			startDomainCooldown(playerId, domainAbility, currentTick, domainCooldownMultiplier);
-			return;
-		}
-
 		for (MagicAbility ability : abilitiesForSchool(domainAbility.school())) {
 			if (ability == domainAbility) {
 				startDomainCooldown(playerId, ability, currentTick, domainCooldownMultiplier);
