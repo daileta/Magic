@@ -420,8 +420,8 @@ public final class MagicConfig {
 		@SerializedName(value = "emptyEmbraceDrainPerSecond", alternate = { "manipulationDrainPerSecond" })
 		public int emptyEmbraceDrainPerSecond = 0;
 		public int domainExpansionActivationCost = 0;
-		public int passiveRegenPerSecond = 10;
-		public int depletedRecoveryRegenPerSecond = 5;
+		public int passiveRegenPerSecond = 2;
+		public int depletedRecoveryRegenPerSecond = 1;
 		public int planckHeatActivationCost = 75;
 	}
 
