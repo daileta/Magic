@@ -21,6 +21,9 @@ import net.evan.magic.mixin.DisplayEntityAccessorMixin;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
 import net.evan.magic.network.payload.JesterJokeOverlayPayload;
+import net.evan.magic.particle.AstralCataclysmBeamParticleEffect;
+import net.evan.magic.particle.AstralCataclysmDownflowParticleEffect;
+import net.evan.magic.particle.AstralCataclysmSpiralParticleEffect;
 import net.evan.magic.registry.ModItems;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
@@ -459,13 +462,29 @@ public final class MagicAbilityManager {
 	private static List<Integer> ASTRAL_CATACLYSM_EXPIRY_WARNING_TICKS = List.of(30 * TICKS_PER_SECOND, 10 * TICKS_PER_SECOND, 5 * TICKS_PER_SECOND);
 	private static boolean ASTRAL_CATACLYSM_ALLOW_MOB_TARGETS = false;
 	private static double ASTRAL_CATACLYSM_TARGET_RANGE = 64.0;
-	private static double ASTRAL_CATACLYSM_BEAM_RADIUS = 5.0;
+	private static double ASTRAL_CATACLYSM_BEAM_RADIUS = 3.0;
 	private static double ASTRAL_CATACLYSM_BEAM_RISE_BLOCKS_PER_SECOND = 2.0;
-	private static double ASTRAL_CATACLYSM_BEAM_PARTICLE_STEP = 0.5;
-	private static int ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_COUNT = 18;
-	private static int ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT = 10;
-	private static int ASTRAL_CATACLYSM_BEAM_SPARK_PARTICLE_COUNT = 6;
-	private static int ASTRAL_CATACLYSM_BEAM_RING_POINTS_PER_STEP = 8;
+	private static double ASTRAL_CATACLYSM_BEAM_PARTICLE_STEP = 1.5;
+	private static double ASTRAL_CATACLYSM_BEAM_DESCENT_BLOCKS_PER_SECOND = 18.0;
+	private static int ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_COUNT = 2;
+	private static int ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT = 2;
+	private static int ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_COUNT = 18;
+	private static int ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_LIFETIME_TICKS = 5;
+	private static int ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_LIFETIME_TICKS = 6;
+	private static int ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_LIFETIME_TICKS = 12;
+	private static float ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_SCALE = 1.2F;
+	private static float ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_SCALE = 0.78F;
+	private static float ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_SCALE = 0.92F;
+	private static int ASTRAL_CATACLYSM_BEAM_CORE_COLOR_RGB = 0xFFF6D6;
+	private static int ASTRAL_CATACLYSM_BEAM_OUTER_COLOR_RGB = 0x8AD7FF;
+	private static float ASTRAL_CATACLYSM_BEAM_CORE_INTENSITY = 0.95F;
+	private static int ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_COUNT = 16;
+	private static double ASTRAL_CATACLYSM_BEAM_SPIRAL_ORBIT_RADIUS = 3.25;
+	private static double ASTRAL_CATACLYSM_BEAM_SPIRAL_ANGULAR_SPEED_RADIANS_PER_TICK = Math.toRadians(14.0);
+	private static double ASTRAL_CATACLYSM_BEAM_SPIRAL_VERTICAL_SPACING = 9.0;
+	private static List<Integer> ASTRAL_CATACLYSM_BEAM_SPIRAL_COLOR_RGBS = List.of(0x8CD8FF, 0xFFDFA2, 0xC4A6FF);
+	private static int ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_LIFETIME_TICKS = 18;
+	private static float ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_SCALE = 0.7F;
 	private static int ASTRAL_CATACLYSM_BEAM_DAMAGE_INTERVAL_TICKS = TICKS_PER_SECOND;
 	private static float ASTRAL_CATACLYSM_BEAM_TRUE_DAMAGE_PER_INTERVAL = 4.0F;
 	private static int ASTRAL_CATACLYSM_BEAM_HEAVENLY_SOUND_INTERVAL_TICKS = TICKS_PER_SECOND;
@@ -659,9 +678,6 @@ public final class MagicAbilityManager {
 	private static final Identifier ORIONS_GAMBIT_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "orions_gambit_max_health");
 	private static final Identifier FROST_STAGE_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "frost_stage_max_health");
 	private static final ParticleEffect SAGITTARIUS_BEAM_PARTICLE = ParticleTypes.END_ROD;
-	private static final ParticleEffect ASTRAL_EXECUTION_BEAM_PARTICLE = ParticleTypes.GLOW;
-	private static final ParticleEffect ASTRAL_EXECUTION_BEAM_OUTER_PARTICLE = ParticleTypes.END_ROD;
-	private static final ParticleEffect ASTRAL_EXECUTION_BEAM_SPARK_PARTICLE = ParticleTypes.ELECTRIC_SPARK;
 	private static final ParticleEffect FROST_SHARD_PARTICLE = new ItemStackParticleEffect(ParticleTypes.ITEM, new ItemStack(ModItems.FROST_SHARD));
 	private static final double DOMAIN_TELEPORT_POSITION_EPSILON_SQUARED = 4.0E-4;
 	private static final float DOMAIN_TELEPORT_ROTATION_EPSILON_DEGREES = 0.5F;
@@ -1103,11 +1119,33 @@ public final class MagicAbilityManager {
 		ASTRAL_CATACLYSM_TARGET_RANGE = Math.max(1.0, config.constellationDomain.targetRange);
 		ASTRAL_CATACLYSM_BEAM_RADIUS = Math.max(0.5, config.constellationDomain.beamRadius);
 		ASTRAL_CATACLYSM_BEAM_RISE_BLOCKS_PER_SECOND = Math.max(0.0, config.constellationDomain.beamRiseBlocksPerSecond);
-		ASTRAL_CATACLYSM_BEAM_PARTICLE_STEP = Math.max(0.1, config.constellationDomain.beamParticleStep);
+		ASTRAL_CATACLYSM_BEAM_PARTICLE_STEP = Math.max(0.25, config.constellationDomain.beamParticleStep);
+		ASTRAL_CATACLYSM_BEAM_DESCENT_BLOCKS_PER_SECOND = Math.max(0.0, config.constellationDomain.beamDescentBlocksPerSecond);
 		ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_COUNT = Math.max(0, config.constellationDomain.beamCoreParticleCount);
 		ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT = Math.max(0, config.constellationDomain.beamOuterParticleCount);
-		ASTRAL_CATACLYSM_BEAM_SPARK_PARTICLE_COUNT = Math.max(0, config.constellationDomain.beamSparkParticleCount);
-		ASTRAL_CATACLYSM_BEAM_RING_POINTS_PER_STEP = Math.max(0, config.constellationDomain.beamRingPointsPerStep);
+		ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_COUNT = Math.max(0, config.constellationDomain.beamFallingParticleCount);
+		ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_LIFETIME_TICKS = Math.max(1, config.constellationDomain.beamCoreParticleLifetimeTicks);
+		ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_LIFETIME_TICKS = Math.max(1, config.constellationDomain.beamOuterParticleLifetimeTicks);
+		ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_LIFETIME_TICKS = Math.max(1, config.constellationDomain.beamFallingParticleLifetimeTicks);
+		ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_SCALE = Math.max(0.1F, config.constellationDomain.beamCoreParticleScale);
+		ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_SCALE = Math.max(0.1F, config.constellationDomain.beamOuterParticleScale);
+		ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_SCALE = Math.max(0.1F, config.constellationDomain.beamFallingParticleScale);
+		ASTRAL_CATACLYSM_BEAM_CORE_COLOR_RGB = parseColorRgb(config.constellationDomain.beamCoreColorHex, 0xFFF6D6, "Astral Cataclysm core");
+		ASTRAL_CATACLYSM_BEAM_OUTER_COLOR_RGB = parseColorRgb(config.constellationDomain.beamOuterColorHex, 0x8AD7FF, "Astral Cataclysm outer");
+		ASTRAL_CATACLYSM_BEAM_CORE_INTENSITY = MathHelper.clamp(config.constellationDomain.beamCoreIntensity, 0.05F, 1.0F);
+		ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_COUNT = Math.max(0, config.constellationDomain.beamSpiralParticleCount);
+		ASTRAL_CATACLYSM_BEAM_SPIRAL_ORBIT_RADIUS = Math.max(0.0, config.constellationDomain.beamSpiralOrbitRadius);
+		ASTRAL_CATACLYSM_BEAM_SPIRAL_ANGULAR_SPEED_RADIANS_PER_TICK = Math.toRadians(
+			MathHelper.clamp(config.constellationDomain.beamSpiralAngularSpeedDegreesPerTick, -60.0, 60.0)
+		);
+		ASTRAL_CATACLYSM_BEAM_SPIRAL_VERTICAL_SPACING = Math.max(0.5, config.constellationDomain.beamSpiralVerticalSpacing);
+		ASTRAL_CATACLYSM_BEAM_SPIRAL_COLOR_RGBS = parseColorRgbList(
+			config.constellationDomain.beamSpiralColorHexes,
+			List.of(0x8CD8FF, 0xFFDFA2, 0xC4A6FF),
+			"Astral Cataclysm spiral"
+		);
+		ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_LIFETIME_TICKS = Math.max(1, config.constellationDomain.beamSpiralParticleLifetimeTicks);
+		ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_SCALE = Math.max(0.1F, config.constellationDomain.beamSpiralParticleScale);
 		ASTRAL_CATACLYSM_BEAM_DAMAGE_INTERVAL_TICKS = Math.max(1, config.constellationDomain.beamDamageIntervalTicks);
 		ASTRAL_CATACLYSM_BEAM_TRUE_DAMAGE_PER_INTERVAL = Math.max(0.0F, config.constellationDomain.beamTrueDamagePerInterval);
 		ASTRAL_CATACLYSM_BEAM_HEAVENLY_SOUND_INTERVAL_TICKS = Math.max(1, config.constellationDomain.beamHeavenlySoundIntervalTicks);
@@ -9265,6 +9303,10 @@ public final class MagicAbilityManager {
 	}
 
 	private static int parseColorRgb(String rawColor, int fallbackColor) {
+		return parseColorRgb(rawColor, fallbackColor, "configured");
+	}
+
+	private static int parseColorRgb(String rawColor, int fallbackColor, String colorContext) {
 		if (rawColor == null || rawColor.isBlank()) {
 			return fallbackColor;
 		}
@@ -9280,9 +9322,28 @@ public final class MagicAbilityManager {
 		try {
 			return Integer.parseInt(normalized, 16) & 0x00FFFFFF;
 		} catch (NumberFormatException exception) {
-			Magic.LOGGER.warn("Invalid Jester color '{}'; using fallback {}.", rawColor, fallbackColor);
+			Magic.LOGGER.warn("Invalid {} color '{}'; using fallback {}.", colorContext, rawColor, fallbackColor);
 			return fallbackColor;
 		}
+	}
+
+	private static List<Integer> parseColorRgbList(List<String> rawColors, List<Integer> fallbackColors, String colorContext) {
+		if (rawColors == null || rawColors.isEmpty()) {
+			return List.copyOf(fallbackColors);
+		}
+
+		List<Integer> parsedColors = new ArrayList<>();
+		for (String rawColor : rawColors) {
+			if (rawColor == null || rawColor.isBlank()) {
+				continue;
+			}
+			parsedColors.add(parseColorRgb(rawColor, fallbackColors.get(parsedColors.size() % fallbackColors.size()), colorContext));
+		}
+
+		if (parsedColors.isEmpty()) {
+			return List.copyOf(fallbackColors);
+		}
+		return List.copyOf(parsedColors);
 	}
 
 	private static Identifier parseIdentifierOrFallback(String rawId, Identifier fallbackId) {
@@ -10957,7 +11018,7 @@ public final class MagicAbilityManager {
 			if (target instanceof MobEntity mob) {
 				mob.getNavigation().stop();
 			}
-			spawnAstralExecutionBeamParticles(world, state);
+			spawnAstralExecutionBeamParticles(world, state, currentTick);
 			if (currentTick >= state.nextSoundTick) {
 				playAstralExecutionBeamSounds(world, state);
 				state.nextSoundTick = currentTick + ASTRAL_CATACLYSM_BEAM_HEAVENLY_SOUND_INTERVAL_TICKS;
@@ -10992,52 +11053,34 @@ public final class MagicAbilityManager {
 		target.setHealth(nextHealth);
 	}
 
-	private static void spawnAstralExecutionBeamParticles(ServerWorld world, AstralExecutionBeamState state) {
-		double topY = state.currentY + 32.0;
+	private static void spawnAstralExecutionBeamParticles(ServerWorld world, AstralExecutionBeamState state, int currentTick) {
+		double topY = getAstralExecutionBeamTopY(world, state);
+		AstralCataclysmBeamParticleEffect coreEffect = new AstralCataclysmBeamParticleEffect(
+			ASTRAL_CATACLYSM_BEAM_CORE_COLOR_RGB,
+			ASTRAL_CATACLYSM_BEAM_CORE_INTENSITY,
+			ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_SCALE,
+			ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_LIFETIME_TICKS
+		);
+		AstralCataclysmBeamParticleEffect outerEffect = new AstralCataclysmBeamParticleEffect(
+			ASTRAL_CATACLYSM_BEAM_OUTER_COLOR_RGB,
+			0.68F,
+			ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_SCALE,
+			ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_LIFETIME_TICKS
+		);
+		AstralCataclysmDownflowParticleEffect downflowEffect = new AstralCataclysmDownflowParticleEffect(
+			ASTRAL_CATACLYSM_BEAM_OUTER_COLOR_RGB,
+			0.82F,
+			ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_SCALE,
+			ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_LIFETIME_TICKS,
+			ASTRAL_CATACLYSM_BEAM_DESCENT_BLOCKS_PER_SECOND / TICKS_PER_SECOND
+		);
 		double beamY = state.baseY;
 		while (beamY <= topY) {
-			if (ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_COUNT > 0) {
-				world.spawnParticles(
-					ASTRAL_EXECUTION_BEAM_PARTICLE,
-					state.lockedX,
-					beamY,
-					state.lockedZ,
-					ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_COUNT,
-					ASTRAL_CATACLYSM_BEAM_RADIUS * 0.07,
-					0.12,
-					ASTRAL_CATACLYSM_BEAM_RADIUS * 0.07,
-					0.0
-				);
-			}
-			if (ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT > 0) {
-				world.spawnParticles(
-					ASTRAL_EXECUTION_BEAM_OUTER_PARTICLE,
-					state.lockedX,
-					beamY,
-					state.lockedZ,
-					ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT,
-					ASTRAL_CATACLYSM_BEAM_RADIUS * 0.18,
-					0.14,
-					ASTRAL_CATACLYSM_BEAM_RADIUS * 0.18,
-					0.0
-				);
-			}
-			if (ASTRAL_CATACLYSM_BEAM_SPARK_PARTICLE_COUNT > 0) {
-				world.spawnParticles(
-					ASTRAL_EXECUTION_BEAM_SPARK_PARTICLE,
-					state.lockedX,
-					beamY,
-					state.lockedZ,
-					ASTRAL_CATACLYSM_BEAM_SPARK_PARTICLE_COUNT,
-					ASTRAL_CATACLYSM_BEAM_RADIUS * 0.11,
-					0.1,
-					ASTRAL_CATACLYSM_BEAM_RADIUS * 0.11,
-					0.0
-				);
-			}
-			spawnAstralExecutionBeamRing(world, state.lockedX, beamY, state.lockedZ);
+			spawnAstralExecutionBeamSlice(world, state.lockedX, beamY, state.lockedZ, currentTick, coreEffect, outerEffect);
 			beamY += ASTRAL_CATACLYSM_BEAM_PARTICLE_STEP;
 		}
+		spawnAstralExecutionDownflow(world, state.lockedX, state.baseY, topY, state.lockedZ, downflowEffect);
+		spawnAstralExecutionSpiral(world, state.lockedX, state.baseY, topY, state.lockedZ, currentTick);
 	}
 
 	private static void playAstralExecutionBeamSounds(ServerWorld world, AstralExecutionBeamState state) {
@@ -11069,17 +11112,108 @@ public final class MagicAbilityManager {
 		target.setOnGround(true);
 	}
 
-	private static void spawnAstralExecutionBeamRing(ServerWorld world, double x, double y, double z) {
-		if (ASTRAL_CATACLYSM_BEAM_RING_POINTS_PER_STEP <= 0) {
+	private static double getAstralExecutionBeamTopY(ServerWorld world, AstralExecutionBeamState state) {
+		return Math.max(world.getTopYInclusive() + 1.0, state.currentY + 12.0);
+	}
+
+	private static void spawnAstralExecutionBeamSlice(
+		ServerWorld world,
+		double x,
+		double y,
+		double z,
+		int currentTick,
+		AstralCataclysmBeamParticleEffect coreEffect,
+		AstralCataclysmBeamParticleEffect outerEffect
+	) {
+		if (ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_COUNT > 0) {
+			world.spawnParticles(coreEffect, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+			double coreSpread = Math.max(0.18, ASTRAL_CATACLYSM_BEAM_RADIUS * 0.24);
+			for (int index = 1; index < ASTRAL_CATACLYSM_BEAM_CORE_PARTICLE_COUNT; index++) {
+				double angle = world.random.nextDouble() * (Math.PI * 2.0);
+				double radius = Math.sqrt(world.random.nextDouble()) * coreSpread;
+				double particleX = x + Math.cos(angle) * radius;
+				double particleY = y + (world.random.nextDouble() - 0.5) * ASTRAL_CATACLYSM_BEAM_PARTICLE_STEP * 0.45;
+				double particleZ = z + Math.sin(angle) * radius;
+				world.spawnParticles(coreEffect, particleX, particleY, particleZ, 1, 0.0, 0.0, 0.0, 0.0);
+			}
+		}
+
+		if (ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT <= 0) {
 			return;
 		}
 
-		double ringRadius = Math.max(0.2, ASTRAL_CATACLYSM_BEAM_RADIUS * 0.42);
-		for (int index = 0; index < ASTRAL_CATACLYSM_BEAM_RING_POINTS_PER_STEP; index++) {
-			double angle = (Math.PI * 2.0 * index) / ASTRAL_CATACLYSM_BEAM_RING_POINTS_PER_STEP;
-			double ringX = x + Math.cos(angle) * ringRadius;
-			double ringZ = z + Math.sin(angle) * ringRadius;
-			world.spawnParticles(ASTRAL_EXECUTION_BEAM_OUTER_PARTICLE, ringX, y, ringZ, 1, 0.03, 0.08, 0.03, 0.0);
+		double angularOffset = currentTick * 0.09;
+		for (int index = 0; index < ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT; index++) {
+			double normalized = (index + 0.5) / ASTRAL_CATACLYSM_BEAM_OUTER_PARTICLE_COUNT;
+			double angle = angularOffset + normalized * Math.PI * 2.0 + world.random.nextDouble() * 0.25;
+			double radius = MathHelper.lerp(world.random.nextDouble(), ASTRAL_CATACLYSM_BEAM_RADIUS * 0.56, ASTRAL_CATACLYSM_BEAM_RADIUS * 0.92);
+			double particleX = x + Math.cos(angle) * radius;
+			double particleY = y + (world.random.nextDouble() - 0.5) * ASTRAL_CATACLYSM_BEAM_PARTICLE_STEP * 0.7;
+			double particleZ = z + Math.sin(angle) * radius;
+			world.spawnParticles(outerEffect, particleX, particleY, particleZ, 1, 0.0, 0.0, 0.0, 0.0);
+		}
+	}
+
+	private static void spawnAstralExecutionDownflow(
+		ServerWorld world,
+		double x,
+		double baseY,
+		double topY,
+		double z,
+		AstralCataclysmDownflowParticleEffect effect
+	) {
+		if (ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_COUNT <= 0) {
+			return;
+		}
+
+		double beamHeight = Math.max(1.0, topY - baseY);
+		double descentTravel = Math.max(8.0, effect.descentPerTick() * ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_LIFETIME_TICKS * 1.6);
+		double spawnMinY = Math.max(baseY + beamHeight * 0.35, topY - descentTravel);
+		for (int index = 0; index < ASTRAL_CATACLYSM_BEAM_FALLING_PARTICLE_COUNT; index++) {
+			double angle = world.random.nextDouble() * (Math.PI * 2.0);
+			double radiusFactor = world.random.nextDouble() < 0.7
+				? Math.sqrt(world.random.nextDouble()) * 0.45
+				: MathHelper.lerp(world.random.nextDouble(), 0.45, 0.92);
+			double radius = Math.max(0.12, ASTRAL_CATACLYSM_BEAM_RADIUS * radiusFactor);
+			double particleX = x + Math.cos(angle) * radius;
+			double particleY = MathHelper.lerp(world.random.nextDouble(), spawnMinY, topY);
+			double particleZ = z + Math.sin(angle) * radius;
+			world.spawnParticles(effect, particleX, particleY, particleZ, 1, 0.0, 0.0, 0.0, 0.0);
+		}
+	}
+
+	private static void spawnAstralExecutionSpiral(ServerWorld world, double x, double baseY, double topY, double z, int currentTick) {
+		if (ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_COUNT <= 0 || ASTRAL_CATACLYSM_BEAM_SPIRAL_COLOR_RGBS.isEmpty()) {
+			return;
+		}
+
+		double beamHeight = Math.max(1.0, topY - baseY);
+		double twistPerBlock = (Math.PI * 2.0) / ASTRAL_CATACLYSM_BEAM_SPIRAL_VERTICAL_SPACING;
+		double descentPerTick = (ASTRAL_CATACLYSM_BEAM_DESCENT_BLOCKS_PER_SECOND / TICKS_PER_SECOND) * 0.18;
+		double descentOffset = beamHeight <= descentPerTick ? 0.0 : (currentTick * descentPerTick * 0.9) % beamHeight;
+		int colorCount = ASTRAL_CATACLYSM_BEAM_SPIRAL_COLOR_RGBS.size();
+		for (int index = 0; index < ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_COUNT; index++) {
+			int colorIndex = index % colorCount;
+			double normalized = (index + 0.5) / (double) ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_COUNT;
+			double localY = (normalized * beamHeight + descentOffset) % beamHeight;
+			double angle = currentTick * ASTRAL_CATACLYSM_BEAM_SPIRAL_ANGULAR_SPEED_RADIANS_PER_TICK
+				+ ((Math.PI * 2.0 * colorIndex) / colorCount);
+			AstralCataclysmSpiralParticleEffect effect = new AstralCataclysmSpiralParticleEffect(
+				x,
+				baseY,
+				z,
+				localY,
+				angle,
+				ASTRAL_CATACLYSM_BEAM_SPIRAL_ANGULAR_SPEED_RADIANS_PER_TICK,
+				descentPerTick,
+				ASTRAL_CATACLYSM_BEAM_SPIRAL_ORBIT_RADIUS,
+				twistPerBlock,
+				ASTRAL_CATACLYSM_BEAM_SPIRAL_COLOR_RGBS.get(colorIndex),
+				0.84F,
+				ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_SCALE,
+				ASTRAL_CATACLYSM_BEAM_SPIRAL_PARTICLE_LIFETIME_TICKS
+			);
+			world.spawnParticles(effect, x, baseY + localY, z, 1, 0.0, 0.0, 0.0, 0.0);
 		}
 	}
 

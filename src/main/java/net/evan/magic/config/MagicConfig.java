@@ -1670,13 +1670,31 @@ public final class MagicConfig {
 		public List<Integer> expiryWarningTicks = new ArrayList<>(List.of(30 * 20, 10 * 20, 5 * 20));
 		public boolean allowMobTargets = false;
 		public double targetRange = 64.0;
-		public double beamRadius = 5.0;
+		public double beamRadius = 3.0;
 		public double beamRiseBlocksPerSecond = 2.0;
-		public double beamParticleStep = 0.5;
-		public int beamCoreParticleCount = 18;
-		public int beamOuterParticleCount = 10;
-		public int beamSparkParticleCount = 6;
-		public int beamRingPointsPerStep = 8;
+		public double beamParticleStep = 1.5;
+		public double beamDescentBlocksPerSecond = 18.0;
+		public int beamCoreParticleCount = 2;
+		public int beamOuterParticleCount = 2;
+		@SerializedName(value = "beamFallingParticleCount", alternate = { "beamSparkParticleCount" })
+		public int beamFallingParticleCount = 18;
+		public int beamCoreParticleLifetimeTicks = 5;
+		public int beamOuterParticleLifetimeTicks = 6;
+		public int beamFallingParticleLifetimeTicks = 12;
+		public float beamCoreParticleScale = 1.2F;
+		public float beamOuterParticleScale = 0.78F;
+		public float beamFallingParticleScale = 0.92F;
+		public String beamCoreColorHex = "#FFF6D6";
+		public String beamOuterColorHex = "#8AD7FF";
+		public float beamCoreIntensity = 0.95F;
+		@SerializedName(value = "beamSpiralParticleCount", alternate = { "beamRingPointsPerStep" })
+		public int beamSpiralParticleCount = 16;
+		public double beamSpiralOrbitRadius = 3.25;
+		public double beamSpiralAngularSpeedDegreesPerTick = 14.0;
+		public double beamSpiralVerticalSpacing = 9.0;
+		public List<String> beamSpiralColorHexes = new ArrayList<>(List.of("#8CD8FF", "#FFDFA2", "#C4A6FF"));
+		public int beamSpiralParticleLifetimeTicks = 18;
+		public float beamSpiralParticleScale = 0.7F;
 		public int beamDamageIntervalTicks = 20;
 		public float beamTrueDamagePerInterval = 4.0F;
 		public int beamHeavenlySoundIntervalTicks = 20;
@@ -1707,11 +1725,37 @@ public final class MagicConfig {
 			targetRange = Math.max(1.0, targetRange);
 			beamRadius = Math.max(0.5, beamRadius);
 			beamRiseBlocksPerSecond = Math.max(0.0, beamRiseBlocksPerSecond);
-			beamParticleStep = Math.max(0.1, beamParticleStep);
+			beamParticleStep = Math.max(0.25, beamParticleStep);
+			beamDescentBlocksPerSecond = Math.max(0.0, beamDescentBlocksPerSecond);
 			beamCoreParticleCount = Math.max(0, beamCoreParticleCount);
 			beamOuterParticleCount = Math.max(0, beamOuterParticleCount);
-			beamSparkParticleCount = Math.max(0, beamSparkParticleCount);
-			beamRingPointsPerStep = Math.max(0, beamRingPointsPerStep);
+			beamFallingParticleCount = Math.max(0, beamFallingParticleCount);
+			beamCoreParticleLifetimeTicks = Math.max(1, beamCoreParticleLifetimeTicks);
+			beamOuterParticleLifetimeTicks = Math.max(1, beamOuterParticleLifetimeTicks);
+			beamFallingParticleLifetimeTicks = Math.max(1, beamFallingParticleLifetimeTicks);
+			beamCoreParticleScale = Math.max(0.1F, beamCoreParticleScale);
+			beamOuterParticleScale = Math.max(0.1F, beamOuterParticleScale);
+			beamFallingParticleScale = Math.max(0.1F, beamFallingParticleScale);
+			if (beamCoreColorHex == null || beamCoreColorHex.isBlank()) {
+				beamCoreColorHex = "#FFF6D6";
+			}
+			if (beamOuterColorHex == null || beamOuterColorHex.isBlank()) {
+				beamOuterColorHex = "#8AD7FF";
+			}
+			beamCoreIntensity = MathHelper.clamp(beamCoreIntensity, 0.05F, 1.0F);
+			beamSpiralParticleCount = Math.max(0, beamSpiralParticleCount);
+			beamSpiralOrbitRadius = Math.max(0.0, beamSpiralOrbitRadius);
+			beamSpiralAngularSpeedDegreesPerTick = MathHelper.clamp(beamSpiralAngularSpeedDegreesPerTick, -60.0, 60.0);
+			beamSpiralVerticalSpacing = Math.max(0.5, beamSpiralVerticalSpacing);
+			if (beamSpiralColorHexes == null) {
+				beamSpiralColorHexes = new ArrayList<>(List.of("#8CD8FF", "#FFDFA2", "#C4A6FF"));
+			}
+			beamSpiralColorHexes.removeIf(color -> color == null || color.isBlank());
+			if (beamSpiralColorHexes.isEmpty()) {
+				beamSpiralColorHexes = new ArrayList<>(List.of("#8CD8FF", "#FFDFA2", "#C4A6FF"));
+			}
+			beamSpiralParticleLifetimeTicks = Math.max(1, beamSpiralParticleLifetimeTicks);
+			beamSpiralParticleScale = Math.max(0.1F, beamSpiralParticleScale);
 			beamDamageIntervalTicks = Math.max(1, beamDamageIntervalTicks);
 			beamTrueDamagePerInterval = Math.max(0.0F, beamTrueDamagePerInterval);
 			beamHeavenlySoundIntervalTicks = Math.max(1, beamHeavenlySoundIntervalTicks);

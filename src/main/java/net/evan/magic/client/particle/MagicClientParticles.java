@@ -14,6 +14,9 @@ public final class MagicClientParticles {
 			return;
 		}
 
+		ParticleFactoryRegistry.getInstance().register(ModParticles.ASTRAL_CATACLYSM_BEAM, AstralCataclysmBeamParticle.Factory::new);
+		ParticleFactoryRegistry.getInstance().register(ModParticles.ASTRAL_CATACLYSM_DOWNFLOW, AstralCataclysmDownflowParticle.Factory::new);
+		ParticleFactoryRegistry.getInstance().register(ModParticles.ASTRAL_CATACLYSM_SPIRAL, AstralCataclysmSpiralParticle.Factory::new);
 		ParticleFactoryRegistry.getInstance().register(ModParticles.TOLLKEEPERS_CLAIM_VORTEX, TollkeepersClaimVortexParticle.Factory::new);
 		initialized = true;
 	}
