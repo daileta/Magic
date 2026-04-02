@@ -28,7 +28,8 @@ public enum MagicAbility {
 	APPRAISERS_MARK(1, MagicSchool.GREED, "appraisers_mark"),
 	TOLLKEEPERS_CLAIM(2, MagicSchool.GREED, "tollkeepers_claim"),
 	KINGS_DUES(3, MagicSchool.GREED, "kings_dues"),
-	BANKRUPTCY(4, MagicSchool.GREED, "bankruptcy");
+	BANKRUPTCY(4, MagicSchool.GREED, "bankruptcy"),
+	GREED_DOMAIN_EXPANSION(5, MagicSchool.GREED, "greed_domain_expansion");
 
 	private final int slot;
 	private final MagicSchool school;

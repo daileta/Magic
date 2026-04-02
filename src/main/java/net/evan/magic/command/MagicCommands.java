@@ -66,6 +66,7 @@ public final class MagicCommands {
 									.then(cooldownAbilityLiteral(MagicAbility.TOLLKEEPERS_CLAIM, "tollkeepers_claim"))
 									.then(cooldownAbilityLiteral(MagicAbility.KINGS_DUES, "kings_dues"))
 									.then(cooldownAbilityLiteral(MagicAbility.BANKRUPTCY, "bankruptcy"))
+									.then(cooldownAbilityLiteral(MagicAbility.GREED_DOMAIN_EXPANSION, "greed_domain_expansion"))
 							)
 					)
 					.then(
@@ -242,6 +243,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.TOLLKEEPERS_CLAIM, "tollkeepers_claim", true))
 									.then(abilityAccessLiteral(MagicAbility.KINGS_DUES, "kings_dues", true))
 									.then(abilityAccessLiteral(MagicAbility.BANKRUPTCY, "bankruptcy", true))
+									.then(abilityAccessLiteral(MagicAbility.GREED_DOMAIN_EXPANSION, "greed_domain_expansion", true))
 							)
 							.then(
 								CommandManager.literal("unlock")
@@ -269,6 +271,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.TOLLKEEPERS_CLAIM, "tollkeepers_claim", false))
 									.then(abilityAccessLiteral(MagicAbility.KINGS_DUES, "kings_dues", false))
 									.then(abilityAccessLiteral(MagicAbility.BANKRUPTCY, "bankruptcy", false))
+									.then(abilityAccessLiteral(MagicAbility.GREED_DOMAIN_EXPANSION, "greed_domain_expansion", false))
 							)
 					)
 			)

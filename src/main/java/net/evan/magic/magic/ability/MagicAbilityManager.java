@@ -46,6 +46,7 @@ import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityPosition;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ExperienceOrbEntity;
 import net.minecraft.entity.LivingEntity;
@@ -664,11 +665,15 @@ public final class MagicAbilityManager {
 	private static boolean DOMAIN_CLASH_PAUSE_TIMED_DOMAIN_COLLAPSE_TIMERS = true;
 	private static boolean DOMAIN_CLASH_PAUSE_ASTRAL_CATACLYSM_PHASE_TIMERS = true;
 	private static boolean DOMAIN_CONTROL_BLOCK_TELEPORT_ACROSS_BOUNDARIES = true;
+	private static boolean DOMAIN_CONTROL_INTERIOR_LIGHTING_ENABLED = true;
+	private static int DOMAIN_CONTROL_INTERIOR_LIGHT_HORIZONTAL_SPACING = 6;
+	private static int DOMAIN_CONTROL_INTERIOR_LIGHT_VERTICAL_SPACING = 6;
+	private static int DOMAIN_CONTROL_INTERIOR_LIGHT_START_Y_OFFSET = 2;
 	private static final int DOMAIN_BLOCK_PLACE_FLAGS = Block.NOTIFY_LISTENERS | Block.FORCE_STATE_AND_SKIP_CALLBACKS_AND_DROPS;
 	private static final int DOMAIN_BLOCK_RESTORE_FLAGS = Block.NOTIFY_ALL | Block.FORCE_STATE_AND_SKIP_CALLBACKS_AND_DROPS;
 	private static final BlockState DOMAIN_SHELL_BLOCK_STATE = Blocks.BLACK_CONCRETE.getDefaultState();
 	private static final BlockState DOMAIN_INTERIOR_BLOCK_STATE = Blocks.AIR.getDefaultState();
-	private static final BlockState LOVE_DOMAIN_LIGHT_STATE = Blocks.LIGHT.getDefaultState().with(LightBlock.LEVEL_15, 15);
+	private static BlockState DOMAIN_INTERIOR_LIGHT_STATE = Blocks.LIGHT.getDefaultState().with(LightBlock.LEVEL_15, 15);
 	private static final ParticleEffect HERCULES_ACTIVATION_DIRT_PARTICLE = new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DIRT.getDefaultState());
 	private static final Identifier SPOTLIGHT_ATTACK_DAMAGE_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "spotlight_attack_damage");
 	private static final Identifier SPOTLIGHT_MOVEMENT_SPEED_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "spotlight_movement_speed");
@@ -764,6 +769,7 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, ConstellationDomainState> ASTRAL_CATACLYSM_DOMAIN_STATES = new HashMap<>();
 	private static final Map<UUID, AstralExecutionBeamState> ASTRAL_EXECUTION_BEAMS = new HashMap<>();
 	private static final Map<UUID, Integer> ASTRAL_CATACLYSM_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, Integer> GREED_DOMAIN_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, ManipulationState> MANIPULATION_STATES = new HashMap<>();
 	private static final Map<UUID, UUID> MANIPULATION_CASTER_BY_TARGET = new HashMap<>();
 	private static final Map<UUID, PlayerInput> MANIPULATION_INPUT_BY_CASTER = new HashMap<>();
@@ -929,6 +935,14 @@ public final class MagicAbilityManager {
 		MARTYRS_FLAME_FIRE_FLAME_PARTICLE_COUNT = Math.max(0, config.martyrsFlame.fireFlameParticleCount);
 		MARTYRS_FLAME_FIRE_SMOKE_PARTICLE_COUNT = Math.max(0, config.martyrsFlame.fireSmokeParticleCount);
 		DOMAIN_CONTROL_BLOCK_TELEPORT_ACROSS_BOUNDARIES = config.domainControl.blockTeleportAcrossDomainBoundaries;
+		DOMAIN_CONTROL_INTERIOR_LIGHTING_ENABLED = config.domainControl.interiorLightingEnabled;
+		DOMAIN_CONTROL_INTERIOR_LIGHT_HORIZONTAL_SPACING = Math.max(1, config.domainControl.interiorLightHorizontalSpacing);
+		DOMAIN_CONTROL_INTERIOR_LIGHT_VERTICAL_SPACING = Math.max(1, config.domainControl.interiorLightVerticalSpacing);
+		DOMAIN_CONTROL_INTERIOR_LIGHT_START_Y_OFFSET = Math.max(1, config.domainControl.interiorLightStartYOffset);
+		DOMAIN_INTERIOR_LIGHT_STATE = Blocks.LIGHT.getDefaultState().with(
+			LightBlock.LEVEL_15,
+			MathHelper.clamp(config.domainControl.interiorLightLevel, 0, 15)
+		);
 		SPOTLIGHT_DETECTION_RANGE = Math.max(1.0, config.jesterSpotlight.detectionRange);
 		SPOTLIGHT_EFFECT_REFRESH_TICKS = Math.max(1, config.jesterSpotlight.effectRefreshTicks);
 		SPOTLIGHT_STAGE_ONE = spotlightStageSettings(config.jesterSpotlight.stageOne);
@@ -1197,6 +1211,7 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE = config.domainClash.participantsInvincible;
 		DOMAIN_CLASH_PAUSE_TIMED_DOMAIN_COLLAPSE_TIMERS = config.domainClash.pauseTimedDomainCollapseTimers;
 		DOMAIN_CLASH_PAUSE_ASTRAL_CATACLYSM_PHASE_TIMERS = config.domainClash.pauseAstralCataclysmPhaseTimers;
+		GreedDomainRuntime.reloadConfigValues();
 	}
 
 	public static void onAbilityRequested(ServerPlayerEntity player, int abilitySlot) {
@@ -1276,6 +1291,15 @@ public final class MagicAbilityManager {
 
 		if (!MagicConfig.get().abilityAccess.isAbilityUnlocked(playerId, requestedAbility)) {
 			player.sendMessage(Text.translatable("message.magic.ability.locked", requestedAbility.displayName()), true);
+			return;
+		}
+
+		if (GreedDomainRuntime.isMagicSealed(player, currentTick)) {
+			player.sendMessage(Text.translatable("message.magic.greed.magic_sealed"), true);
+			return;
+		}
+
+		if (currentActiveAbility != requestedAbility && GreedDomainRuntime.beforeAbilityUse(player, requestedAbility, currentTick)) {
 			return;
 		}
 
@@ -2031,7 +2055,10 @@ public final class MagicAbilityManager {
 
 		spendAbilityCost(player, manaCost);
 		if (!isCooldownDeferredByOrionsGambit(player.getUuid(), MagicAbility.WITTY_ONE_LINER) && selectedTier.cooldownTicks() > 0) {
-			WITTY_ONE_LINER_COOLDOWN_END_TICK.put(player.getUuid(), currentTick + selectedTier.cooldownTicks());
+			WITTY_ONE_LINER_COOLDOWN_END_TICK.put(
+				player.getUuid(),
+				currentTick + adjustedCooldownTicks(player.getUuid(), MagicAbility.WITTY_ONE_LINER, selectedTier.cooldownTicks(), currentTick)
+			);
 		}
 		applyWittyOneLinerEffects(target, selectedTier);
 		sendWittyOneLinerOverlay(player, target, joke, selectedTier.colorRgb());
@@ -2657,7 +2684,7 @@ public final class MagicAbilityManager {
 		if (overcast && FROST_CONFIG.rangedAttack.instantKillEnabled) {
 			dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().freeze(), Float.MAX_VALUE);
 		} else if (damage > 0.0F) {
-			dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().genericKill(), damage);
+			dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().magic(), damage);
 		}
 		if (target.isAlive()) {
 			return;
@@ -3999,6 +4026,9 @@ public final class MagicAbilityManager {
 			if (startDomainClash(player, requestedAbility, containingDomain.ownerId, containingDomain.state, currentTick)) {
 				spendAbilityCost(player, DOMAIN_EXPANSION_ACTIVATION_MANA_COST);
 				setActiveAbility(player, requestedAbility);
+				if (requestedAbility == MagicAbility.GREED_DOMAIN_EXPANSION) {
+					GreedRuntime.recordSuccessfulMagicAbilityUse(player, requestedAbility);
+				}
 				recordOrionsGambitAbilityUse(player, requestedAbility);
 				return;
 			}
@@ -4016,6 +4046,9 @@ public final class MagicAbilityManager {
 		activateDomainExpansion(player, requestedAbility, currentTick);
 		spendAbilityCost(player, DOMAIN_EXPANSION_ACTIVATION_MANA_COST);
 		setActiveAbility(player, requestedAbility);
+		if (requestedAbility == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			GreedRuntime.recordSuccessfulMagicAbilityUse(player, requestedAbility);
+		}
 		recordOrionsGambitAbilityUse(player, requestedAbility);
 		if (requestedAbility == MagicAbility.ASTRAL_CATACLYSM) {
 			ASTRAL_CATACLYSM_DOMAIN_STATES.put(player.getUuid(), new ConstellationDomainState(ConstellationDomainPhase.CHARGING, currentTick + ASTRAL_CATACLYSM_CHARGE_DURATION_TICKS));
@@ -4143,13 +4176,19 @@ public final class MagicAbilityManager {
 
 		int radius = ability == MagicAbility.FROST_DOMAIN_EXPANSION
 			? Math.max(1, FROST_CONFIG.domain.radius)
-			: Math.max(1, DOMAIN_EXPANSION_RADIUS);
+			: ability == MagicAbility.GREED_DOMAIN_EXPANSION
+				? Math.max(1, GreedDomainRuntime.domainRadius())
+				: Math.max(1, DOMAIN_EXPANSION_RADIUS);
 		int height = ability == MagicAbility.FROST_DOMAIN_EXPANSION
 			? Math.max(1, FROST_CONFIG.domain.height)
-			: Math.max(1, DOMAIN_EXPANSION_HEIGHT);
+			: ability == MagicAbility.GREED_DOMAIN_EXPANSION
+				? Math.max(1, GreedDomainRuntime.domainHeight())
+				: Math.max(1, DOMAIN_EXPANSION_HEIGHT);
 		int shellThickness = ability == MagicAbility.FROST_DOMAIN_EXPANSION
 			? Math.max(1, FROST_CONFIG.domain.shellThickness)
-			: Math.max(1, DOMAIN_EXPANSION_SHELL_THICKNESS);
+			: ability == MagicAbility.GREED_DOMAIN_EXPANSION
+				? Math.max(1, GreedDomainRuntime.domainShellThickness())
+				: Math.max(1, DOMAIN_EXPANSION_SHELL_THICKNESS);
 		int innerRadius = Math.max(0, radius - shellThickness);
 		int innerHeight = Math.max(1, height - shellThickness);
 
@@ -4196,7 +4235,9 @@ public final class MagicAbilityManager {
 							innerHeight,
 							immutablePos
 						);
-						if (shell || targetState.isOf(Blocks.LIGHT)) {
+						boolean protectGreedInterior = ability == MagicAbility.GREED_DOMAIN_EXPANSION
+							&& GreedDomainRuntime.isProtectedInteriorStructureBlock(centerX, centerZ, baseY, innerRadius, innerHeight, immutablePos);
+						if (shell || targetState.isOf(Blocks.LIGHT) || protectGreedInterior) {
 							protectedShellStates.put(immutablePos, targetState);
 						}
 
@@ -4211,7 +4252,7 @@ public final class MagicAbilityManager {
 						}
 
 						if (hasProtectedDecorationEntity(world, immutablePos)) {
-							if (shell || targetState.isOf(Blocks.LIGHT)) {
+							if (shell || targetState.isOf(Blocks.LIGHT) || protectGreedInterior) {
 								protectedShellStates.put(immutablePos, currentState);
 							}
 							continue;
@@ -4235,7 +4276,7 @@ public final class MagicAbilityManager {
 			centerDz,
 			baseY,
 			innerRadius,
-			height
+			innerHeight
 		);
 		playDomainActivationSounds(world, player);
 
@@ -4269,6 +4310,19 @@ public final class MagicAbilityManager {
 			capturedEntities
 		);
 		DOMAIN_EXPANSIONS.put(player.getUuid(), state);
+		if (ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			GreedDomainRuntime.onDomainActivated(
+				player,
+				world,
+				centerDx,
+				centerDz,
+				baseY,
+				innerRadius,
+				innerHeight,
+				capturedEntities.keySet(),
+				currentTick
+			);
+		}
 		persistDomainRuntimeState(world.getServer());
 	}
 
@@ -4293,6 +4347,20 @@ public final class MagicAbilityManager {
 		int currentTick
 	) {
 		cancelDomainClash(ownerId, server);
+		ServerWorld world = server.getWorld(state.dimension);
+		if (world != null && state.ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			GreedDomainRuntime.onDomainEnded(
+				server,
+				ownerId,
+				world,
+				state.centerX,
+				state.centerZ,
+				state.baseY,
+				state.innerRadius,
+				state.innerHeight,
+				currentTick
+			);
+		}
 		restoreDomainExpansion(server, state);
 		applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier);
 	}
@@ -4345,11 +4413,30 @@ public final class MagicAbilityManager {
 			UUID ownerId = entry.getKey();
 			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(ownerId);
 			boolean clashActive = DOMAIN_CLASHES_BY_OWNER.containsKey(ownerId);
+			if (!clashActive && state.ability == MagicAbility.GREED_DOMAIN_EXPANSION && GreedDomainRuntime.shouldPauseDomainTimer(ownerId, currentTick)) {
+				state.expiresTick++;
+				if (state.effectEndTick != Integer.MAX_VALUE) {
+					state.effectEndTick++;
+				}
+			}
 			boolean expired = !clashActive && currentTick >= state.expiresTick;
 
 			if (!expired) {
 				if (!(clashActive && DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS) && state.ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
 					changed |= updateFrostDomain(world, ownerId, state, currentTick);
+				}
+				if (!(clashActive && DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS) && state.ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+					GreedDomainRuntime.updateActiveDomain(
+						server,
+						world,
+						ownerId,
+						state.centerX,
+						state.centerZ,
+						state.baseY,
+						state.innerRadius,
+						state.innerHeight,
+						currentTick
+					);
 				}
 				if (!(clashActive && DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS)) {
 					enforceCapturedEntitiesInsideDomain(world, state);
@@ -4360,6 +4447,19 @@ public final class MagicAbilityManager {
 
 			if (state.ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
 				executeFrostDomainFinale(world, ownerId, state);
+			}
+			if (state.ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+				GreedDomainRuntime.onDomainEnded(
+					server,
+					ownerId,
+					world,
+					state.centerX,
+					state.centerZ,
+					state.baseY,
+					state.innerRadius,
+					state.innerHeight,
+					currentTick
+				);
 			}
 			cancelDomainClash(ownerId, server);
 			restoreDomainExpansion(server, state);
@@ -4557,6 +4657,10 @@ public final class MagicAbilityManager {
 		spendAbilityCost(challenger, DOMAIN_EXPANSION_ACTIVATION_MANA_COST);
 		setActiveAbility(challenger, MagicAbility.NONE);
 		startDomainCooldown(challenger.getUuid(), challengerAbility, currentTick, 1.0);
+		if (challengerAbility == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			GreedRuntime.recordSuccessfulMagicAbilityUse(challenger, challengerAbility);
+		}
+		recordOrionsGambitAbilityUse(challenger, challengerAbility);
 
 		DOMAIN_EXPANSIONS.remove(ownerId);
 		cancelDomainClash(ownerId, server);
@@ -5168,12 +5272,22 @@ public final class MagicAbilityManager {
 				pos
 			);
 			if (hasProtectedDecorationEntity(world, pos)) {
-				if (shell || targetState.isOf(Blocks.LIGHT)) {
+				if (
+					shell
+						|| targetState.isOf(Blocks.LIGHT)
+						|| ability == MagicAbility.GREED_DOMAIN_EXPANSION
+							&& GreedDomainRuntime.isProtectedInteriorStructureBlock(centerX, centerZ, state.baseY, state.innerRadius, state.innerHeight, pos)
+				) {
 					refreshedShell.put(pos, savedEntry.getValue().blockState);
 				}
 				continue;
 			}
-			if (shell || targetState.isOf(Blocks.LIGHT)) {
+			if (
+				shell
+					|| targetState.isOf(Blocks.LIGHT)
+					|| ability == MagicAbility.GREED_DOMAIN_EXPANSION
+						&& GreedDomainRuntime.isProtectedInteriorStructureBlock(centerX, centerZ, state.baseY, state.innerRadius, state.innerHeight, pos)
+			) {
 				refreshedShell.put(pos, targetState);
 			}
 			setDomainBlockState(world, pos, targetState, DOMAIN_BLOCK_PLACE_FLAGS);
@@ -5185,6 +5299,22 @@ public final class MagicAbilityManager {
 
 	public static boolean isDomainClashParticipantInvincible(Entity entity) {
 		return DOMAIN_CLASH_PARTICIPANTS_INVINCIBLE && domainClashStateForParticipant(entity.getUuid()) != null;
+	}
+
+	public static boolean isGreedDomainIntroFrozen(ServerPlayerEntity player) {
+		if (player == null || player.getEntityWorld().isClient()) {
+			return false;
+		}
+		MinecraftServer server = player.getEntityWorld().getServer();
+		return server != null && GreedDomainRuntime.isPlayerFrozenDuringIntro(player, server.getTicks());
+	}
+
+	public static boolean isGreedDomainIntroInvincible(Entity entity) {
+		if (!(entity instanceof ServerPlayerEntity player) || player.getEntityWorld().isClient()) {
+			return false;
+		}
+		MinecraftServer server = player.getEntityWorld().getServer();
+		return server != null && GreedDomainRuntime.isPlayerInvulnerableDuringIntro(player, server.getTicks());
 	}
 
 	private static void maintainDomainShell(ServerWorld world, DomainExpansionState state) {
@@ -5221,7 +5351,33 @@ public final class MagicAbilityManager {
 			}
 
 			Vec3d safePos = captured.lastSafePos;
+			if (
+				safePos == null
+				|| !isInsideDomainInterior(
+					(safePos.x - state.centerX) * (safePos.x - state.centerX) + (safePos.z - state.centerZ) * (safePos.z - state.centerZ),
+					safePos.y - state.baseY,
+					state.innerRadius,
+					state.innerHeight
+				)
+				|| !isSafeDomainTeleportPosition(world, living, safePos.x, safePos.y, safePos.z)
+			) {
+				safePos = findNearestSafeDomainOccupantPosition(
+					world,
+					living,
+					state.centerX,
+					state.centerZ,
+					state.baseY,
+					state.innerRadius,
+					state.innerHeight,
+					living.getX(),
+					living.getZ()
+				);
+			}
+			if (safePos == null) {
+				safePos = new Vec3d(state.centerX, state.baseY + 1.0, state.centerZ);
+			}
 			teleportDomainEntity(living, safePos.x, safePos.y, safePos.z, captured.lastSafeYaw, captured.lastSafePitch);
+			captured.lastSafePos = safePos;
 		}
 	}
 
@@ -5286,11 +5442,9 @@ public final class MagicAbilityManager {
 		double centerZ,
 		int baseY,
 		int innerRadius,
-		int height
+		int innerHeight
 	) {
 		double maxRadius = Math.max(0.0, innerRadius - 1.5);
-		double minY = baseY + 1.0;
-		double maxY = baseY + Math.max(2, height - 2);
 
 		for (DomainCapturedEntityState captured : capturedEntities) {
 			Entity entity = world.getEntity(captured.entityId);
@@ -5300,7 +5454,6 @@ public final class MagicAbilityManager {
 
 			double targetX = captured.position.x;
 			double targetZ = captured.position.z;
-			double targetY = MathHelper.clamp(captured.position.y, minY, maxY);
 			double dx = targetX - centerX;
 			double dz = targetZ - centerZ;
 			double distance = Math.sqrt(dx * dx + dz * dz);
@@ -5309,12 +5462,116 @@ public final class MagicAbilityManager {
 				targetX = centerX + dx * scale;
 				targetZ = centerZ + dz * scale;
 			}
+			Vec3d safePos = findNearestSafeDomainOccupantPosition(world, living, centerX, centerZ, baseY, innerRadius, innerHeight, targetX, targetZ);
+			if (safePos == null) {
+				safePos = findNearestSafeDomainOccupantPosition(world, living, centerX, centerZ, baseY, innerRadius, innerHeight, centerX, centerZ);
+			}
+			if (safePos == null) {
+				safePos = new Vec3d(centerX, baseY + 1.0, centerZ);
+			}
 
-			teleportDomainEntity(living, targetX, targetY, targetZ, captured.yaw, captured.pitch);
-			captured.lastSafePos = new Vec3d(targetX, targetY, targetZ);
+			teleportDomainEntity(living, safePos.x, safePos.y, safePos.z, captured.yaw, captured.pitch);
+			captured.lastSafePos = safePos;
 			captured.lastSafeYaw = captured.yaw;
 			captured.lastSafePitch = captured.pitch;
 		}
+	}
+
+	private static Vec3d findNearestSafeDomainOccupantPosition(
+		ServerWorld world,
+		LivingEntity entity,
+		double centerX,
+		double centerZ,
+		int baseY,
+		int innerRadius,
+		int innerHeight,
+		double preferredX,
+		double preferredZ
+	) {
+		int preferredBlockX = MathHelper.floor(preferredX);
+		int preferredBlockZ = MathHelper.floor(preferredZ);
+		int searchRadius = Math.max(1, innerRadius * 2);
+		for (int radius = 0; radius <= searchRadius; radius++) {
+			Vec3d bestCandidate = null;
+			double bestDistanceSq = Double.MAX_VALUE;
+			for (int dx = -radius; dx <= radius; dx++) {
+				for (int dz = -radius; dz <= radius; dz++) {
+					if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) {
+						continue;
+					}
+					Vec3d candidate = safeDomainOccupantPositionAtColumn(
+						world,
+						entity,
+						centerX,
+						centerZ,
+						baseY,
+						innerRadius,
+						innerHeight,
+						preferredBlockX + dx,
+						preferredBlockZ + dz
+					);
+					if (candidate == null) {
+						continue;
+					}
+					double distanceSq = squaredHorizontalDistance(candidate.x, candidate.z, preferredX, preferredZ);
+					if (distanceSq < bestDistanceSq) {
+						bestDistanceSq = distanceSq;
+						bestCandidate = candidate;
+					}
+				}
+			}
+			if (bestCandidate != null) {
+				return bestCandidate;
+			}
+		}
+		return null;
+	}
+
+	private static Vec3d safeDomainOccupantPositionAtColumn(
+		ServerWorld world,
+		LivingEntity entity,
+		double centerX,
+		double centerZ,
+		int baseY,
+		int innerRadius,
+		int innerHeight,
+		int blockX,
+		int blockZ
+	) {
+		double targetX = blockX + 0.5;
+		double targetZ = blockZ + 0.5;
+		double horizontalDistanceSq = squaredHorizontalDistance(targetX, targetZ, centerX, centerZ);
+		for (int supportY : new int[] { baseY + 1, baseY }) {
+			BlockPos supportPos = new BlockPos(blockX, supportY, blockZ);
+			BlockState supportState = world.getBlockState(supportPos);
+			VoxelShape supportShape = supportState.getCollisionShape(world, supportPos);
+			if (supportShape.isEmpty()) {
+				continue;
+			}
+			if (supportY > baseY && supportState.blocksMovement()) {
+				continue;
+			}
+			double targetY = supportPos.getY() + supportShape.getMax(Direction.Axis.Y);
+			if (!isInsideDomainInterior(horizontalDistanceSq, targetY - baseY, innerRadius, innerHeight)) {
+				continue;
+			}
+			if (!isSafeDomainTeleportPosition(world, entity, targetX, targetY, targetZ)) {
+				continue;
+			}
+			return new Vec3d(targetX, targetY, targetZ);
+		}
+		return null;
+	}
+
+	private static boolean isSafeDomainTeleportPosition(ServerWorld world, LivingEntity entity, double x, double y, double z) {
+		Box targetBox = entity.getBoundingBox().offset(x - entity.getX(), y - entity.getY(), z - entity.getZ());
+		return world.isSpaceEmpty(entity, targetBox) && !world.containsFluid(targetBox);
+	}
+
+	private static double squaredHorizontalDistance(double x1, double z1, double x2, double z2) {
+		double dx = x1 - x2;
+		double dz = z1 - z2;
+		return dx * dx + dz * dz;
 	}
 
 	private static void restoreCapturedEntities(MinecraftServer server, DomainExpansionState state) {
@@ -5521,6 +5778,7 @@ public final class MagicAbilityManager {
 		DOMAIN_CLASH_PENDING_DAMAGE.clear();
 		FROST_DOMAIN_COOLDOWN_END_TICK.clear();
 		LOVE_DOMAIN_COOLDOWN_END_TICK.clear();
+		GREED_DOMAIN_COOLDOWN_END_TICK.clear();
 		MAGIC_DAMAGE_PENDING_ATTACKER.clear();
 		DOMAIN_PENDING_RETURNS.clear();
 		FROST_STAGE_STATES.clear();
@@ -5544,6 +5802,7 @@ public final class MagicAbilityManager {
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
 		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.clear();
 		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.clear();
+		GreedDomainRuntime.onServerStarted(server);
 		loadPersistedDomainRuntimeState(server);
 	}
 
@@ -5571,6 +5830,8 @@ public final class MagicAbilityManager {
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
 		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.clear();
 		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.clear();
+		GREED_DOMAIN_COOLDOWN_END_TICK.clear();
+		GreedDomainRuntime.onServerStopping(server);
 		DOMAIN_PENDING_RETURNS.clear();
 	}
 
@@ -5999,6 +6260,7 @@ public final class MagicAbilityManager {
 			}
 		}
 		GreedRuntime.onEndServerTick(server, currentTick);
+		GreedDomainRuntime.onEndServerTick(server, currentTick);
 		enforceOrionsGambitGreedTargetCoins(server);
 	}
 
@@ -6236,6 +6498,7 @@ public final class MagicAbilityManager {
 			persistDomainRuntimeState(server);
 		}
 
+		GreedDomainRuntime.onPlayerDeath(player);
 		GreedRuntime.onPlayerDeath(player);
 	}
 
@@ -6457,6 +6720,10 @@ public final class MagicAbilityManager {
 		}
 
 		double regenPercent = depletedMode ? DEPLETED_RECOVERY_REGEN_PER_SECOND : PASSIVE_MANA_REGEN_PER_SECOND;
+		regenPercent *= GreedDomainRuntime.manaRegenMultiplier(player, player.getEntityWorld().getServer().getTicks());
+		if (regenPercent <= 0.0) {
+			return;
+		}
 		double bufferedRegen = MANA_REGEN_BUFFER.getOrDefault(playerId, 0.0) + manaFromPercentExact(regenPercent);
 		int regenAmount = Math.max(0, (int) Math.floor(bufferedRegen + 1.0E-7));
 		double remainingRegen = Math.max(0.0, bufferedRegen - regenAmount);
@@ -7694,7 +7961,10 @@ public final class MagicAbilityManager {
 		target.fallDistance = 0.0F;
 		target.velocityDirty = true;
 		if (target instanceof ServerPlayerEntity playerTarget) {
-			playerTarget.networkHandler.requestTeleport(playerTarget.getX(), playerTarget.getY(), playerTarget.getZ(), playerTarget.getYaw(), playerTarget.getPitch());
+			playerTarget.networkHandler.requestTeleport(
+				new EntityPosition(new Vec3d(playerTarget.getX(), playerTarget.getY(), playerTarget.getZ()), playerTarget.getVelocity(), playerTarget.getYaw(), playerTarget.getPitch()),
+				Set.of()
+			);
 			playerTarget.networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(playerTarget.getId(), playerTarget.getVelocity()));
 		}
 	}
@@ -9748,7 +10018,10 @@ public final class MagicAbilityManager {
 			COMEDIC_REWRITE_COOLDOWN_END_TICK.remove(playerId);
 			return;
 		}
-		COMEDIC_REWRITE_COOLDOWN_END_TICK.put(playerId, currentTick + COMEDIC_REWRITE_COOLDOWN_TICKS);
+		COMEDIC_REWRITE_COOLDOWN_END_TICK.put(
+			playerId,
+			currentTick + adjustedCooldownTicks(playerId, MagicAbility.COMEDIC_REWRITE, COMEDIC_REWRITE_COOLDOWN_TICKS, currentTick)
+		);
 	}
 
 	private static void startComedicAssistantCooldown(UUID playerId, int currentTick, int cooldownTicks) {
@@ -9762,7 +10035,10 @@ public final class MagicAbilityManager {
 			COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(playerId);
 			return;
 		}
-		COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(playerId, currentTick + safeCooldownTicks);
+		COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(
+			playerId,
+			currentTick + adjustedCooldownTicks(playerId, MagicAbility.COMEDIC_ASSISTANT, safeCooldownTicks, currentTick)
+		);
 	}
 
 	private static void startPlusUltraCooldown(UUID playerId, int currentTick, int cooldownTicks) {
@@ -9776,7 +10052,10 @@ public final class MagicAbilityManager {
 			PLUS_ULTRA_COOLDOWN_END_TICK.remove(playerId);
 			return;
 		}
-		PLUS_ULTRA_COOLDOWN_END_TICK.put(playerId, currentTick + safeCooldownTicks);
+		PLUS_ULTRA_COOLDOWN_END_TICK.put(
+			playerId,
+			currentTick + adjustedCooldownTicks(playerId, MagicAbility.PLUS_ULTRA, safeCooldownTicks, currentTick)
+		);
 	}
 
 	private static boolean hasActiveComedicRewriteImmunity(UUID playerId, int currentTick) {
@@ -9865,18 +10144,20 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean canSpendAbilityCost(ServerPlayerEntity player, int manaCost) {
-		return isTestingMode(player) || isOrionsGambitManaCostSuppressed(player) || MagicPlayerData.getMana(player) >= Math.max(0, manaCost);
+		int adjustedManaCost = GreedDomainRuntime.adjustManaCost(player, manaCost);
+		return isTestingMode(player) || isOrionsGambitManaCostSuppressed(player) || MagicPlayerData.getMana(player) >= Math.max(0, adjustedManaCost);
 	}
 
 	private static void spendAbilityCost(ServerPlayerEntity player, int manaCost) {
+		int adjustedManaCost = GreedDomainRuntime.adjustManaCost(player, manaCost);
 		if (isTestingMode(player)) {
 			MagicPlayerData.setMana(player, MagicPlayerData.MAX_MANA);
 			MagicPlayerData.setDepletedRecoveryMode(player, false);
 			return;
 		}
 
-		if (!isOrionsGambitManaCostSuppressed(player) && manaCost > 0) {
-			MagicPlayerData.setMana(player, Math.max(0, MagicPlayerData.getMana(player) - manaCost));
+		if (!isOrionsGambitManaCostSuppressed(player) && adjustedManaCost > 0) {
+			MagicPlayerData.setMana(player, Math.max(0, MagicPlayerData.getMana(player) - adjustedManaCost));
 		}
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
 	}
@@ -9990,6 +10271,10 @@ public final class MagicAbilityManager {
 	}
 
 	private static void recordOrionsGambitAbilityUse(ServerPlayerEntity player, MagicAbility ability, int trackedCooldownTicks) {
+		if (ability != null && ability.school() != MagicSchool.GREED) {
+			GreedRuntime.recordSuccessfulMagicAbilityUse(player, ability);
+		}
+
 		UUID casterId = ORIONS_GAMBIT_CASTER_BY_TARGET.get(player.getUuid());
 		if (casterId == null) {
 			return;
@@ -10655,7 +10940,10 @@ public final class MagicAbilityManager {
 			? ORIONS_GAMBIT_WAIT_CANCEL_COOLDOWN_TICKS
 			: ORIONS_GAMBIT_COOLDOWN_TICKS;
 		if (cooldownTicks > 0) {
-			ORIONS_GAMBIT_COOLDOWN_END_TICK.put(casterId, currentTick + cooldownTicks);
+			ORIONS_GAMBIT_COOLDOWN_END_TICK.put(
+				casterId,
+				currentTick + adjustedCooldownTicks(casterId, MagicAbility.ORIONS_GAMBIT, cooldownTicks, currentTick)
+			);
 		}
 
 		if (activeAbility(caster) == MagicAbility.ORIONS_GAMBIT) {
@@ -10789,7 +11077,10 @@ public final class MagicAbilityManager {
 			if (ability == MagicAbility.WITTY_ONE_LINER && state.usedTargetCooldownOverrides.containsKey(ability)) {
 				int cooldownTicks = Math.max(0, state.usedTargetCooldownOverrides.get(ability));
 				if (cooldownTicks > 0) {
-					WITTY_ONE_LINER_COOLDOWN_END_TICK.put(state.targetId, currentTick + cooldownTicks);
+					WITTY_ONE_LINER_COOLDOWN_END_TICK.put(
+						state.targetId,
+						currentTick + adjustedCooldownTicks(state.targetId, ability, cooldownTicks, currentTick)
+					);
 				} else {
 					WITTY_ONE_LINER_COOLDOWN_END_TICK.remove(state.targetId);
 				}
@@ -10798,7 +11089,10 @@ public final class MagicAbilityManager {
 			if (ability == MagicAbility.COMEDIC_ASSISTANT && state.usedTargetCooldownOverrides.containsKey(ability)) {
 				int cooldownTicks = Math.max(0, state.usedTargetCooldownOverrides.get(ability));
 				if (cooldownTicks > 0) {
-					COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(state.targetId, currentTick + cooldownTicks);
+					COMEDIC_ASSISTANT_COOLDOWN_END_TICK.put(
+						state.targetId,
+						currentTick + adjustedCooldownTicks(state.targetId, ability, cooldownTicks, currentTick)
+					);
 				} else {
 					COMEDIC_ASSISTANT_COOLDOWN_END_TICK.remove(state.targetId);
 				}
@@ -10807,7 +11101,10 @@ public final class MagicAbilityManager {
 			if (ability == MagicAbility.PLUS_ULTRA && state.usedTargetCooldownOverrides.containsKey(ability)) {
 				int cooldownTicks = Math.max(0, state.usedTargetCooldownOverrides.get(ability));
 				if (cooldownTicks > 0) {
-					PLUS_ULTRA_COOLDOWN_END_TICK.put(state.targetId, currentTick + cooldownTicks);
+					PLUS_ULTRA_COOLDOWN_END_TICK.put(
+						state.targetId,
+						currentTick + adjustedCooldownTicks(state.targetId, ability, cooldownTicks, currentTick)
+					);
 				} else {
 					PLUS_ULTRA_COOLDOWN_END_TICK.remove(state.targetId);
 				}
@@ -11569,16 +11866,13 @@ public final class MagicAbilityManager {
 		if (world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer)) {
 			return ActionResult.PASS;
 		}
-
-		if (!isEntityCapturedByDomain(serverPlayer)) {
-			return ActionResult.PASS;
+		if (isEntityCapturedByDomain(serverPlayer)) {
+			if (stack.isOf(Items.CHORUS_FRUIT) || stack.isOf(Items.ENDER_PEARL)) {
+				serverPlayer.sendMessage(Text.translatable("message.magic.domain.teleport_blocked"), true);
+				return ActionResult.FAIL;
+			}
 		}
-
-		if (stack.isOf(Items.CHORUS_FRUIT) || stack.isOf(Items.ENDER_PEARL)) {
-			serverPlayer.sendMessage(Text.translatable("message.magic.domain.teleport_blocked"), true);
-			return ActionResult.FAIL;
-		}
-
+		GreedRuntime.onUseItem(serverPlayer, stack);
 		return ActionResult.PASS;
 	}
 
@@ -11713,12 +12007,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean isArtifactItem(ItemStack stack) {
-		if (stack.isEmpty()) {
-			return false;
-		}
-
-		Identifier itemId = Registries.ITEM.getId(stack.getItem());
-		return ARTIFACT_ITEM_NAMESPACE.equals(itemId.getNamespace());
+		return GreedDomainRuntime.isArtifactItem(stack);
 	}
 
 	private static void applyOrRefreshFrostbite(LivingEntity target, UUID casterId, int currentTick) {
@@ -11935,13 +12224,13 @@ public final class MagicAbilityManager {
 				target.setHealth(nextHealth);
 				return;
 			}
-			dealTrackedMagicDamage(target, casterId, world.getDamageSources().genericKill(), amount);
+			dealTrackedMagicDamage(target, casterId, world.getDamageSources().magic(), amount);
 		}
 	}
 
 	private static void dealAbsoluteZeroAuraDamage(UUID casterId, LivingEntity target) {
 		if (target.getEntityWorld() instanceof ServerWorld world) {
-			dealTrackedMagicDamage(target, casterId, world.getDamageSources().genericKill(), ABSOLUTE_ZERO_AURA_DAMAGE);
+			dealTrackedMagicDamage(target, casterId, world.getDamageSources().magic(), ABSOLUTE_ZERO_AURA_DAMAGE);
 		}
 	}
 
@@ -12272,7 +12561,8 @@ public final class MagicAbilityManager {
 				MagicAbility.APPRAISERS_MARK,
 				MagicAbility.TOLLKEEPERS_CLAIM,
 				MagicAbility.KINGS_DUES,
-				MagicAbility.BANKRUPTCY
+				MagicAbility.BANKRUPTCY,
+				MagicAbility.GREED_DOMAIN_EXPANSION
 			);
 			default -> List.of();
 		};
@@ -12299,7 +12589,7 @@ public final class MagicAbilityManager {
 			case SAGITTARIUS_ASTRAL_ARROW -> sagittariusAstralArrowCooldownRemaining(player, currentTick);
 			case ORIONS_GAMBIT -> orionsGambitCooldownRemaining(player, currentTick);
 			case APPRAISERS_MARK, TOLLKEEPERS_CLAIM, KINGS_DUES, BANKRUPTCY -> GreedRuntime.cooldownRemaining(player, ability, currentTick);
-			case FROST_DOMAIN_EXPANSION, LOVE_DOMAIN_EXPANSION, ASTRAL_CATACLYSM -> domainCooldownRemaining(player, ability, currentTick);
+			case FROST_DOMAIN_EXPANSION, LOVE_DOMAIN_EXPANSION, ASTRAL_CATACLYSM, GREED_DOMAIN_EXPANSION -> domainCooldownRemaining(player, ability, currentTick);
 			default -> 0;
 		};
 	}
@@ -12471,6 +12761,9 @@ public final class MagicAbilityManager {
 		if (ability == MagicAbility.ASTRAL_CATACLYSM) {
 			return Math.max(0, ASTRAL_CATACLYSM_COOLDOWN_END_TICK.getOrDefault(playerId, 0) - currentTick);
 		}
+		if (ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			return Math.max(0, GREED_DOMAIN_COOLDOWN_END_TICK.getOrDefault(playerId, 0) - currentTick);
+		}
 		return 0;
 	}
 
@@ -12485,7 +12778,7 @@ public final class MagicAbilityManager {
 		}
 
 		double safeMultiplier = MathHelper.clamp(multiplier, 0.0, 10.0);
-		int cooldownTicks = (int) Math.ceil(baseTicks * safeMultiplier);
+		int cooldownTicks = adjustedCooldownTicks(playerId, ability, (int) Math.ceil(baseTicks * safeMultiplier), currentTick);
 		if (cooldownTicks <= 0) {
 			return;
 		}
@@ -12502,6 +12795,11 @@ public final class MagicAbilityManager {
 
 		if (ability == MagicAbility.ASTRAL_CATACLYSM) {
 			ASTRAL_CATACLYSM_COOLDOWN_END_TICK.put(playerId, currentTick + cooldownTicks);
+			return;
+		}
+
+		if (ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			GREED_DOMAIN_COOLDOWN_END_TICK.put(playerId, currentTick + cooldownTicks);
 		}
 	}
 
@@ -12530,6 +12828,9 @@ public final class MagicAbilityManager {
 		if (ability == MagicAbility.ASTRAL_CATACLYSM) {
 			return Math.max(0, ASTRAL_CATACLYSM_COOLDOWN_TICKS);
 		}
+		if (ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			return Math.max(0, GreedDomainRuntime.domainCooldownTicks());
+		}
 		return 0;
 	}
 
@@ -12547,7 +12848,9 @@ public final class MagicAbilityManager {
 
 		int durationTicks = ability == MagicAbility.ASTRAL_CATACLYSM
 			? ASTRAL_CATACLYSM_DURATION_TICKS
-			: DOMAIN_EXPANSION_DURATION_TICKS;
+			: ability == MagicAbility.GREED_DOMAIN_EXPANSION
+				? GreedDomainRuntime.domainDurationTicks()
+				: DOMAIN_EXPANSION_DURATION_TICKS;
 		return currentTick + Math.max(TICKS_PER_SECOND, durationTicks);
 	}
 
@@ -12557,7 +12860,7 @@ public final class MagicAbilityManager {
 				BELOW_FREEZING_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			BELOW_FREEZING_COOLDOWN_END_TICK.put(playerId, currentTick + BELOW_FREEZING_COOLDOWN_TICKS);
+			BELOW_FREEZING_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, BELOW_FREEZING_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12566,7 +12869,7 @@ public final class MagicAbilityManager {
 				FROST_ASCENT_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			FROST_ASCENT_COOLDOWN_END_TICK.put(playerId, currentTick + FROST_ASCENT_COOLDOWN_TICKS);
+			FROST_ASCENT_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, FROST_ASCENT_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12575,7 +12878,7 @@ public final class MagicAbilityManager {
 				MARTYRS_FLAME_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			MARTYRS_FLAME_COOLDOWN_END_TICK.put(playerId, currentTick + MARTYRS_FLAME_COOLDOWN_TICKS);
+			MARTYRS_FLAME_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, MARTYRS_FLAME_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12584,7 +12887,7 @@ public final class MagicAbilityManager {
 				ABSOLUTE_ZERO_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			ABSOLUTE_ZERO_COOLDOWN_END_TICK.put(playerId, currentTick + ABSOLUTE_ZERO_COOLDOWN_TICKS);
+			ABSOLUTE_ZERO_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, ABSOLUTE_ZERO_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12593,7 +12896,7 @@ public final class MagicAbilityManager {
 				PLANCK_HEAT_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			PLANCK_HEAT_COOLDOWN_END_TICK.put(playerId, currentTick + PLANCK_HEAT_COOLDOWN_TICKS);
+			PLANCK_HEAT_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, PLANCK_HEAT_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12607,7 +12910,7 @@ public final class MagicAbilityManager {
 				WITTY_ONE_LINER_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			WITTY_ONE_LINER_COOLDOWN_END_TICK.put(playerId, currentTick + cooldownTicks);
+			WITTY_ONE_LINER_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, cooldownTicks, currentTick));
 			return;
 		}
 
@@ -12631,7 +12934,7 @@ public final class MagicAbilityManager {
 				TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.put(playerId, currentTick + TILL_DEATH_DO_US_PART_COOLDOWN_TICKS);
+			TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, TILL_DEATH_DO_US_PART_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12640,7 +12943,7 @@ public final class MagicAbilityManager {
 				MANIPULATION_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			MANIPULATION_COOLDOWN_END_TICK.put(playerId, currentTick + MANIPULATION_COOLDOWN_TICKS);
+			MANIPULATION_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, MANIPULATION_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12649,7 +12952,7 @@ public final class MagicAbilityManager {
 				HERCULES_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			HERCULES_COOLDOWN_END_TICK.put(playerId, currentTick + HERCULES_COOLDOWN_TICKS);
+			HERCULES_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, HERCULES_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12658,7 +12961,7 @@ public final class MagicAbilityManager {
 				SAGITTARIUS_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			SAGITTARIUS_COOLDOWN_END_TICK.put(playerId, currentTick + SAGITTARIUS_COOLDOWN_TICKS);
+			SAGITTARIUS_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, SAGITTARIUS_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12667,7 +12970,7 @@ public final class MagicAbilityManager {
 				ORIONS_GAMBIT_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			ORIONS_GAMBIT_COOLDOWN_END_TICK.put(playerId, currentTick + ORIONS_GAMBIT_COOLDOWN_TICKS);
+			ORIONS_GAMBIT_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, ORIONS_GAMBIT_COOLDOWN_TICKS, currentTick));
 			return;
 		}
 
@@ -12681,19 +12984,30 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		if (ability == MagicAbility.FROST_DOMAIN_EXPANSION || ability == MagicAbility.LOVE_DOMAIN_EXPANSION || ability == MagicAbility.ASTRAL_CATACLYSM) {
+		if (
+			ability == MagicAbility.FROST_DOMAIN_EXPANSION
+			|| ability == MagicAbility.LOVE_DOMAIN_EXPANSION
+			|| ability == MagicAbility.ASTRAL_CATACLYSM
+			|| ability == MagicAbility.GREED_DOMAIN_EXPANSION
+		) {
 			if (isCooldownDeferredByOrionsGambit(playerId, ability)) {
 				if (ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
 					FROST_DOMAIN_COOLDOWN_END_TICK.remove(playerId);
 				} else if (ability == MagicAbility.LOVE_DOMAIN_EXPANSION) {
 					LOVE_DOMAIN_COOLDOWN_END_TICK.remove(playerId);
-				} else {
+				} else if (ability == MagicAbility.ASTRAL_CATACLYSM) {
 					ASTRAL_CATACLYSM_COOLDOWN_END_TICK.remove(playerId);
+				} else {
+					GREED_DOMAIN_COOLDOWN_END_TICK.remove(playerId);
 				}
 				return;
 			}
 			startDomainCooldown(playerId, ability, currentTick, 1.0);
 		}
+	}
+
+	static void forceAbilityCooldown(UUID playerId, MagicAbility ability, int currentTick) {
+		startAbilityCooldownFromNow(playerId, ability, currentTick);
 	}
 
 	private static boolean isCooldownDeferredByOrionsGambit(UUID playerId, MagicAbility ability) {
@@ -12709,6 +13023,10 @@ public final class MagicAbilityManager {
 
 		state.usedTargetAbilities.add(ability);
 		return ORIONS_GAMBIT_SUPPRESS_TARGET_COOLDOWNS;
+	}
+
+	private static int adjustedCooldownTicks(UUID playerId, MagicAbility ability, int baseTicks, int currentTick) {
+		return Math.max(0, GreedDomainRuntime.adjustCooldownTicks(playerId, ability, baseTicks, currentTick));
 	}
 
 	private static void applyDomainInstabilityPenalty(ServerPlayerEntity player) {
@@ -12816,7 +13134,8 @@ public final class MagicAbilityManager {
 	private static boolean isDomainExpansion(MagicAbility ability) {
 		return ability == MagicAbility.FROST_DOMAIN_EXPANSION
 			|| ability == MagicAbility.LOVE_DOMAIN_EXPANSION
-			|| ability == MagicAbility.ASTRAL_CATACLYSM;
+			|| ability == MagicAbility.ASTRAL_CATACLYSM
+			|| ability == MagicAbility.GREED_DOMAIN_EXPANSION;
 	}
 
 	private static boolean isMaximumAbility(MagicAbility ability) {
@@ -12955,15 +13274,20 @@ public final class MagicAbilityManager {
 		BlockPos pos
 	) {
 		if (ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
-			return resolveFrostDomainState(shell, pos, centerX, centerZ, baseY, radius, height);
+			return resolveFrostDomainState(shell, pos, centerX, centerZ, baseY, radius, height, innerRadius, innerHeight);
 		}
 
 		if (ability == MagicAbility.ASTRAL_CATACLYSM) {
 			return resolveConstellationDomainState(shell, pos, centerX, centerZ, baseY, height, innerRadius, innerHeight);
 		}
 
+		if (ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			return GreedDomainRuntime.resolveDomainState(shell, centerX, centerZ, baseY, radius, height, innerRadius, innerHeight, pos);
+		}
+
 		if (ability != MagicAbility.LOVE_DOMAIN_EXPANSION) {
-			return shell ? DOMAIN_SHELL_BLOCK_STATE : DOMAIN_INTERIOR_BLOCK_STATE;
+			BlockState sharedLightState = resolveSharedDomainInteriorLightState(pos, baseY, centerX, centerZ, innerRadius, innerHeight);
+			return shell ? DOMAIN_SHELL_BLOCK_STATE : sharedLightState != null ? sharedLightState : DOMAIN_INTERIOR_BLOCK_STATE;
 		}
 
 		boolean roseSide = pos.getX() >= centerX;
@@ -12972,7 +13296,7 @@ public final class MagicAbilityManager {
 			return resolveLoveDomainShellState(pos, roseSide, relativeY, height);
 		}
 
-		return resolveLoveDomainInteriorState(pos, roseSide, relativeY, centerX, centerZ, innerRadius, innerHeight);
+		return resolveLoveDomainInteriorState(pos, roseSide, relativeY, baseY, centerX, centerZ, innerRadius, innerHeight);
 	}
 
 	private static BlockState resolveFrostDomainState(
@@ -12982,14 +13306,16 @@ public final class MagicAbilityManager {
 		int centerZ,
 		int baseY,
 		int radius,
-		int height
+		int height,
+		int innerRadius,
+		int innerHeight
 	) {
 		int relativeY = pos.getY() - baseY;
 		if (relativeY == 0) {
 			return resolveFrostDomainFloorState(pos, centerX, centerZ, radius);
 		}
 		if (!shell) {
-			return resolveFrostDomainInteriorState(pos, relativeY, centerX, centerZ, radius, height);
+			return resolveFrostDomainInteriorState(pos, relativeY, baseY, centerX, centerZ, innerRadius, innerHeight);
 		}
 		return resolveFrostDomainShellState(pos, centerX, centerZ, relativeY, height);
 	}
@@ -13051,13 +13377,18 @@ public final class MagicAbilityManager {
 	private static BlockState resolveFrostDomainInteriorState(
 		BlockPos pos,
 		int relativeY,
+		int baseY,
 		int centerX,
 		int centerZ,
 		int innerRadius,
 		int innerHeight
 	) {
 		if (shouldPlaceFrostDomainLight(pos, relativeY, centerX, centerZ, innerRadius, innerHeight)) {
-			return LOVE_DOMAIN_LIGHT_STATE;
+			return DOMAIN_INTERIOR_LIGHT_STATE;
+		}
+		BlockState sharedLightState = resolveSharedDomainInteriorLightState(pos, baseY, centerX, centerZ, innerRadius, innerHeight);
+		if (sharedLightState != null) {
+			return sharedLightState;
 		}
 		return DOMAIN_INTERIOR_BLOCK_STATE;
 	}
@@ -13138,7 +13469,11 @@ public final class MagicAbilityManager {
 		}
 
 		if (shouldPlaceConstellationDomainLight(pos, relativeY, centerX, centerZ, innerRadius, innerHeight)) {
-			return LOVE_DOMAIN_LIGHT_STATE;
+			return DOMAIN_INTERIOR_LIGHT_STATE;
+		}
+		BlockState sharedLightState = resolveSharedDomainInteriorLightState(pos, baseY, centerX, centerZ, innerRadius, innerHeight);
+		if (sharedLightState != null) {
+			return sharedLightState;
 		}
 		return DOMAIN_INTERIOR_BLOCK_STATE;
 	}
@@ -13189,6 +13524,7 @@ public final class MagicAbilityManager {
 		BlockPos pos,
 		boolean roseSide,
 		int relativeY,
+		int baseY,
 		int centerX,
 		int centerZ,
 		int innerRadius,
@@ -13213,7 +13549,11 @@ public final class MagicAbilityManager {
 		}
 
 		if (shouldPlaceLoveDomainLight(pos, relativeY, centerX, centerZ, innerRadius, innerHeight)) {
-			return LOVE_DOMAIN_LIGHT_STATE;
+			return DOMAIN_INTERIOR_LIGHT_STATE;
+		}
+		BlockState sharedLightState = resolveSharedDomainInteriorLightState(pos, baseY, centerX, centerZ, innerRadius, innerHeight);
+		if (sharedLightState != null) {
+			return sharedLightState;
 		}
 
 		if (roseSide && relativeY > 1) {
@@ -13248,6 +13588,49 @@ public final class MagicAbilityManager {
 			return false;
 		}
 
+		int horizontalDistanceSq = horizontalDistanceSq(pos.getX(), centerX, pos.getZ(), centerZ);
+		return isInsideDomainDome(horizontalDistanceSq, relativeY, innerRadius, innerHeight);
+	}
+
+	static BlockState resolveSharedDomainInteriorLightState(
+		BlockPos pos,
+		int baseY,
+		int centerX,
+		int centerZ,
+		int innerRadius,
+		int innerHeight
+	) {
+		if (!shouldPlaceSharedDomainInteriorLight(pos, pos.getY() - baseY, centerX, centerZ, innerRadius, innerHeight)) {
+			return null;
+		}
+		return DOMAIN_INTERIOR_LIGHT_STATE;
+	}
+
+	private static boolean shouldPlaceSharedDomainInteriorLight(
+		BlockPos pos,
+		int relativeY,
+		int centerX,
+		int centerZ,
+		int innerRadius,
+		int innerHeight
+	) {
+		if (!DOMAIN_CONTROL_INTERIOR_LIGHTING_ENABLED || relativeY < DOMAIN_CONTROL_INTERIOR_LIGHT_START_Y_OFFSET || relativeY >= innerHeight) {
+			return false;
+		}
+		if (
+			relativeY != DOMAIN_CONTROL_INTERIOR_LIGHT_START_Y_OFFSET
+				&& (relativeY - DOMAIN_CONTROL_INTERIOR_LIGHT_START_Y_OFFSET) % DOMAIN_CONTROL_INTERIOR_LIGHT_VERTICAL_SPACING != 0
+		) {
+			return false;
+		}
+		int dx = Math.abs(pos.getX() - centerX);
+		int dz = Math.abs(pos.getZ() - centerZ);
+		if (dx + dz <= 1) {
+			return true;
+		}
+		if (dx % DOMAIN_CONTROL_INTERIOR_LIGHT_HORIZONTAL_SPACING != 0 || dz % DOMAIN_CONTROL_INTERIOR_LIGHT_HORIZONTAL_SPACING != 0) {
+			return false;
+		}
 		int horizontalDistanceSq = horizontalDistanceSq(pos.getX(), centerX, pos.getZ(), centerZ);
 		return isInsideDomainDome(horizontalDistanceSq, relativeY, innerRadius, innerHeight);
 	}
@@ -13428,6 +13811,7 @@ public final class MagicAbilityManager {
 	private static boolean isControlLocked(PlayerEntity player) {
 		return isLoveLocked(player)
 			|| isDomainClashParticipantFrozen(player)
+			|| isGreedDomainIntroFrozen(player)
 			|| isAstralExecutionTarget(player)
 			|| isFrostMaximumFearLocked(player)
 			|| isFrostHelpless(player);
@@ -13486,14 +13870,27 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean isItemUseBlocked(PlayerEntity player) {
-		return isLoveItemUseBlocked(player) || isDomainClashParticipantFrozen(player) || isAstralExecutionTarget(player) || isFrostHelpless(player);
+		return isLoveItemUseBlocked(player)
+			|| isDomainClashParticipantFrozen(player)
+			|| isGreedDomainIntroFrozen(player)
+			|| isAstralExecutionTarget(player)
+			|| isFrostHelpless(player);
 	}
 
 	private static boolean isAttackBlocked(PlayerEntity player) {
 		return (LOVE_AT_FIRST_SIGHT_BLOCK_ATTACKS && isLoveLocked(player))
 			|| isDomainClashParticipantFrozen(player)
+			|| isGreedDomainIntroFrozen(player)
 			|| isAstralExecutionTarget(player)
 			|| isFrostHelpless(player);
+	}
+
+	private static boolean isGreedDomainIntroFrozen(PlayerEntity player) {
+		if (!(player instanceof ServerPlayerEntity serverPlayer) || player.getEntityWorld().isClient()) {
+			return false;
+		}
+		MinecraftServer server = player.getEntityWorld().getServer();
+		return server != null && GreedDomainRuntime.isPlayerFrozenDuringIntro(serverPlayer, server.getTicks());
 	}
 
 	public static boolean isPlayerControlLocked(ServerPlayerEntity player) {
@@ -13784,6 +14181,10 @@ public final class MagicAbilityManager {
 			return removed ? 1 : 0;
 		}
 
+		if (ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			return GREED_DOMAIN_COOLDOWN_END_TICK.remove(playerId) != null ? 1 : 0;
+		}
+
 		return 0;
 	}
 
@@ -13809,7 +14210,8 @@ public final class MagicAbilityManager {
 			+ resetCooldown(player, MagicAbility.MANIPULATION)
 			+ resetCooldown(player, MagicAbility.FROST_DOMAIN_EXPANSION)
 			+ resetCooldown(player, MagicAbility.LOVE_DOMAIN_EXPANSION)
-			+ resetCooldown(player, MagicAbility.ASTRAL_CATACLYSM);
+			+ resetCooldown(player, MagicAbility.ASTRAL_CATACLYSM)
+			+ resetCooldown(player, MagicAbility.GREED_DOMAIN_EXPANSION);
 	}
 
 	public static void clearLockedAbilityState(ServerPlayerEntity player, MagicAbility ability) {
@@ -13837,6 +14239,15 @@ public final class MagicAbilityManager {
 				deactivateDomainExpansion(player);
 				setActiveAbility(player, MagicAbility.NONE);
 			}
+			return;
+		}
+
+		if (ability == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			if (DOMAIN_EXPANSIONS.containsKey(player.getUuid()) && activeAbility(player) == MagicAbility.GREED_DOMAIN_EXPANSION) {
+				deactivateDomainExpansion(player);
+				setActiveAbility(player, MagicAbility.NONE);
+			}
+			GREED_DOMAIN_COOLDOWN_END_TICK.remove(player.getUuid());
 			return;
 		}
 
@@ -13959,9 +14370,12 @@ public final class MagicAbilityManager {
 		if (ASTRAL_CATACLYSM_COOLDOWN_END_TICK.remove(playerId) != null) {
 			domainStateChanged = true;
 		}
+		GREED_DOMAIN_COOLDOWN_END_TICK.remove(playerId);
 		if (clearCapturedDomainState(playerId)) {
 			domainStateChanged = true;
 		}
+
+		GreedDomainRuntime.clearAllRuntimeState(player);
 
 		LOVE_LOCKED_TARGETS.entrySet().removeIf(entry -> entry.getValue().casterId.equals(playerId));
 		List<UUID> linkedTillDeathCasters = new ArrayList<>();

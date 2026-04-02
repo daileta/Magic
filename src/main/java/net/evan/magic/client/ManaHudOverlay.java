@@ -1,5 +1,7 @@
 package net.evan.magic.client;
 
+import java.util.ArrayList;
+import java.util.List;
 import net.evan.magic.Magic;
 import net.evan.magic.config.MagicConfig;
 import net.evan.magic.magic.MagicPlayerData;
@@ -79,6 +81,13 @@ public final class ManaHudOverlay {
 	private static int constellationWarningStayTicks = 0;
 	private static int constellationWarningFadeOutTicks = 0;
 	private static int constellationWarningStartAge = Integer.MIN_VALUE;
+	private static List<Text> activeGreedDomainWarningLines = List.of();
+	private static int activeGreedDomainWarningColor = 0xFFFFFFFF;
+	private static int activeGreedDomainWarningOutlineColor = 0xFF000000;
+	private static float greedDomainWarningScale = 0.95F;
+	private static int greedDomainWarningDurationTicks = 0;
+	private static int greedDomainWarningLineSpacing = 11;
+	private static int greedDomainWarningStartAge = Integer.MIN_VALUE;
 
 	private ManaHudOverlay() {
 	}
@@ -93,11 +102,13 @@ public final class ManaHudOverlay {
 		if (client.player == null || client.world == null) {
 			clearJesterJoke();
 			clearConstellationWarning();
+			clearGreedDomainWarning();
 			return;
 		}
 
 		renderConstellationWarningOverlay(drawContext, client);
 		renderJesterJokeOverlay(drawContext, client);
+		renderGreedDomainWarningOverlay(drawContext, client);
 		if (!MagicPlayerData.hasMagic(client.player)) {
 			return;
 		}
@@ -200,6 +211,29 @@ public final class ManaHudOverlay {
 		constellationWarningStayTicks = Math.max(0, stayTicks);
 		constellationWarningFadeOutTicks = Math.max(0, fadeOutTicks);
 		constellationWarningStartAge = client.player == null ? Integer.MIN_VALUE : client.player.age;
+	}
+
+	public static void showGreedDomainWarning(
+		String message,
+		int colorRgb,
+		int outlineColorRgb,
+		float scale,
+		int durationTicks,
+		int lineSpacing
+	) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		ArrayList<Text> lines = new ArrayList<>();
+		String rawMessage = message == null ? "" : message;
+		for (String line : rawMessage.split("\\R", -1)) {
+			lines.add(Text.literal(line));
+		}
+		activeGreedDomainWarningLines = lines;
+		activeGreedDomainWarningColor = 0xFF000000 | (colorRgb & 0x00FFFFFF);
+		activeGreedDomainWarningOutlineColor = 0xFF000000 | (outlineColorRgb & 0x00FFFFFF);
+		greedDomainWarningScale = Math.max(0.5F, scale);
+		greedDomainWarningDurationTicks = Math.max(0, durationTicks);
+		greedDomainWarningLineSpacing = Math.max(8, lineSpacing);
+		greedDomainWarningStartAge = client.player == null ? Integer.MIN_VALUE : client.player.age;
 	}
 
 	private static void renderDomainTimerOverlay(DrawContext drawContext, MinecraftClient client) {
@@ -658,6 +692,55 @@ public final class ManaHudOverlay {
 		matrices.popMatrix();
 	}
 
+	private static void renderGreedDomainWarningOverlay(DrawContext drawContext, MinecraftClient client) {
+		if (activeGreedDomainWarningLines.isEmpty()) {
+			return;
+		}
+
+		if (greedDomainWarningStartAge == Integer.MIN_VALUE) {
+			greedDomainWarningStartAge = client.player.age;
+		}
+
+		int elapsed = Math.max(0, client.player.age - greedDomainWarningStartAge);
+		if (greedDomainWarningDurationTicks <= 0 || elapsed >= greedDomainWarningDurationTicks) {
+			clearGreedDomainWarning();
+			return;
+		}
+
+		int widestLineWidth = 0;
+		for (Text line : activeGreedDomainWarningLines) {
+			widestLineWidth = Math.max(widestLineWidth, client.textRenderer.getWidth(line));
+		}
+		int totalHeight = client.textRenderer.fontHeight;
+		if (activeGreedDomainWarningLines.size() > 1) {
+			totalHeight += (activeGreedDomainWarningLines.size() - 1) * greedDomainWarningLineSpacing;
+		}
+		float maxWidth = Math.max(1.0F, drawContext.getScaledWindowWidth() - 24.0F);
+		float maxHeight = Math.max(1.0F, drawContext.getScaledWindowHeight() - 36.0F);
+		float fittedScale = greedDomainWarningScale;
+		if (widestLineWidth > 0) {
+			fittedScale = Math.min(fittedScale, maxWidth / widestLineWidth);
+		}
+		if (totalHeight > 0) {
+			fittedScale = Math.min(fittedScale, maxHeight / totalHeight);
+		}
+		fittedScale = Math.max(0.5F, fittedScale);
+		int startY = Math.round((drawContext.getScaledWindowHeight() - totalHeight * fittedScale) / 2.0F);
+		int centerX = drawContext.getScaledWindowWidth() / 2;
+		for (int index = 0; index < activeGreedDomainWarningLines.size(); index++) {
+			drawCenteredScaledOutlinedText(
+				drawContext,
+				client,
+				activeGreedDomainWarningLines.get(index),
+				centerX,
+				startY + Math.round(index * greedDomainWarningLineSpacing * fittedScale),
+				fittedScale,
+				activeGreedDomainWarningColor,
+				activeGreedDomainWarningOutlineColor
+			);
+		}
+	}
+
 	private static void advanceVisualTimers(int playerAge) {
 		if (lastObservedPlayerAge == Integer.MIN_VALUE) {
 			lastObservedPlayerAge = playerAge;
@@ -789,6 +872,16 @@ public final class ManaHudOverlay {
 		constellationWarningStayTicks = 0;
 		constellationWarningFadeOutTicks = 0;
 		constellationWarningStartAge = Integer.MIN_VALUE;
+	}
+
+	private static void clearGreedDomainWarning() {
+		activeGreedDomainWarningLines = List.of();
+		activeGreedDomainWarningColor = 0xFFFFFFFF;
+		activeGreedDomainWarningOutlineColor = 0xFF000000;
+		greedDomainWarningScale = 0.95F;
+		greedDomainWarningDurationTicks = 0;
+		greedDomainWarningLineSpacing = 11;
+		greedDomainWarningStartAge = Integer.MIN_VALUE;
 	}
 
 	private static String keyCodeToPrompt(int keyCode) {

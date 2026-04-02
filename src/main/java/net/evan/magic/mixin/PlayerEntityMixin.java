@@ -2,10 +2,12 @@ package net.evan.magic.mixin;
 
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.evan.magic.magic.ability.GreedRuntime;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.world.ServerWorld;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,16 +31,28 @@ public abstract class PlayerEntityMixin {
 				return;
 			}
 		}
-		if (MagicAbilityManager.isEntityCapturedByLoveDomain(self) || MagicAbilityManager.isDomainClashParticipantInvincible(self)) {
+		if (
+			MagicAbilityManager.isEntityCapturedByLoveDomain(self)
+			|| MagicAbilityManager.isDomainClashParticipantInvincible(self)
+			|| MagicAbilityManager.isGreedDomainIntroInvincible(self)
+		) {
 			cir.setReturnValue(false);
 		}
 	}
 
 	@Inject(method = "takeShieldHit", at = @At("RETURN"))
 	private void magic$recordGreedShieldDisable(ServerWorld world, LivingEntity attacker, CallbackInfo ci) {
-		if (attacker instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
-			GreedRuntime.onShieldDisabled(serverPlayer);
+		PlayerEntity self = (PlayerEntity) (Object) this;
+		if (!(attacker instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer)) {
+			return;
 		}
+
+		ItemStack blockingItem = self.getBlockingItem();
+		if (blockingItem == null || blockingItem.get(DataComponentTypes.BLOCKS_ATTACKS) == null || attacker.getWeaponDisableBlockingForSeconds() <= 0.0F) {
+			return;
+		}
+
+		GreedRuntime.onShieldDisabled(serverPlayer, self instanceof net.minecraft.server.network.ServerPlayerEntity targetPlayer ? targetPlayer : null);
 	}
 
 	@Inject(method = "addAttackParticlesAndSounds", at = @At("HEAD"))

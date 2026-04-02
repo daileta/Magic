@@ -20,7 +20,9 @@ import net.evan.magic.registry.ModStatusEffects;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.RespawnAnchorBlock;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
@@ -84,6 +86,9 @@ public final class GreedRuntime {
 	private static final Map<UUID, Integer> ABILITY_LOCK_END_TICK = new HashMap<>();
 	private static final Map<UUID, AttackSpeedLockState> ATTACK_SPEED_LOCKS = new HashMap<>();
 	private static final Map<UUID, Double> MANA_SICKNESS_DRAIN_BUFFER = new HashMap<>();
+	private static final Map<UUID, Boolean> LAST_ELYTRA_EQUIPPED_STATE = new HashMap<>();
+	private static final Map<UUID, Integer> LAST_SPRINT_TRIGGER_TICK = new HashMap<>();
+	private static final Map<UUID, Integer> LAST_JUMP_TRIGGER_TICK = new HashMap<>();
 
 	private GreedRuntime() {
 	}
@@ -148,7 +153,7 @@ public final class GreedRuntime {
 		}
 
 		if (state.isOf(Blocks.TNT) && (stack.isOf(Items.FLINT_AND_STEEL) || stack.isOf(Items.FIRE_CHARGE))) {
-			recordActionFromPlayer(player, "ignite_tnt");
+			recordActionFromPlayer(player, "ignite_tnt", null);
 			return;
 		}
 
@@ -158,7 +163,7 @@ public final class GreedRuntime {
 
 		int charges = state.getOrEmpty(RespawnAnchorBlock.CHARGES).orElse(0);
 		if (charges > 0 && !RespawnAnchorBlock.isUsable(serverWorld, pos)) {
-			recordActionFromPlayer(player, "explode_respawn_anchor");
+			recordActionFromPlayer(player, "explode_respawn_anchor", null);
 		}
 	}
 
@@ -169,51 +174,144 @@ public final class GreedRuntime {
 		}
 
 		if (isFallingMaceAttack(source)) {
-			recordActionFromPlayer(attacker, "falling_mace_attack");
+			recordActionFromPlayer(attacker, "falling_mace_attack", damagedPlayer.getUuid());
 			return;
 		}
 		if (isFireworkShot(source)) {
-			recordActionFromPlayer(attacker, "firework_shot");
+			recordActionFromPlayer(attacker, "firework_shot", damagedPlayer.getUuid());
 			return;
 		}
 		if (isTippedArrowShot(source)) {
-			recordActionFromPlayer(attacker, "tipped_arrow_shot");
+			recordActionFromPlayer(attacker, "tipped_arrow_shot", damagedPlayer.getUuid());
 			return;
 		}
 		if (isSpearChargeAttack(attacker, source)) {
-			recordActionFromPlayer(attacker, "spear_charge_attack");
+			recordActionFromPlayer(attacker, "spear_charge_attack", damagedPlayer.getUuid());
 			return;
 		}
 		if (isSpearLunge(source)) {
-			recordActionFromPlayer(attacker, "spear_lunge");
+			recordActionFromPlayer(attacker, "spear_lunge", damagedPlayer.getUuid());
 			return;
 		}
 		if (isFullChargeBowShot(source)) {
-			recordActionFromPlayer(attacker, "full_charge_bow_shot");
+			recordActionFromPlayer(attacker, "full_charge_bow_shot", damagedPlayer.getUuid());
 			return;
 		}
+		recordActionFromPlayer(attacker, "normal_hit", damagedPlayer.getUuid());
 	}
 
-	public static void onShieldDisabled(ServerPlayerEntity attacker) {
-		recordActionFromPlayer(attacker, "disable_shield");
+	public static void onShieldDisabled(ServerPlayerEntity attacker, ServerPlayerEntity target) {
+		recordActionFromPlayer(attacker, "disable_shield", target == null ? null : target.getUuid());
+	}
+
+	public static void onShieldRaised(ServerPlayerEntity player) {
+		if (player == null) {
+			return;
+		}
+		recordActionFromPlayer(player, "raise_shield", null);
+	}
+
+	public static void onPlayerDeathProtectorTriggered(ServerPlayerEntity target, DamageSource source) {
+		if (target == null) {
+			return;
+		}
+		ServerPlayerEntity attacker = attackingPlayerFrom(source);
+		if (attacker == null || attacker == target || !attacker.isAlive() || attacker.isSpectator()) {
+			return;
+		}
+		recordActionFromPlayer(attacker, "pop_player_totem", target.getUuid());
 	}
 
 	public static void onEndCrystalDestroyed(DamageSource source) {
 		ServerPlayerEntity attacker = attackingPlayerFrom(source);
 		if (attacker != null) {
-			recordActionFromPlayer(attacker, "destroy_end_crystal");
+			recordActionFromPlayer(attacker, "destroy_end_crystal", null);
 		}
 	}
 
 	public static void onTntMinecartPrimed(DamageSource source) {
 		ServerPlayerEntity attacker = attackingPlayerFrom(source);
 		if (attacker != null) {
-			recordActionFromPlayer(attacker, "ignite_tnt_minecart");
+			recordActionFromPlayer(attacker, "ignite_tnt_minecart", null);
 		}
 	}
 
 	public static void recordExternalAction(ServerPlayerEntity actor, String triggerId) {
-		recordActionFromPlayer(actor, triggerId);
+		recordActionFromPlayer(actor, triggerId, null);
+	}
+
+	public static void recordExternalAction(ServerPlayerEntity actor, String triggerId, UUID directTargetId) {
+		recordActionFromPlayer(actor, triggerId, directTargetId);
+	}
+
+	public static void onUseItem(ServerPlayerEntity player, ItemStack stack) {
+		if (player == null || stack == null || stack.isEmpty()) {
+			return;
+		}
+		if (stack.get(DataComponentTypes.BLOCKS_ATTACKS) != null) {
+			recordActionFromPlayer(player, "raise_shield", null);
+			return;
+		}
+		if (stack.isOf(Items.ENDER_PEARL)) {
+			releaseRootForEnderPearlEscape(player);
+			recordActionFromPlayer(player, "use_ender_pearl", null);
+			return;
+		}
+		if (stack.isOf(Items.POTION) || stack.isOf(Items.SPLASH_POTION) || stack.isOf(Items.LINGERING_POTION)) {
+			recordActionFromPlayer(player, "use_potion", null);
+			return;
+		}
+		if (stack.isOf(Items.ENCHANTED_GOLDEN_APPLE)) {
+			recordActionFromPlayer(player, "eat_enchanted_golden_apple", null);
+			return;
+		}
+		if (stack.isOf(Items.GOLDEN_APPLE)) {
+			recordActionFromPlayer(player, "eat_golden_apple", null);
+			return;
+		}
+		if (stack.get(DataComponentTypes.FOOD) != null) {
+			recordActionFromPlayer(player, "eat_food", null);
+		}
+	}
+
+	public static void onStartSprinting(ServerPlayerEntity player) {
+		if (player == null) {
+			return;
+		}
+		int currentTick = currentTick(player);
+		if (currentTick == Integer.MIN_VALUE) {
+			return;
+		}
+		Integer lastTriggerTick = LAST_SPRINT_TRIGGER_TICK.put(player.getUuid(), currentTick);
+		if (lastTriggerTick != null && lastTriggerTick == currentTick) {
+			return;
+		}
+		recordActionFromPlayer(player, "start_sprinting", null);
+	}
+
+	public static void onPlayerJump(ServerPlayerEntity player) {
+		if (player == null) {
+			return;
+		}
+		int currentTick = currentTick(player);
+		if (currentTick == Integer.MIN_VALUE) {
+			return;
+		}
+		Integer lastTriggerTick = LAST_JUMP_TRIGGER_TICK.put(player.getUuid(), currentTick);
+		if (lastTriggerTick != null && lastTriggerTick == currentTick) {
+			return;
+		}
+		recordActionFromPlayer(player, "jump", null);
+	}
+
+	public static void recordSuccessfulMagicAbilityUse(ServerPlayerEntity player, MagicAbility ability) {
+		if (player == null || ability == null || ability == MagicAbility.NONE || isPassiveGreedCoinAbility(ability)) {
+			return;
+		}
+		String triggerId = greedCoinTriggerIdForAbility(ability);
+		if (triggerId != null) {
+			recordActionFromPlayer(player, triggerId, null);
+		}
 	}
 
 	public static int addCoins(ServerPlayerEntity player, double coins) {
@@ -236,6 +334,18 @@ public final class GreedRuntime {
 		return Math.max(0, MagicPlayerData.getGreedCoinUnits(player) - previousCoinUnits);
 	}
 
+	static int coinUnitsFromConfiguredCoinsValue(double coins) {
+		return coinUnitsFromConfiguredCoins(coins);
+	}
+
+	static void grantCoinUnits(ServerPlayerEntity caster, UUID sourcePlayerId, int coinUnits, int currentTick, boolean allowOverflowBeyondCap) {
+		addCoinUnits(caster, sourcePlayerId, coinUnits, currentTick, allowOverflowBeyondCap);
+	}
+
+	static void grantAnonymousCoinUnits(ServerPlayerEntity caster, int coinUnits, int currentTick, boolean allowOverflowBeyondCap) {
+		addCoinUnits(caster, COMMAND_COIN_SOURCE_ID, coinUnits, currentTick, allowOverflowBeyondCap);
+	}
+
 	public static void onEndServerTick(MinecraftServer server, int currentTick) {
 		updateAppraisersMarks(server, currentTick);
 		updateCoinStorages(server, currentTick);
@@ -245,6 +355,7 @@ public final class GreedRuntime {
 		updateShieldLocks(currentTick);
 		updateAbilityLocks(currentTick);
 		updateAttackSpeedLocks(server, currentTick);
+		updateElytraEquipActions(server);
 
 		if (currentTick % TICKS_PER_SECOND == 0) {
 			updateAppraisersMarkMana(server, currentTick);
@@ -266,6 +377,9 @@ public final class GreedRuntime {
 		ABILITY_LOCK_END_TICK.remove(player.getUuid());
 		ATTACK_SPEED_LOCKS.remove(player.getUuid());
 		MANA_SICKNESS_DRAIN_BUFFER.remove(player.getUuid());
+		LAST_ELYTRA_EQUIPPED_STATE.remove(player.getUuid());
+		LAST_SPRINT_TRIGGER_TICK.remove(player.getUuid());
+		LAST_JUMP_TRIGGER_TICK.remove(player.getUuid());
 		removeAttackSpeedModifier(player);
 	}
 
@@ -283,6 +397,9 @@ public final class GreedRuntime {
 		KINGS_DUES_COOLDOWN_END_TICK.remove(player.getUuid());
 		BANKRUPTCY_COOLDOWN_END_TICK.remove(player.getUuid());
 		MANA_SICKNESS_DRAIN_BUFFER.remove(player.getUuid());
+		LAST_ELYTRA_EQUIPPED_STATE.remove(player.getUuid());
+		LAST_SPRINT_TRIGGER_TICK.remove(player.getUuid());
+		LAST_JUMP_TRIGGER_TICK.remove(player.getUuid());
 		removeAttackSpeedModifier(player);
 		player.removeStatusEffect(ModStatusEffects.gildedBurdenEntry());
 		player.removeStatusEffect(ModStatusEffects.manaSicknessEntry());
@@ -380,6 +497,14 @@ public final class GreedRuntime {
 		return currentTick != Integer.MIN_VALUE && currentTick < state.endTick;
 	}
 
+	public static boolean canUseEnderPearlWhileRooted(PlayerEntity player, ItemStack stack) {
+		return player != null
+			&& stack != null
+			&& stack.isOf(Items.ENDER_PEARL)
+			&& MagicConfig.get().greed.tollkeepersClaim.allowEnderPearlEscapeWhileRooted
+			&& isRooted(player);
+	}
+
 	public static boolean isShieldLocked(PlayerEntity player) {
 		if (player == null) {
 			return false;
@@ -441,6 +566,7 @@ public final class GreedRuntime {
 		}
 
 		APPRAISERS_MARK_STATES.put(player.getUuid(), AppraisersMarkState.waiting());
+		recordSuccessfulMagicAbilityUse(player, MagicAbility.APPRAISERS_MARK);
 		player.sendMessage(Text.translatable("message.magic.greed.appraisers_mark.waiting"), true);
 	}
 
@@ -495,6 +621,7 @@ public final class GreedRuntime {
 				1.2F
 			);
 		}
+		recordSuccessfulMagicAbilityUse(player, MagicAbility.TOLLKEEPERS_CLAIM);
 		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.TOLLKEEPERS_CLAIM.displayName()), true);
 	}
 
@@ -535,8 +662,12 @@ public final class GreedRuntime {
 		if (stage.attackSpeedLockTicks > 0 && Math.abs(stage.attackSpeedModifierAmount) > 1.0E-6) {
 			applyAttackSpeedLock(target, currentTick + stage.attackSpeedLockTicks, stage.attackSpeedModifierAmount);
 		}
-		KINGS_DUES_COOLDOWN_END_TICK.put(player.getUuid(), currentTick + config.cooldownTicks);
+		KINGS_DUES_COOLDOWN_END_TICK.put(
+			player.getUuid(),
+			currentTick + GreedDomainRuntime.adjustCooldownTicks(player.getUuid(), MagicAbility.KINGS_DUES, config.cooldownTicks, currentTick)
+		);
 		applyKingsDuesVisuals(target, spend);
+		recordSuccessfulMagicAbilityUse(player, MagicAbility.KINGS_DUES);
 		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.KINGS_DUES.displayName()), true);
 	}
 
@@ -594,17 +725,22 @@ public final class GreedRuntime {
 				stage.preserveDomainAbilities
 			);
 		}
-		BANKRUPTCY_COOLDOWN_END_TICK.put(player.getUuid(), currentTick + config.cooldownTicks);
+		BANKRUPTCY_COOLDOWN_END_TICK.put(
+			player.getUuid(),
+			currentTick + GreedDomainRuntime.adjustCooldownTicks(player.getUuid(), MagicAbility.BANKRUPTCY, config.cooldownTicks, currentTick)
+		);
 		applyBankruptcyVisuals(target);
+		recordSuccessfulMagicAbilityUse(player, MagicAbility.BANKRUPTCY);
 		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.BANKRUPTCY.displayName()), true);
 	}
 
-	private static void recordActionFromPlayer(ServerPlayerEntity actor, String triggerId) {
+	private static void recordActionFromPlayer(ServerPlayerEntity actor, String triggerId, UUID directTargetId) {
 		if (actor == null || triggerId == null || triggerId.isBlank()) {
 			return;
 		}
 
-		Double configuredCoins = MagicConfig.get().greed.appraisersMark.coinTriggers.get(triggerId.trim().toLowerCase());
+		String normalizedTriggerId = triggerId.trim().toLowerCase();
+		Double configuredCoins = MagicConfig.get().greed.appraisersMark.coinTriggers.get(normalizedTriggerId);
 		if (configuredCoins == null) {
 			return;
 		}
@@ -619,6 +755,7 @@ public final class GreedRuntime {
 		}
 
 		int currentTick = server.getTicks();
+		HashSet<UUID> grantedCasterIds = new HashSet<>();
 		for (Map.Entry<UUID, AppraisersMarkState> entry : APPRAISERS_MARK_STATES.entrySet()) {
 			AppraisersMarkState state = entry.getValue();
 			if (state.stage != AppraisersMarkStage.MARKED || !actor.getUuid().equals(state.markedTargetId)) {
@@ -635,9 +772,25 @@ public final class GreedRuntime {
 			if (caster.squaredDistanceTo(actor) > MagicConfig.get().greed.appraisersMark.markedActionRange * MagicConfig.get().greed.appraisersMark.markedActionRange) {
 				continue;
 			}
+			if (!GreedDomainRuntime.allowsCoinTrigger(actor.getUuid(), caster.getUuid(), directTargetId, currentTick)) {
+				continue;
+			}
 
-			addCoinUnits(caster, actor.getUuid(), configuredCoinUnits, currentTick);
+			int adjustedCoinUnits = GreedDomainRuntime.adjustCoinTriggerCoinUnits(
+				actor.getUuid(),
+				caster.getUuid(),
+				normalizedTriggerId,
+				configuredCoinUnits,
+				currentTick
+			);
+			if (adjustedCoinUnits <= 0) {
+				continue;
+			}
+
+			addCoinUnits(caster, actor.getUuid(), adjustedCoinUnits, currentTick);
+			grantedCasterIds.add(caster.getUuid());
 		}
+		GreedDomainRuntime.onCoinTrigger(server, actor, normalizedTriggerId, directTargetId, configuredCoinUnits, currentTick, grantedCasterIds);
 	}
 
 	private static void updateAppraisersMarks(MinecraftServer server, int currentTick) {
@@ -657,7 +810,7 @@ public final class GreedRuntime {
 			ServerPlayerEntity target = server.getPlayerManager().getPlayer(state.markedTargetId);
 			if (target == null || !target.isAlive() || target.isSpectator()) {
 				iterator.remove();
-				startCooldown(caster.getUuid(), APPRAISERS_MARK_COOLDOWN_END_TICK, MagicConfig.get().greed.appraisersMark.cooldownTicks, currentTick);
+				startAbilityCooldownFromNow(caster.getUuid(), MagicAbility.APPRAISERS_MARK, currentTick);
 				continue;
 			}
 			if (currentTick < state.lastParticleTick + MagicConfig.get().greed.appraisersMark.markParticleIntervalTicks) {
@@ -683,10 +836,13 @@ public final class GreedRuntime {
 
 			expireContributions(storage, currentTick);
 			if (
-				storage.contributions.isEmpty() ||
-				(storage.lastGainTick != Integer.MIN_VALUE &&
-					currentTick - storage.lastGainTick >= MagicConfig.get().greed.appraisersMark.inactivityWipeTicks)
+				storage.lastGainTick != Integer.MIN_VALUE &&
+				currentTick - storage.lastGainTick >= MagicConfig.get().greed.appraisersMark.inactivityWipeTicks
 			) {
+				storage.contributions.clear();
+				storage.lastGainTick = Integer.MIN_VALUE;
+			}
+			if (pouchCoinUnits(storage) <= 0 && storage.temporaryOverflowCoinUnits <= 0) {
 				iterator.remove();
 				MagicPlayerData.setGreedCoinUnits(caster, 0);
 				continue;
@@ -697,6 +853,7 @@ public final class GreedRuntime {
 	}
 
 	private static void updateTollkeepersClaimZones(MinecraftServer server, int currentTick) {
+		HashSet<UUID> rootedThisTick = new HashSet<>();
 		Iterator<Map.Entry<UUID, TollkeepersClaimZoneState>> iterator = TOLLKEEPER_ZONES.entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<UUID, TollkeepersClaimZoneState> entry = iterator.next();
@@ -739,6 +896,7 @@ public final class GreedRuntime {
 				boolean insideZone = isInsideZone(zone, player);
 				if (insideZone) {
 					newInsidePlayerIds.add(player.getUuid());
+					zone.rootConsumedPlayerIds.remove(player.getUuid());
 					applyGildedBurden(player, zone.coinsSpent);
 					if (player.isSprinting() && isSprintBlocked(player)) {
 						player.setSprinting(false);
@@ -747,14 +905,19 @@ public final class GreedRuntime {
 				}
 
 				if (zone.insidePlayerIds.contains(player.getUuid())) {
-					applyRoot(player, zone, currentTick);
-					if (isMarkedTarget(caster, player) && MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins > 0.0) {
-						addCoinUnits(
-							caster,
-							player.getUuid(),
-							coinUnitsFromConfiguredCoins(MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins),
-							currentTick
-						);
+					boolean firstExitSinceReentry = zone.rootConsumedPlayerIds.add(player.getUuid());
+					if (firstExitSinceReentry) {
+						if (!isRooted(player) && rootedThisTick.add(player.getUuid())) {
+							applyRoot(player, zone, currentTick);
+						}
+						if (isMarkedTarget(caster, player) && MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins > 0.0) {
+							addCoinUnits(
+								caster,
+								player.getUuid(),
+								coinUnitsFromConfiguredCoins(MagicConfig.get().greed.tollkeepersClaim.markedExitBonusCoins),
+								currentTick
+							);
+						}
 					}
 				}
 			}
@@ -780,6 +943,38 @@ public final class GreedRuntime {
 			if (player.squaredDistanceTo(state.lockedX, state.lockedY, state.lockedZ) > 0.0004) {
 				player.requestTeleport(state.lockedX, state.lockedY, state.lockedZ);
 			}
+		}
+	}
+
+	private static boolean isRooted(PlayerEntity player) {
+		if (player == null) {
+			return false;
+		}
+		RootState state = ROOTED_PLAYERS.get(player.getUuid());
+		if (state == null) {
+			return false;
+		}
+		int currentTick = currentTick(player);
+		return currentTick != Integer.MIN_VALUE && currentTick < state.endTick && player.getEntityWorld().getRegistryKey() == state.dimension;
+	}
+
+	private static void releaseRootForEnderPearlEscape(ServerPlayerEntity player) {
+		if (!canUseEnderPearlWhileRooted(player, player.getMainHandStack()) && !canUseEnderPearlWhileRooted(player, player.getOffHandStack())) {
+			return;
+		}
+		ROOTED_PLAYERS.remove(player.getUuid());
+		removeRootStatusEffect(player, StatusEffects.SLOWNESS, MagicConfig.get().greed.tollkeepersClaim.rootSlownessAmplifier);
+		removeRootStatusEffect(player, StatusEffects.MINING_FATIGUE, MagicConfig.get().greed.tollkeepersClaim.rootMiningFatigueAmplifier);
+	}
+
+	private static void removeRootStatusEffect(
+		ServerPlayerEntity player,
+		net.minecraft.registry.entry.RegistryEntry<net.minecraft.entity.effect.StatusEffect> effect,
+		int amplifier
+	) {
+		StatusEffectInstance instance = player.getStatusEffect(effect);
+		if (instance != null && instance.getAmplifier() == amplifier) {
+			player.removeStatusEffect(effect);
 		}
 	}
 
@@ -845,6 +1040,22 @@ public final class GreedRuntime {
 				player.sendMessage(Text.translatable("message.magic.ability.out_of_mana", MagicAbility.APPRAISERS_MARK.displayName()), true);
 			}
 		}
+	}
+
+	private static void updateElytraEquipActions(MinecraftServer server) {
+		HashSet<UUID> onlinePlayerIds = new HashSet<>();
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			UUID playerId = player.getUuid();
+			onlinePlayerIds.add(playerId);
+			boolean currentlyEquipped = player.getEquippedStack(EquipmentSlot.CHEST).isOf(Items.ELYTRA);
+			Boolean previousState = LAST_ELYTRA_EQUIPPED_STATE.put(playerId, currentlyEquipped);
+			if (previousState != null && !previousState && currentlyEquipped) {
+				recordActionFromPlayer(player, "elytra_equip", null);
+			}
+		}
+		LAST_ELYTRA_EQUIPPED_STATE.entrySet().removeIf(entry -> !onlinePlayerIds.contains(entry.getKey()));
+		LAST_SPRINT_TRIGGER_TICK.entrySet().removeIf(entry -> !onlinePlayerIds.contains(entry.getKey()));
+		LAST_JUMP_TRIGGER_TICK.entrySet().removeIf(entry -> !onlinePlayerIds.contains(entry.getKey()));
 	}
 
 	private static void updateManaSickness(MinecraftServer server, int currentTick, int intervalTicks) {
@@ -1028,12 +1239,7 @@ public final class GreedRuntime {
 		}
 
 		if (startCooldownIfMarked && state.stage == AppraisersMarkStage.MARKED) {
-			startCooldown(
-				player.getUuid(),
-				APPRAISERS_MARK_COOLDOWN_END_TICK,
-				MagicConfig.get().greed.appraisersMark.cooldownTicks,
-				currentTick
-			);
+			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.APPRAISERS_MARK, currentTick);
 		}
 	}
 
@@ -1057,22 +1263,38 @@ public final class GreedRuntime {
 	}
 
 	private static void addCoinUnits(ServerPlayerEntity caster, UUID sourcePlayerId, int coinUnits, int currentTick) {
+		addCoinUnits(caster, sourcePlayerId, coinUnits, currentTick, false);
+	}
+
+	private static void addCoinUnits(ServerPlayerEntity caster, UUID sourcePlayerId, int coinUnits, int currentTick, boolean allowOverflowBeyondCap) {
 		if (coinUnits <= 0) {
 			return;
 		}
 
 		GreedCoinStorage storage = GREED_COIN_STORAGES.computeIfAbsent(caster.getUuid(), ignored -> new GreedCoinStorage());
 		expireContributions(storage, currentTick);
+		if (allowOverflowBeyondCap) {
+			storage.temporaryOverflowCoinUnits += coinUnits;
+			MagicPlayerData.setGreedCoinUnits(caster, totalCoinUnits(storage));
+			if (MagicConfig.get().greed.appraisersMark.playCoinGainSound) {
+				caster.playSound(
+					SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
+					MagicConfig.get().greed.appraisersMark.coinGainSoundVolume,
+					MagicConfig.get().greed.appraisersMark.coinGainSoundPitch
+				);
+			}
+			return;
+		}
 		boolean commandContribution = COMMAND_COIN_SOURCE_ID.equals(sourcePlayerId);
 		if (!commandContribution && !storage.contributions.containsKey(sourcePlayerId)) {
-			while (trackedPlayerContributionCount(storage) >= MagicConfig.get().greed.appraisersMark.maxTrackedPlayers) {
-				if (!removeOldestTrackedPlayerContribution(storage)) {
+			while (trackedPlayerContributionCount(caster.getUuid(), storage) >= MagicConfig.get().greed.appraisersMark.maxTrackedPlayers) {
+				if (!removeOldestTrackedPlayerContribution(caster.getUuid(), storage)) {
 					break;
 				}
 			}
 		}
 
-		int availableRoom = Math.max(0, coinUnitsFromConfiguredCoins(MagicConfig.get().greed.appraisersMark.maxCoins) - totalCoinUnits(storage));
+		int availableRoom = Math.max(0, coinUnitsFromConfiguredCoins(MagicConfig.get().greed.appraisersMark.maxCoins) - pouchCoinUnits(storage));
 		if (availableRoom <= 0) {
 			MagicPlayerData.setGreedCoinUnits(caster, totalCoinUnits(storage));
 			return;
@@ -1111,6 +1333,11 @@ public final class GreedRuntime {
 		}
 
 		int remaining = coinUnitsToSpend;
+		if (storage.temporaryOverflowCoinUnits > 0) {
+			int overflowSpent = Math.min(storage.temporaryOverflowCoinUnits, remaining);
+			storage.temporaryOverflowCoinUnits -= overflowSpent;
+			remaining -= overflowSpent;
+		}
 		Iterator<Map.Entry<UUID, GreedCoinContribution>> iterator = storage.contributions.entrySet().iterator();
 		while (iterator.hasNext() && remaining > 0) {
 			GreedCoinContribution contribution = iterator.next().getValue();
@@ -1122,7 +1349,7 @@ public final class GreedRuntime {
 			}
 		}
 
-		if (storage.contributions.isEmpty()) {
+		if (pouchCoinUnits(storage) <= 0 && storage.temporaryOverflowCoinUnits <= 0) {
 			GREED_COIN_STORAGES.remove(caster.getUuid());
 			MagicPlayerData.setGreedCoinUnits(caster, 0);
 			return;
@@ -1132,6 +1359,14 @@ public final class GreedRuntime {
 	}
 
 	private static int totalCoinUnits(GreedCoinStorage storage) {
+		int total = storage.temporaryOverflowCoinUnits;
+		for (GreedCoinContribution contribution : storage.contributions.values()) {
+			total += contribution.coinUnits;
+		}
+		return total;
+	}
+
+	private static int pouchCoinUnits(GreedCoinStorage storage) {
 		int total = 0;
 		for (GreedCoinContribution contribution : storage.contributions.values()) {
 			total += contribution.coinUnits;
@@ -1152,21 +1387,21 @@ public final class GreedRuntime {
 		}
 	}
 
-	private static int trackedPlayerContributionCount(GreedCoinStorage storage) {
+	private static int trackedPlayerContributionCount(UUID casterId, GreedCoinStorage storage) {
 		int count = 0;
 		for (UUID contributorId : storage.contributions.keySet()) {
-			if (!COMMAND_COIN_SOURCE_ID.equals(contributorId)) {
+			if (!COMMAND_COIN_SOURCE_ID.equals(contributorId) && GreedDomainRuntime.countsTowardUniqueTargetCap(casterId, contributorId)) {
 				count++;
 			}
 		}
 		return count;
 	}
 
-	private static boolean removeOldestTrackedPlayerContribution(GreedCoinStorage storage) {
+	private static boolean removeOldestTrackedPlayerContribution(UUID casterId, GreedCoinStorage storage) {
 		Iterator<Map.Entry<UUID, GreedCoinContribution>> iterator = storage.contributions.entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<UUID, GreedCoinContribution> entry = iterator.next();
-			if (COMMAND_COIN_SOURCE_ID.equals(entry.getKey())) {
+			if (COMMAND_COIN_SOURCE_ID.equals(entry.getKey()) || !GreedDomainRuntime.countsTowardUniqueTargetCap(casterId, entry.getKey())) {
 				continue;
 			}
 			iterator.remove();
@@ -1461,15 +1696,30 @@ public final class GreedRuntime {
 
 	static void startAbilityCooldownFromNow(UUID playerId, MagicAbility ability, int currentTick) {
 		if (ability == MagicAbility.APPRAISERS_MARK) {
-			startCooldown(playerId, APPRAISERS_MARK_COOLDOWN_END_TICK, MagicConfig.get().greed.appraisersMark.cooldownTicks, currentTick);
+			startCooldown(
+				playerId,
+				APPRAISERS_MARK_COOLDOWN_END_TICK,
+				GreedDomainRuntime.adjustCooldownTicks(playerId, ability, MagicConfig.get().greed.appraisersMark.cooldownTicks, currentTick),
+				currentTick
+			);
 			return;
 		}
 		if (ability == MagicAbility.KINGS_DUES) {
-			startCooldown(playerId, KINGS_DUES_COOLDOWN_END_TICK, MagicConfig.get().greed.kingsDues.cooldownTicks, currentTick);
+			startCooldown(
+				playerId,
+				KINGS_DUES_COOLDOWN_END_TICK,
+				GreedDomainRuntime.adjustCooldownTicks(playerId, ability, MagicConfig.get().greed.kingsDues.cooldownTicks, currentTick),
+				currentTick
+			);
 			return;
 		}
 		if (ability == MagicAbility.BANKRUPTCY) {
-			startCooldown(playerId, BANKRUPTCY_COOLDOWN_END_TICK, MagicConfig.get().greed.bankruptcy.cooldownTicks, currentTick);
+			startCooldown(
+				playerId,
+				BANKRUPTCY_COOLDOWN_END_TICK,
+				GreedDomainRuntime.adjustCooldownTicks(playerId, ability, MagicConfig.get().greed.bankruptcy.cooldownTicks, currentTick),
+				currentTick
+			);
 		}
 	}
 
@@ -1525,6 +1775,39 @@ public final class GreedRuntime {
 		return server == null ? Integer.MIN_VALUE : server.getTicks();
 	}
 
+	private static String greedCoinTriggerIdForAbility(MagicAbility ability) {
+		if (ability == null || ability == MagicAbility.NONE) {
+			return null;
+		}
+		if (isMaximumOrDomainGreedCoinAbility(ability)) {
+			return "magic_ability_maximum_or_domain";
+		}
+		return switch (ability.slot()) {
+			case 1 -> "magic_ability_1";
+			case 2 -> "magic_ability_2";
+			case 3 -> "magic_ability_3";
+			case 4 -> "magic_ability_4";
+			default -> null;
+		};
+	}
+
+	private static boolean isMaximumOrDomainGreedCoinAbility(MagicAbility ability) {
+		return ability == MagicAbility.ABSOLUTE_ZERO
+			|| ability == MagicAbility.FROST_DOMAIN_EXPANSION
+			|| ability == MagicAbility.LOVE_DOMAIN_EXPANSION
+			|| ability == MagicAbility.PLUS_ULTRA
+			|| ability == MagicAbility.ASTRAL_CATACLYSM
+			|| ability == MagicAbility.GREED_DOMAIN_EXPANSION;
+	}
+
+	private static boolean isPassiveGreedCoinAbility(MagicAbility ability) {
+		return ability == MagicAbility.MARTYRS_FLAME
+			|| ability == MagicAbility.SPOTLIGHT
+			|| ability == MagicAbility.CASSIOPEIA
+			|| ability == MagicAbility.COMEDIC_REWRITE
+			|| ability == MagicAbility.TILL_DEATH_DO_US_PART;
+	}
+
 	private enum AppraisersMarkStage {
 		WAITING,
 		MARKED
@@ -1548,6 +1831,7 @@ public final class GreedRuntime {
 
 	private static final class GreedCoinStorage {
 		private final LinkedHashMap<UUID, GreedCoinContribution> contributions = new LinkedHashMap<>();
+		private int temporaryOverflowCoinUnits;
 		private int lastGainTick = Integer.MIN_VALUE;
 	}
 
@@ -1574,6 +1858,7 @@ public final class GreedRuntime {
 		private int nextParticleTick;
 		private int nextSoundTick;
 		private final Set<UUID> insidePlayerIds = new HashSet<>();
+		private final Set<UUID> rootConsumedPlayerIds = new HashSet<>();
 
 		private TollkeepersClaimZoneState(
 			UUID casterId,

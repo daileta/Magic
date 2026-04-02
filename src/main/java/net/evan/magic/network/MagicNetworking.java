@@ -5,6 +5,7 @@ import net.evan.magic.network.payload.CooldownCheckPayload;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
 import net.evan.magic.network.payload.DomainClashInputPayload;
+import net.evan.magic.network.payload.GreedDomainWarningOverlayPayload;
 import net.evan.magic.network.payload.JesterJokeOverlayPayload;
 import net.evan.magic.network.payload.UseAbilityPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -26,6 +27,7 @@ public final class MagicNetworking {
 		PayloadTypeRegistry.playC2S().register(CooldownCheckPayload.ID, CooldownCheckPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ConstellationOutlinePayload.ID, ConstellationOutlinePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ConstellationWarningOverlayPayload.ID, ConstellationWarningOverlayPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(GreedDomainWarningOverlayPayload.ID, GreedDomainWarningOverlayPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(JesterJokeOverlayPayload.ID, JesterJokeOverlayPayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(UseAbilityPayload.ID, (payload, context) ->
 			MagicAbilityManager.onAbilityRequested(context.player(), payload.abilitySlot())

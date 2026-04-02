@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
+import net.evan.magic.network.payload.GreedDomainWarningOverlayPayload;
 import net.evan.magic.network.payload.JesterJokeOverlayPayload;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -37,6 +38,18 @@ public final class MagicClientNetworking {
 					payload.fadeInTicks(),
 					payload.stayTicks(),
 					payload.fadeOutTicks()
+				)
+			)
+		);
+		ClientPlayNetworking.registerGlobalReceiver(GreedDomainWarningOverlayPayload.ID, (payload, context) ->
+			context.client().execute(() ->
+				ManaHudOverlay.showGreedDomainWarning(
+					payload.message(),
+					payload.colorRgb(),
+					payload.outlineColorRgb(),
+					payload.scale(),
+					payload.durationTicks(),
+					payload.lineSpacing()
 				)
 			)
 		);

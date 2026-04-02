@@ -96,7 +96,12 @@
     "fireSmokeParticleCount": 4
   },
   "domainControl": {
-    "blockTeleportAcrossDomainBoundaries": true
+    "blockTeleportAcrossDomainBoundaries": true,
+    "interiorLightingEnabled": true,
+    "interiorLightLevel": 15,
+    "interiorLightHorizontalSpacing": 6,
+    "interiorLightVerticalSpacing": 6,
+    "interiorLightStartYOffset": 2
   },
   "emptyEmbrace": {
     "deactivateTargetMagic": true,
@@ -623,6 +628,22 @@
         "ignite_tnt_minecart": 3.0,
         "attribute_swapping": 2.0,
         "disable_shield": 1.5,
+        "raise_shield": 0.25,
+        "elytra_equip": 2.0,
+        "use_ender_pearl": 2.0,
+        "use_potion": 0.5,
+        "eat_food": 0.1,
+        "eat_golden_apple": 1.0,
+        "eat_enchanted_golden_apple": 2.0,
+        "normal_hit": 0.1,
+        "pop_player_totem": 3.0,
+        "start_sprinting": 0.1,
+        "jump": 0.1,
+        "magic_ability_1": 3.0,
+        "magic_ability_2": 5.0,
+        "magic_ability_3": 7.0,
+        "magic_ability_4": 9.0,
+        "magic_ability_maximum_or_domain": 18.0,
         "spear_lunge": 0.5,
         "spear_charge_attack": 1.5,
         "critical_hit": 0.5
@@ -640,6 +661,7 @@
       "reducedJumpVelocityMultiplier": 0.55,
       "rootSlownessAmplifier": 255,
       "rootMiningFatigueAmplifier": 5,
+      "allowEnderPearlEscapeWhileRooted": true,
       "markedExitBonusCoins": 1.0,
       "vortexParticleIntervalTicks": 2,
       "vortexParticleLifetimeTicks": 24,
@@ -817,6 +839,348 @@
         "cancelActiveAbilities": true,
         "preserveMaximumAbilities": true,
         "preserveDomainAbilities": true
+      }
+    },
+    "domain": {
+      "radius": 25,
+      "height": 25,
+      "shellThickness": 1,
+      "cooldownTicks": 36000,
+      "durationTicks": 1800,
+      "structure": {
+        "shellPalette": [
+          {
+            "blockId": "minecraft:gilded_blackstone",
+            "weight": 6
+          },
+          {
+            "blockId": "minecraft:blackstone",
+            "weight": 5
+          },
+          {
+            "blockId": "minecraft:polished_blackstone_bricks",
+            "weight": 5
+          },
+          {
+            "blockId": "minecraft:chiseled_polished_blackstone",
+            "weight": 2
+          },
+          {
+            "blockId": "minecraft:gold_block",
+            "weight": 2
+          }
+        ],
+        "carpetBlockId": "minecraft:red_carpet",
+        "throneBlockIds": [
+          "minecraft:gold_block"
+        ],
+        "pillarBlockIds": [
+          "minecraft:gold_block"
+        ],
+        "pillarCount": 8,
+        "pillarPlacementRadius": 9.0,
+        "pillarSpacingDegrees": 45.0,
+        "pillarHeight": 23,
+        "pillarWidth": 3,
+        "carpetWidth": 3,
+        "carpetExtensionPastCenter": 10,
+        "throneSide": "south",
+        "throneOffset": 12,
+        "throneWidth": 7,
+        "throneDepth": 5,
+        "throneHeight": 7,
+        "protectInteriorStructures": true
+      },
+      "passiveIncome": {
+        "passiveCoinsPerSecondPerOtherPlayer": 1.0,
+        "passiveCoinIntervalTicks": 20,
+        "countMobs": false
+      },
+      "tribute": {
+        "initialTribute": 18,
+        "tributeDisplayPersistAfterEndTicks": 60,
+        "activeWeaknessAmplifier": 0,
+        "activeManaDrainLevel": 1,
+        "applyOnlyToPlayers": true,
+        "displayPrefix": "Tribute"
+      },
+      "activationWarning": {
+        "enabled": true,
+        "durationTicks": 500,
+        "pauseDomainTimerDuringDisplay": true,
+        "freezePlayersDuringDisplay": true,
+        "preventDamageDuringDisplay": true,
+        "scale": 0.95,
+        "lineSpacing": 11,
+        "textColorHex": "#FFE7A4",
+        "outlineColorHex": "#000000",
+        "lines": [
+          "(A VOICE RINGS OUT IN YOUR HEAD)",
+          "",
+          "!ATTENTION!",
+          "",
+          "THIS DOMAIN HAS NO SURE HIT AFFECT",
+          "",
+          "CERTAIN ACTIONS PERTAINING TO PVP WILL LOWER YOUR TRIBUTES TO THE USER OF THE DOMAIN",
+          "",
+          "THE LESS TRIBUTES YOU HAVE THE MORE YOU \"OWE\" TO THE USER OF THE DOMAIN",
+          "",
+          "MAGIC, ARMOR, WEAPONS, ITEMS, AND ARTIFACTS ARE ALL AT RISK DEPENDING ON SEVERITY",
+          "",
+          "DO NOT LOSE ALL TRIBUTES!!!! WORK TOGETHER TO MKAE SURE NO ONE RUNS OUT!!!",
+          "",
+          "If you are alone, kill the user, it wont matter if you have 0 tributes if the user is dead... Goodluck from Dominus"
+        ]
+      },
+      "detection": {
+        "armorTags": [
+          "minecraft:head_armor",
+          "minecraft:chest_armor",
+          "minecraft:leg_armor",
+          "minecraft:foot_armor"
+        ],
+        "armorItemIds": [],
+        "weaponTags": [
+          "minecraft:swords",
+          "minecraft:axes"
+        ],
+        "weaponItemIds": [],
+        "toolTags": [
+          "minecraft:axes",
+          "minecraft:pickaxes",
+          "minecraft:shovels",
+          "minecraft:hoes"
+        ],
+        "toolItemIds": [],
+        "equipmentTags": [],
+        "equipmentItemIds": [],
+        "artifactTags": [],
+        "artifactItemIds": [],
+        "artifactNamespaces": [
+          "evanpack"
+        ],
+        "detectArmorByClass": true,
+        "detectWeaponsByClass": true,
+        "detectToolsByClass": true,
+        "includeShieldAsEquipment": true
+      },
+      "lightDebt": {
+        "manaSicknessAmplifierRange": {
+          "min": 1,
+          "max": 3
+        },
+        "manaSicknessDurationTicks": 300,
+        "manaRegenMultiplier": 0.5,
+        "manaRegenPenaltyDurationTicks": 1200,
+        "castFailureChance": 0.1,
+        "castFailureDurationTicks": 1200,
+        "durabilityLossFraction": 0.25,
+        "armorEffectivenessMultiplier": 0.75,
+        "weaponDamageMultiplier": 0.75,
+        "statPenaltyDurationTicks": 600
+      },
+      "standardDebt": {
+        "manaSicknessAmplifierRange": {
+          "min": 4,
+          "max": 6
+        },
+        "manaSicknessDurationTicks": 300,
+        "manaCostMultiplier": 1.25,
+        "manaCostPenaltyDurationTicks": 1200,
+        "artifactBurden": {
+          "enabled": true,
+          "durationTicks": 1200,
+          "slownessByArtifactCount": {
+            "1": 1,
+            "2": 2,
+            "3": 3,
+            "4": 3,
+            "5": 4
+          }
+        },
+        "durabilityLossFractionRange": {
+          "min": 0.25,
+          "max": 0.75
+        },
+        "qualifyingItemCategories": {
+          "includeArmor": true,
+          "includeWeapons": true,
+          "includeTools": true,
+          "includeArtifacts": true,
+          "includeOtherDamageables": false
+        }
+      },
+      "heavyDebt": {
+        "manaSicknessAmplifierRange": {
+          "min": 7,
+          "max": 8
+        },
+        "manaSicknessDurationTicks": 200,
+        "castFailureChance": 0.25,
+        "castFailureDurationTicks": 2400,
+        "cooldownMultiplier": 1.25,
+        "cooldownPenaltyDurationTicks": 4800,
+        "forcedTaxationItemCountRange": {
+          "min": 2,
+          "max": 4
+        },
+        "allowedSeizureCategories": {
+          "includeMainInventory": true,
+          "includeHotbar": true,
+          "includeOffhand": false,
+          "includeArmor": false,
+          "includeWeapons": false,
+          "includeTools": false,
+          "includeArtifacts": false,
+          "includeDamageable": true,
+          "includeUndamageable": true
+        },
+        "coinConversion": {
+          "coinsPerSeizedStack": 1.0,
+          "allowOverflowBeyondPouchCap": true
+        }
+      },
+      "severeCollection": {
+        "manaSicknessAmplifier": 9,
+        "manaSicknessDurationTicks": 160,
+        "castFailureChance": 0.5,
+        "castFailureDurationTicks": 3600,
+        "backfire": {
+          "chance": 0.25,
+          "damage": 10.0,
+          "horizontalLaunch": 1.2,
+          "verticalLaunch": 0.55,
+          "primaryParticleId": "minecraft:explosion",
+          "secondaryParticleId": "minecraft:crit",
+          "primaryParticleCount": 1,
+          "secondaryParticleCount": 16,
+          "soundId": "minecraft:entity.generic.explode",
+          "soundVolume": 1.0,
+          "soundPitch": 1.0
+        },
+        "seizureItemCategorySelectionRules": {
+          "preferEquippedWeapon": true,
+          "preferEquippedArmor": true,
+          "allowInventoryFallback": true
+        }
+      },
+      "bankruptcyTier": {
+        "magicSealDurationTicks": 1200,
+        "seizureItemCountRange": {
+          "min": 2,
+          "max": 6
+        },
+        "seizureCategoryFilters": {
+          "includeMainInventory": true,
+          "includeHotbar": true,
+          "includeOffhand": true,
+          "includeArmor": false,
+          "includeWeapons": true,
+          "includeTools": true,
+          "includeArtifacts": false,
+          "includeDamageable": true,
+          "includeUndamageable": true
+        },
+        "statSuppressionDurationTicks": 2400,
+        "statSuppressionAttributeMultipliers": {
+          "outgoingDamageMultiplier": 0.55,
+          "armorEffectivenessMultiplier": 0.55,
+          "movementSpeedMultiplier": 0.65,
+          "attackSpeedMultiplier": 0.65,
+          "maxHealthMultiplier": 0.72,
+          "knockbackResistanceMultiplier": 0.45,
+          "scaleMultiplier": 0.9
+        },
+        "indebted": {
+          "enabled": true,
+          "casterLowManaCleanupThresholdPercent": 20.0,
+          "uniqueTargetCapBypassEnabled": true
+        }
+      },
+      "finalCollection": {
+        "magicSealDurationTicks": 1200,
+        "statSuppressionDurationTicks": 2400,
+        "statSuppressionAttributeMultipliers": {
+          "outgoingDamageMultiplier": 0.42,
+          "armorEffectivenessMultiplier": 0.42,
+          "movementSpeedMultiplier": 0.55,
+          "attackSpeedMultiplier": 0.5,
+          "maxHealthMultiplier": 0.6,
+          "knockbackResistanceMultiplier": 0.25,
+          "scaleMultiplier": 0.82
+        },
+        "removeWornArmorFirst": true,
+        "removeArmorFromInventoryIfNoArmorWorn": true,
+        "preferMainHandWeapon": true,
+        "allowInventoryWeaponFallback": true,
+        "randomItemSeizureCountRange": {
+          "min": 2,
+          "max": 6
+        },
+        "randomItemSeizureFilters": {
+          "includeMainInventory": true,
+          "includeHotbar": true,
+          "includeOffhand": true,
+          "includeArmor": false,
+          "includeWeapons": true,
+          "includeTools": true,
+          "includeArtifacts": false,
+          "includeDamageable": true,
+          "includeUndamageable": true
+        },
+        "artifactSeizureChance": 0.5,
+        "indebted": {
+          "enabled": true,
+          "casterLowManaCleanupThresholdPercent": 20.0,
+          "uniqueTargetCapBypassEnabled": true
+        }
+      },
+      "totalCollection": {
+        "magicSealDurationTicks": 2400,
+        "severeStatSuppressionDurationTicks": 3600,
+        "severeStatSuppressionAttributeMultipliers": {
+          "outgoingDamageMultiplier": 0.22,
+          "armorEffectivenessMultiplier": 0.22,
+          "movementSpeedMultiplier": 0.38,
+          "attackSpeedMultiplier": 0.32,
+          "maxHealthMultiplier": 0.45,
+          "knockbackResistanceMultiplier": 0.1,
+          "scaleMultiplier": 0.68
+        },
+        "halfInventorySeizureFraction": 0.5,
+        "halfInventorySeizureFilters": {
+          "includeMainInventory": true,
+          "includeHotbar": true,
+          "includeOffhand": true,
+          "includeArmor": false,
+          "includeWeapons": false,
+          "includeTools": false,
+          "includeArtifacts": false,
+          "includeDamageable": true,
+          "includeUndamageable": true
+        },
+        "equipmentCoinRewardPerSeizedItem": 2.0,
+        "equipmentCoinRewardUsesTemporaryOverflowStack": true,
+        "artifactSeizeChance": 0.75,
+        "minimumArtifactSeizureCountIfMultiple": 1,
+        "indebted": {
+          "enabled": true,
+          "casterLowManaCleanupThresholdPercent": 20.0,
+          "uniqueTargetCapBypassEnabled": true
+        },
+        "collected": {
+          "enabled": true,
+          "futureReducedTributeStartingValue": 12,
+          "coinExtractionMultiplier": 1.25,
+          "tributeLossMultiplier": 1.5,
+          "residualExtractionEnabled": true,
+          "residualExtractionTriggers": {
+            "critical_hit": 0.25,
+            "disable_shield": 0.25,
+            "spear_lunge": 0.1,
+            "attribute_swapping": 0.1
+          }
+        }
       }
     }
   },

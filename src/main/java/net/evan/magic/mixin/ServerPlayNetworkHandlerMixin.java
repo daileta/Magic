@@ -45,8 +45,16 @@ public abstract class ServerPlayNetworkHandlerMixin {
 		MagicAbilityManager.debugManipulationPacket(message, args);
 	}
 
+	private boolean magic$isGreedIntroFrozen() {
+		return MagicAbilityManager.isGreedDomainIntroFrozen(player);
+	}
+
 	private boolean magic$shouldCancelGreedHandUse(Hand hand) {
-		if (hand == Hand.OFF_HAND && GreedRuntime.isOffhandBlocked(player)) {
+		if (
+			hand == Hand.OFF_HAND
+			&& GreedRuntime.isOffhandBlocked(player)
+			&& !GreedRuntime.canUseEnderPearlWhileRooted(player, player.getStackInHand(hand))
+		) {
 			GreedRuntime.onBlockedShieldUse(player);
 			return true;
 		}
@@ -85,6 +93,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			ci.cancel();
 			return;
 		}
+		if (magic$isGreedIntroFrozen()) {
+			ci.cancel();
+			return;
+		}
 
 		MagicAbilityManager.beginManipulationMovementProxy(player);
 	}
@@ -99,6 +111,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 		MagicAbilityManager.onManipulationInputPacket(player, packet.input());
 		if (MagicAbilityManager.isManipulationControlledTarget(player)) {
 			magic$packetDebug("{} packet onPlayerInput canceled: player is manipulation-controlled target", magic$debugName());
+			ci.cancel();
+			return;
+		}
+		if (magic$isGreedIntroFrozen()) {
 			ci.cancel();
 			return;
 		}
@@ -123,6 +139,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			magic$debugName(),
 			packet.getMode()
 		);
+		if (magic$isGreedIntroFrozen()) {
+			ci.cancel();
+			return;
+		}
 		if (packet.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING && GreedRuntime.isSprintBlocked(player)) {
 			player.setSprinting(false);
 			GreedRuntime.onBlockedSprintAttempt(player);
@@ -133,6 +153,9 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			magic$packetDebug("{} packet onClientCommand canceled: player is manipulation-controlled target", magic$debugName());
 			ci.cancel();
 			return;
+		}
+		if (packet.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING) {
+			GreedRuntime.onStartSprinting(player);
 		}
 
 		MagicAbilityManager.beginManipulationMovementProxy(player);
@@ -156,6 +179,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 	private void magic$onPlayerActionHead(PlayerActionC2SPacket packet, CallbackInfo ci) {
 		PlayerActionC2SPacket.Action action = packet.getAction();
 		magic$packetDebug("{} packet onPlayerAction HEAD: action={}", magic$debugName(), action);
+		if (magic$isGreedIntroFrozen()) {
+			ci.cancel();
+			return;
+		}
 		if (action == PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND) {
 			if (GreedRuntime.isOffhandBlocked(player)) {
 				GreedRuntime.onBlockedShieldUse(player);
@@ -186,6 +213,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerInteractBlock", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerInteractBlockHead(PlayerInteractBlockC2SPacket packet, CallbackInfo ci) {
+		if (magic$isGreedIntroFrozen()) {
+			ci.cancel();
+			return;
+		}
 		if (magic$shouldCancelGreedHandUse(packet.getHand())) {
 			ci.cancel();
 			return;
@@ -209,6 +240,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerInteractItem", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerInteractItemHead(PlayerInteractItemC2SPacket packet, CallbackInfo ci) {
+		if (magic$isGreedIntroFrozen()) {
+			ci.cancel();
+			return;
+		}
 		if (magic$shouldCancelGreedHandUse(packet.getHand())) {
 			ci.cancel();
 			return;
@@ -228,6 +263,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 	@Inject(method = "onPlayerInteractEntity", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerInteractEntityHead(PlayerInteractEntityC2SPacket packet, CallbackInfo ci) {
 		magic$packetDebug("{} packet onPlayerInteractEntity HEAD", magic$debugName());
+		if (magic$isGreedIntroFrozen()) {
+			ci.cancel();
+			return;
+		}
 		boolean cancelManipulationAttack = MagicAbilityManager.shouldCancelManipulationEntityAttack(player, packet);
 		if (!cancelManipulationAttack) {
 			Hand hand = magic$interactionHand(packet);
