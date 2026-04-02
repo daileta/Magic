@@ -47,6 +47,11 @@ public final class MagicCommands {
 									.then(cooldownAbilityLiteral(MagicAbility.BELOW_FREEZING, "below_freezing"))
 									.then(cooldownAbilityLiteral(MagicAbility.FROST_ASCENT, "frost_ascent"))
 									.then(cooldownAbilityLiteral(MagicAbility.MARTYRS_FLAME, "martyrs_flame"))
+									.then(cooldownAbilityLiteral(MagicAbility.IGNITION, "ignition"))
+									.then(cooldownAbilityLiteral(MagicAbility.PHOENIXS_CAGE, "phoenixs_cage"))
+									.then(cooldownAbilityLiteral(MagicAbility.PYROTECHNICS_LAW, "pyrotechnics_law"))
+									.then(cooldownAbilityLiteral(MagicAbility.IM_THE_FASTEST_THERE_IS, "im_the_fastest_there_is"))
+									.then(cooldownAbilityLiteral(MagicAbility.OVERRIDE, "override"))
 									.then(cooldownAbilityLiteral(MagicAbility.ABSOLUTE_ZERO, "absolute_zero"))
 									.then(cooldownAbilityLiteral(MagicAbility.PLANCK_HEAT, "planck_heat"))
 									.then(cooldownAbilityLiteral(MagicAbility.FROST_DOMAIN_EXPANSION, "frost_domain_expansion"))
@@ -179,6 +184,25 @@ public final class MagicCommands {
 							)
 					)
 					.then(
+						CommandManager.literal("burning_passion")
+							.then(
+								CommandManager.literal("override")
+									.then(
+										CommandManager.literal("force")
+											.executes(context -> forceBurningPassionOverrideForSelf(context.getSource()))
+											.then(
+												CommandManager.argument("targets", EntityArgumentType.players())
+													.executes(context ->
+														forceBurningPassionOverride(
+															context.getSource(),
+															EntityArgumentType.getPlayers(context, "targets")
+														)
+													)
+											)
+									)
+							)
+					)
+					.then(
 						CommandManager.literal("greed")
 							.then(
 								CommandManager.literal("coins")
@@ -220,6 +244,11 @@ public final class MagicCommands {
 							.then(
 								CommandManager.literal("lock")
 									.then(abilityAccessLiteral(MagicAbility.MARTYRS_FLAME, "martyrs_flame", true))
+									.then(abilityAccessLiteral(MagicAbility.IGNITION, "ignition", true))
+									.then(abilityAccessLiteral(MagicAbility.PHOENIXS_CAGE, "phoenixs_cage", true))
+									.then(abilityAccessLiteral(MagicAbility.PYROTECHNICS_LAW, "pyrotechnics_law", true))
+									.then(abilityAccessLiteral(MagicAbility.IM_THE_FASTEST_THERE_IS, "im_the_fastest_there_is", true))
+									.then(abilityAccessLiteral(MagicAbility.OVERRIDE, "override", true))
 									.then(abilityAccessLiteral(MagicAbility.BELOW_FREEZING, "below_freezing", true))
 									.then(abilityAccessLiteral(MagicAbility.FROST_ASCENT, "frost_ascent", true))
 									.then(abilityAccessLiteral(MagicAbility.ABSOLUTE_ZERO, "absolute_zero", true))
@@ -248,6 +277,11 @@ public final class MagicCommands {
 							.then(
 								CommandManager.literal("unlock")
 									.then(abilityAccessLiteral(MagicAbility.MARTYRS_FLAME, "martyrs_flame", false))
+									.then(abilityAccessLiteral(MagicAbility.IGNITION, "ignition", false))
+									.then(abilityAccessLiteral(MagicAbility.PHOENIXS_CAGE, "phoenixs_cage", false))
+									.then(abilityAccessLiteral(MagicAbility.PYROTECHNICS_LAW, "pyrotechnics_law", false))
+									.then(abilityAccessLiteral(MagicAbility.IM_THE_FASTEST_THERE_IS, "im_the_fastest_there_is", false))
+									.then(abilityAccessLiteral(MagicAbility.OVERRIDE, "override", false))
 									.then(abilityAccessLiteral(MagicAbility.BELOW_FREEZING, "below_freezing", false))
 									.then(abilityAccessLiteral(MagicAbility.FROST_ASCENT, "frost_ascent", false))
 									.then(abilityAccessLiteral(MagicAbility.ABSOLUTE_ZERO, "absolute_zero", false))
@@ -379,6 +413,10 @@ public final class MagicCommands {
 
 	private static int setFrostStageProgressForSelf(ServerCommandSource source, int seconds) throws CommandSyntaxException {
 		return setFrostStageProgress(source, List.of(source.getPlayerOrThrow()), seconds);
+	}
+
+	private static int forceBurningPassionOverrideForSelf(ServerCommandSource source) throws CommandSyntaxException {
+		return forceBurningPassionOverride(source, List.of(source.getPlayerOrThrow()));
 	}
 
 	private static int resetAll(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
@@ -584,6 +622,23 @@ public final class MagicCommands {
 		return updatedTargets.size();
 	}
 
+	private static int forceBurningPassionOverride(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.forceBurningPassionOverride(target) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.burning_passion.override.force.failure.no_updates"));
+			return 0;
+		}
+
+		sendBurningPassionOverrideForceFeedback(source, updatedTargets);
+		return updatedTargets.size();
+	}
+
 	private static void sendAllResetFeedback(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
 		if (targets.size() == 1) {
 			ServerPlayerEntity target = targets.iterator().next();
@@ -786,6 +841,22 @@ public final class MagicCommands {
 
 		source.sendFeedback(
 			() -> Text.translatable("command.magic.frost.stage.progress.set.multiple", seconds, targets.size()),
+			true
+		);
+	}
+
+	private static void sendBurningPassionOverrideForceFeedback(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.burning_passion.override.force.single", target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.burning_passion.override.force.multiple", targets.size()),
 			true
 		);
 	}

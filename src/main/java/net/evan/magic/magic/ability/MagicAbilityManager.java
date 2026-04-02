@@ -114,6 +114,7 @@ import net.minecraft.util.PlayerInput;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.AffineTransformation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
@@ -124,12 +125,15 @@ import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateType;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 public final class MagicAbilityManager {
 	private static final int TICKS_PER_SECOND = 20;
 	private static final int COOLDOWN_MESSAGE_DEBOUNCE_TICKS = 20;
 	private static final float DEFAULT_PLAYER_FLY_SPEED = 0.05F;
 	private static MagicConfig.FrostConfig FROST_CONFIG = new MagicConfig.FrostConfig();
+	private static MagicConfig.BurningPassionConfig BURNING_PASSION_CONFIG = new MagicConfig.BurningPassionConfig();
 	private static int BELOW_FREEZING_COOLDOWN_TICKS = 30 * TICKS_PER_SECOND;
 	private static int FROST_ASCENT_COOLDOWN_TICKS = 0;
 	private static int BELOW_FREEZING_MANA_DRAIN_PER_SECOND = 5;
@@ -682,6 +686,7 @@ public final class MagicAbilityManager {
 	private static final Identifier SAGITTARIUS_WINDUP_SPEED_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "sagittarius_windup_speed");
 	private static final Identifier ORIONS_GAMBIT_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "orions_gambit_max_health");
 	private static final Identifier FROST_STAGE_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "frost_stage_max_health");
+	private static final Identifier BURNING_PASSION_STEP_HEIGHT_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "burning_passion_step_height");
 	private static final ParticleEffect SAGITTARIUS_BEAM_PARTICLE = ParticleTypes.END_ROD;
 	private static final ParticleEffect FROST_SHARD_PARTICLE = new ItemStackParticleEffect(ParticleTypes.ITEM, new ItemStack(ModItems.FROST_SHARD));
 	private static final double DOMAIN_TELEPORT_POSITION_EPSILON_SQUARED = 4.0E-4;
@@ -750,6 +755,18 @@ public final class MagicAbilityManager {
 	private static final Set<UUID> PLUS_ULTRA_DAMAGE_SCALING_GUARD = new HashSet<>();
 	private static final Map<UUID, Double> MARTYRS_FLAME_DRAIN_BUFFER = new HashMap<>();
 	private static final Map<UUID, MartyrsFlameBurnState> MARTYRS_FLAME_BURNING_TARGETS = new HashMap<>();
+	private static final Map<UUID, BurningPassionIgnitionState> BURNING_PASSION_IGNITION_STATES = new HashMap<>();
+	private static final Map<UUID, BurningPassionAuraFireState> BURNING_PASSION_AURA_FIRE_TARGETS = new HashMap<>();
+	private static final Map<UUID, BurningPassionAuraFireState> BURNING_PASSION_SELF_FIRE_TARGETS = new HashMap<>();
+	private static final List<PhoenixsCageLineState> PHOENIXS_CAGE_LINES = new ArrayList<>();
+	private static final Map<UUID, BurningPassionFastestState> BURNING_PASSION_FASTEST_STATES = new HashMap<>();
+	private static final Map<UUID, BurningPassionDeathfireState> BURNING_PASSION_DEATHFIRE_TARGETS = new HashMap<>();
+	private static final Map<UUID, OverrideMeteorState> OVERRIDE_METEOR_STATES = new HashMap<>();
+	private static final Map<UUID, Integer> IGNITION_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, Integer> PHOENIXS_CAGE_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, Integer> PYROTECHNICS_LAW_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, Integer> IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, Integer> OVERRIDE_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Set<UUID> TILL_DEATH_DO_US_PART_PASSIVE_ENABLED = new HashSet<>();
 	private static final Map<UUID, TillDeathDoUsPartState> TILL_DEATH_DO_US_PART_STATES = new HashMap<>();
 	private static final Map<UUID, Integer> TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK = new HashMap<>();
@@ -842,6 +859,7 @@ public final class MagicAbilityManager {
 	public static void reloadConfigValues() {
 		MagicConfig.MagicConfigData config = MagicConfig.get();
 		FROST_CONFIG = config.frost;
+		BURNING_PASSION_CONFIG = config.burningPassion;
 
 		BELOW_FREEZING_MANA_DRAIN_PER_SECOND = 0;
 		ABSOLUTE_ZERO_MANA_DRAIN_PER_SECOND = 0;
@@ -1327,6 +1345,26 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		if (requestedAbility == MagicAbility.IGNITION) {
+			handleIgnitionRequest(player, currentTick);
+			return;
+		}
+
+		if (requestedAbility == MagicAbility.PHOENIXS_CAGE) {
+			handlePhoenixsCageRequest(player, currentTick);
+			return;
+		}
+
+		if (requestedAbility == MagicAbility.PYROTECHNICS_LAW) {
+			handleBurningPassionSlotFourRequest(player, currentTick);
+			return;
+		}
+
+		if (requestedAbility == MagicAbility.OVERRIDE) {
+			handleOverrideRequest(player, currentTick);
+			return;
+		}
+
 		if (requestedAbility == MagicAbility.SPOTLIGHT) {
 			handleSpotlightRequest(player);
 			return;
@@ -1435,6 +1473,1835 @@ public final class MagicAbilityManager {
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
 		player.sendMessage(Text.translatable("message.magic.ability.passive_enabled", MagicAbility.MARTYRS_FLAME.displayName()), false);
 		recordOrionsGambitAbilityUse(player, MagicAbility.MARTYRS_FLAME);
+	}
+
+	private static void handleIgnitionRequest(ServerPlayerEntity player, int currentTick) {
+		BurningPassionIgnitionState activeState = BURNING_PASSION_IGNITION_STATES.get(player.getUuid());
+		if (activeAbility(player) == MagicAbility.IGNITION && activeState != null) {
+			if (!BURNING_PASSION_CONFIG.ignition.allowManualCancel) {
+				player.sendMessage(Text.translatable("message.magic.burning_passion.ignition.cancel_disabled"), true);
+				return;
+			}
+			endIgnition(
+				player,
+				currentTick,
+				BurningPassionIgnitionEndReason.MANUAL,
+				BURNING_PASSION_CONFIG.ignition.manualCancelStartsCooldown,
+				true
+			);
+			return;
+		}
+
+		int remainingTicks = ignitionCooldownRemaining(player, currentTick);
+		if (remainingTicks > 0) {
+			sendAbilityCooldownMessage(player, MagicAbility.IGNITION, remainingTicks, false);
+			return;
+		}
+
+		if (!isOrionsGambitManaCostSuppressed(player) && MagicPlayerData.getMana(player) <= 0) {
+			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
+			return;
+		}
+
+		BURNING_PASSION_IGNITION_STATES.put(
+			player.getUuid(),
+			new BurningPassionIgnitionState(player.getEntityWorld().getRegistryKey(), 1, currentTick, 0.0)
+		);
+		setActiveAbility(player, MagicAbility.IGNITION);
+		MagicPlayerData.setDepletedRecoveryMode(player, false);
+		IGNITION_COOLDOWN_END_TICK.remove(player.getUuid());
+		spawnIgnitionActivationEffects(player);
+		syncBurningPassionHud(player);
+		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.IGNITION.displayName()), true);
+		recordOrionsGambitAbilityUse(player, MagicAbility.IGNITION);
+	}
+
+	private static void handlePhoenixsCageRequest(ServerPlayerEntity player, int currentTick) {
+		BurningPassionIgnitionState ignitionState = burningPassionIgnitionState(player);
+		if (ignitionState == null) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.ignition.required"), true);
+			return;
+		}
+
+		int remainingTicks = phoenixsCageCooldownRemaining(player, currentTick);
+		if (remainingTicks > 0) {
+			sendAbilityCooldownMessage(player, MagicAbility.PHOENIXS_CAGE, remainingTicks, false);
+			return;
+		}
+
+		int manaCost = (int) Math.ceil(manaFromPercentExact(BURNING_PASSION_CONFIG.phoenixsCage.manaCostPercent));
+		if (!canSpendAbilityCost(player, manaCost)) {
+			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
+			return;
+		}
+		if (!canPayBurningPassionHealthDemand(player, ignitionState, MagicAbility.PHOENIXS_CAGE)) {
+			return;
+		}
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+
+		PhoenixsCageLineState lineState = createPhoenixsCageLine(player, world, currentTick);
+		if (lineState == null) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.phoenixs_cage.no_space"), true);
+			return;
+		}
+
+		spendAbilityCost(player, manaCost);
+		payBurningPassionHealthDemand(player, ignitionState, MagicAbility.PHOENIXS_CAGE);
+		PHOENIXS_CAGE_LINES.add(lineState);
+		if (BURNING_PASSION_CONFIG.phoenixsCage.cooldownTicks > 0) {
+			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.PHOENIXS_CAGE, currentTick);
+		}
+		spawnPhoenixsCageCastEffects(world, lineState);
+		recordOrionsGambitAbilityUse(player, MagicAbility.PHOENIXS_CAGE);
+	}
+
+	private static void handleBurningPassionSlotFourRequest(ServerPlayerEntity player, int currentTick) {
+		BurningPassionIgnitionState ignitionState = burningPassionIgnitionState(player);
+		handlePyrotechnicsLawRequest(player, ignitionState, currentTick);
+	}
+
+	private static void handlePyrotechnicsLawRequest(
+		ServerPlayerEntity player,
+		BurningPassionIgnitionState ignitionState,
+		int currentTick
+	) {
+		if (ignitionState == null || ignitionState.currentStage < 2) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.pyrotechnics_law.stage_required"), true);
+			return;
+		}
+
+		int remainingTicks = pyrotechnicsLawCooldownRemaining(player, currentTick);
+		if (remainingTicks > 0) {
+			sendAbilityCooldownMessage(player, MagicAbility.PYROTECHNICS_LAW, remainingTicks, false);
+			return;
+		}
+		if (BURNING_PASSION_CONFIG.pyrotechnicsLaw.requiresFullMana && !hasFullManaBar(player)) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.full_mana_required", MagicAbility.PYROTECHNICS_LAW.displayName()), true);
+			return;
+		}
+		if (!canPayBurningPassionHealthDemand(player, ignitionState, MagicAbility.PYROTECHNICS_LAW)) {
+			return;
+		}
+
+		if (BURNING_PASSION_CONFIG.pyrotechnicsLaw.consumeFullMana) {
+			consumeFullManaBar(player);
+		}
+		payBurningPassionHealthDemand(player, ignitionState, MagicAbility.PYROTECHNICS_LAW);
+		ignitionState.heatPercent = Math.max(0.0, ignitionState.heatPercent - BURNING_PASSION_CONFIG.pyrotechnicsLaw.heatReductionPercent);
+		if (BURNING_PASSION_CONFIG.pyrotechnicsLaw.stageSetbackTicks > 0) {
+			ignitionState.stageStartTick = Math.min(currentTick, ignitionState.stageStartTick + BURNING_PASSION_CONFIG.pyrotechnicsLaw.stageSetbackTicks);
+		}
+		if (BURNING_PASSION_CONFIG.pyrotechnicsLaw.healHearts > 0.0) {
+			player.heal((float) (BURNING_PASSION_CONFIG.pyrotechnicsLaw.healHearts * 2.0));
+		}
+		if (BURNING_PASSION_CONFIG.pyrotechnicsLaw.cooldownTicks > 0) {
+			startAbilityCooldownFromNow(player.getUuid(), MagicAbility.PYROTECHNICS_LAW, currentTick);
+		}
+		spawnPyrotechnicsLawEffects(player);
+		syncBurningPassionHud(player);
+		recordOrionsGambitAbilityUse(player, MagicAbility.PYROTECHNICS_LAW);
+	}
+
+	private static void handleOverrideRequest(ServerPlayerEntity player, int currentTick) {
+		tryStartOverride(player, currentTick, false);
+	}
+
+	private static boolean tryStartOverride(ServerPlayerEntity player, int currentTick, boolean bypassDomainRequirement) {
+		if (OVERRIDE_METEOR_STATES.containsKey(player.getUuid())) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.override.already_active"), true);
+			return false;
+		}
+
+		int remainingTicks = overrideCooldownRemaining(player, currentTick);
+		if (remainingTicks > 0) {
+			sendAbilityCooldownMessage(player, MagicAbility.OVERRIDE, remainingTicks, false);
+			return false;
+		}
+		if (BURNING_PASSION_CONFIG.override.requiresFullMana && !hasFullManaBar(player)) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.full_mana_required", MagicAbility.OVERRIDE.displayName()), true);
+			return false;
+		}
+
+		BurningPassionIgnitionState ignitionState = burningPassionIgnitionState(player);
+		if (!canPayBurningPassionHealthDemand(player, ignitionState, MagicAbility.OVERRIDE)) {
+			return false;
+		}
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return false;
+		}
+
+		Vec3d impactCenter = resolveOverrideImpactCenter(world, player);
+		double impactRadius = burningPassionOverrideImpactRadius();
+		List<UUID> qualifyingDomains = qualifyingOverrideDomains(player, impactCenter, impactRadius);
+		if (!bypassDomainRequirement && qualifyingDomains.isEmpty()) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.override.no_valid_domain"), true);
+			return false;
+		}
+
+		if (BURNING_PASSION_CONFIG.override.consumeFullMana) {
+			consumeFullManaBar(player);
+		}
+		payBurningPassionHealthDemand(player, ignitionState, MagicAbility.OVERRIDE);
+		startAbilityCooldownFromNow(player.getUuid(), MagicAbility.OVERRIDE, currentTick);
+
+		OverrideMeteorState meteorState = createOverrideMeteorState(player, world, impactCenter, impactRadius, qualifyingDomains, currentTick);
+		if (meteorState == null) {
+			OVERRIDE_COOLDOWN_END_TICK.remove(player.getUuid());
+			player.sendMessage(Text.translatable("message.magic.burning_passion.override.cast_failed"), true);
+			return false;
+		}
+
+		OVERRIDE_METEOR_STATES.put(player.getUuid(), meteorState);
+		recordOrionsGambitAbilityUse(player, MagicAbility.OVERRIDE);
+		return true;
+	}
+
+	private static void applyIgnition(ServerPlayerEntity player, int currentTick) {
+		BurningPassionIgnitionState state = BURNING_PASSION_IGNITION_STATES.get(player.getUuid());
+		if (state == null || state.dimension != player.getEntityWorld().getRegistryKey()) {
+			endIgnition(player, currentTick, BurningPassionIgnitionEndReason.INVALID, false, false);
+			return;
+		}
+
+		int previousStage = state.currentStage;
+		while (true) {
+			int stageDuration = burningPassionStageDurationTicks(state.currentStage);
+			if (currentTick - state.stageStartTick < stageDuration) {
+				break;
+			}
+			if (state.currentStage >= 3) {
+				endIgnition(
+					player,
+					currentTick,
+					BurningPassionIgnitionEndReason.NATURAL,
+					BURNING_PASSION_CONFIG.ignition.naturalEndStartsCooldown,
+					true
+				);
+				return;
+			}
+			state.stageStartTick += stageDuration;
+			state.currentStage++;
+		}
+
+		MagicConfig.BurningPassionStageConfig stageConfig = burningPassionStageConfig(state.currentStage);
+		if (previousStage != state.currentStage || !stageConfig.auraEnabled) {
+			state.auraPlayersInside.clear();
+		}
+
+		applyBurningPassionStageBuffs(player, stageConfig);
+		applyBurningPassionFastestState(player, state, currentTick);
+		if (!BURNING_PASSION_IGNITION_STATES.containsKey(player.getUuid())) {
+			return;
+		}
+
+		if (stageConfig.auraEnabled && stageConfig.auraRadius > 0.0) {
+			applyBurningPassionAura(player, state, stageConfig, currentTick);
+		} else {
+			state.auraPlayersInside.clear();
+		}
+
+		double passiveHeatPerTick = stageConfig.passiveHeatPerSecond <= 0.0 ? 0.0 : stageConfig.passiveHeatPerSecond / TICKS_PER_SECOND;
+		if (passiveHeatPerTick > 0.0) {
+			state.heatPercent = Math.min(BURNING_PASSION_CONFIG.heat.overheatThresholdPercent, state.heatPercent + passiveHeatPerTick);
+		}
+		if (stageConfig.waterHeatPerSecond != 0.0 && isBurningPassionCoolingInWater(player)) {
+			state.heatPercent = MathHelper.clamp(
+				state.heatPercent + stageConfig.waterHeatPerSecond / TICKS_PER_SECOND,
+				0.0,
+				BURNING_PASSION_CONFIG.heat.overheatThresholdPercent
+			);
+		}
+
+		double phoenixHeatPerTick = burningPassionPhoenixUpkeepHeatPerTick(player.getUuid(), currentTick);
+		if (phoenixHeatPerTick > 0.0) {
+			state.heatPercent = Math.min(BURNING_PASSION_CONFIG.heat.overheatThresholdPercent, state.heatPercent + phoenixHeatPerTick);
+		}
+
+		if (state.heatPercent >= BURNING_PASSION_CONFIG.heat.selfFireThresholdPercent) {
+			applyOrRefreshBurningPassionSelfFire(player, state.currentStage, currentTick);
+		} else if (BURNING_PASSION_SELF_FIRE_TARGETS.remove(player.getUuid()) != null) {
+			player.extinguish();
+		}
+
+		spawnBurningPassionStageParticles(player, stageConfig, state.currentStage);
+		syncBurningPassionHud(player);
+		if (state.heatPercent >= BURNING_PASSION_CONFIG.heat.overheatThresholdPercent) {
+			triggerBurningPassionOverheat(player, currentTick);
+		}
+	}
+
+	private static void endIgnition(
+		ServerPlayerEntity player,
+		int currentTick,
+		BurningPassionIgnitionEndReason reason,
+		boolean startCooldown,
+		boolean sendDeactivatedMessage
+	) {
+		UUID playerId = player.getUuid();
+		BURNING_PASSION_IGNITION_STATES.remove(playerId);
+		clearPhoenixsCageLinesByCaster(playerId, player.getEntityWorld().getServer());
+		clearBurningPassionFastestState(playerId);
+		if (BURNING_PASSION_SELF_FIRE_TARGETS.remove(playerId) != null) {
+			player.extinguish();
+		}
+		removeBurningPassionStageBuffs(player);
+		if (activeAbility(player) == MagicAbility.IGNITION) {
+			setActiveAbility(player, MagicAbility.NONE);
+		}
+		if (startCooldown) {
+			startAbilityCooldownFromNow(playerId, MagicAbility.IGNITION, currentTick);
+		}
+		MagicPlayerData.clearBurningPassionHud(player);
+		if (reason == BurningPassionIgnitionEndReason.MANUAL && player.getEntityWorld() instanceof ServerWorld world) {
+			playConfiguredSound(
+				world,
+				new Vec3d(player.getX(), player.getBodyY(0.45), player.getZ()),
+				SoundEvents.BLOCK_FIRE_EXTINGUISH,
+				BURNING_PASSION_CONFIG.ignition.cancelSoundVolume,
+				BURNING_PASSION_CONFIG.ignition.cancelSoundPitch
+			);
+		}
+		if (reason == BurningPassionIgnitionEndReason.OVERHEAT) {
+			player.sendMessage(Text.translatable("message.magic.burning_passion.overheat"), true);
+		} else if (sendDeactivatedMessage) {
+			player.sendMessage(Text.translatable("message.magic.ability.deactivated", MagicAbility.IGNITION.displayName()), true);
+		}
+	}
+
+	private static void applyBurningPassionAura(
+		ServerPlayerEntity player,
+		BurningPassionIgnitionState state,
+		MagicConfig.BurningPassionStageConfig stageConfig,
+		int currentTick
+	) {
+		double radius = Math.max(0.0, stageConfig.auraRadius);
+		double radiusSq = radius * radius;
+		Set<UUID> seenPlayers = new HashSet<>();
+		MinecraftServer server = player.getEntityWorld().getServer();
+		for (ServerPlayerEntity other : server.getPlayerManager().getPlayerList()) {
+			if (other == player || other.isSpectator() || other.getEntityWorld().getRegistryKey() != state.dimension) {
+				continue;
+			}
+
+			UUID targetId = other.getUuid();
+			seenPlayers.add(targetId);
+			boolean inside = player.squaredDistanceTo(other) <= radiusSq;
+			boolean previouslyInside = state.auraPlayersInside.getOrDefault(targetId, false);
+			if (inside != previouslyInside) {
+				int cooldownEndTick = state.boundaryCooldownEndTickByTarget.getOrDefault(targetId, Integer.MIN_VALUE);
+				if (currentTick >= cooldownEndTick && stageConfig.boundaryHeatGainPercent > 0.0) {
+					state.heatPercent = Math.min(
+						BURNING_PASSION_CONFIG.heat.overheatThresholdPercent,
+						state.heatPercent + stageConfig.boundaryHeatGainPercent
+					);
+					state.boundaryCooldownEndTickByTarget.put(
+						targetId,
+						currentTick + Math.max(0, stageConfig.boundaryTriggerCooldownTicks)
+					);
+				}
+				state.auraPlayersInside.put(targetId, inside);
+			}
+			if (!inside) {
+				continue;
+			}
+
+			applyOrRefreshBurningPassionAuraFire(
+				other,
+				player.getUuid(),
+				currentTick,
+				stageConfig.fireDamagePerTick,
+				stageConfig.fireDamageIntervalTicks,
+				stageConfig.fireRefreshTicks,
+				stageConfig.persistentFireUntilExtinguished,
+				stageConfig.extinguishWhenWet
+			);
+		}
+
+		state.auraPlayersInside.keySet().removeIf(targetId -> !seenPlayers.contains(targetId));
+		state.boundaryCooldownEndTickByTarget.keySet().removeIf(targetId -> !seenPlayers.contains(targetId));
+	}
+
+	private static void applyBurningPassionStageBuffs(ServerPlayerEntity player, MagicConfig.BurningPassionStageConfig stageConfig) {
+		int refreshTicks = Math.max(1, BURNING_PASSION_CONFIG.ignition.effectRefreshTicks);
+		if (stageConfig.speedAmplifier >= 0) {
+			refreshStatusEffect(player, StatusEffects.SPEED, refreshTicks, stageConfig.speedAmplifier, true, false, true);
+		}
+		if (stageConfig.strengthAmplifier >= 0) {
+			refreshStatusEffect(player, StatusEffects.STRENGTH, refreshTicks, stageConfig.strengthAmplifier, true, false, true);
+		}
+		if (stageConfig.regenerationAmplifier >= 0) {
+			refreshStatusEffect(player, StatusEffects.REGENERATION, refreshTicks, stageConfig.regenerationAmplifier, true, false, true);
+		}
+		overwriteAttributeModifier(
+			player.getAttributeInstance(EntityAttributes.STEP_HEIGHT),
+			BURNING_PASSION_STEP_HEIGHT_MODIFIER_ID,
+			stageConfig.extraStepHeightBlocks,
+			EntityAttributeModifier.Operation.ADD_VALUE
+		);
+	}
+
+	private static void removeBurningPassionStageBuffs(ServerPlayerEntity player) {
+		removeStatusEffectIfMatching(player, StatusEffects.SPEED, burningPassionStageAmplifiers(StatusEffects.SPEED));
+		removeStatusEffectIfMatching(player, StatusEffects.STRENGTH, burningPassionStageAmplifiers(StatusEffects.STRENGTH));
+		removeStatusEffectIfMatching(player, StatusEffects.REGENERATION, burningPassionStageAmplifiers(StatusEffects.REGENERATION));
+		removeAttributeModifier(player.getAttributeInstance(EntityAttributes.STEP_HEIGHT), BURNING_PASSION_STEP_HEIGHT_MODIFIER_ID);
+	}
+
+	private static Set<Integer> burningPassionStageAmplifiers(RegistryEntry<StatusEffect> effect) {
+		Set<Integer> amplifiers = new HashSet<>();
+		if (effect == StatusEffects.SPEED) {
+			if (BURNING_PASSION_CONFIG.stageOne.speedAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageOne.speedAmplifier);
+			}
+			if (BURNING_PASSION_CONFIG.stageTwo.speedAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageTwo.speedAmplifier);
+			}
+			if (BURNING_PASSION_CONFIG.stageThree.speedAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageThree.speedAmplifier);
+			}
+			return amplifiers;
+		}
+		if (effect == StatusEffects.STRENGTH) {
+			if (BURNING_PASSION_CONFIG.stageOne.strengthAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageOne.strengthAmplifier);
+			}
+			if (BURNING_PASSION_CONFIG.stageTwo.strengthAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageTwo.strengthAmplifier);
+			}
+			if (BURNING_PASSION_CONFIG.stageThree.strengthAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageThree.strengthAmplifier);
+			}
+			return amplifiers;
+		}
+		if (effect == StatusEffects.REGENERATION) {
+			if (BURNING_PASSION_CONFIG.stageOne.regenerationAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageOne.regenerationAmplifier);
+			}
+			if (BURNING_PASSION_CONFIG.stageTwo.regenerationAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageTwo.regenerationAmplifier);
+			}
+			if (BURNING_PASSION_CONFIG.stageThree.regenerationAmplifier >= 0) {
+				amplifiers.add(BURNING_PASSION_CONFIG.stageThree.regenerationAmplifier);
+			}
+		}
+		return amplifiers;
+	}
+
+	private static void triggerBurningPassionOverheat(ServerPlayerEntity player, int currentTick) {
+		if (player.getEntityWorld() instanceof ServerWorld world) {
+			world.spawnParticles(
+				ParticleTypes.FLAME,
+				player.getX(),
+				player.getBodyY(0.45),
+				player.getZ(),
+				BURNING_PASSION_CONFIG.overheat.flameBurstParticleCount,
+				0.75,
+				0.5,
+				0.75,
+				0.08
+			);
+			world.spawnParticles(
+				ParticleTypes.CAMPFIRE_COSY_SMOKE,
+				player.getX(),
+				player.getBodyY(0.4),
+				player.getZ(),
+				BURNING_PASSION_CONFIG.overheat.smokeParticleCount,
+				0.65,
+				0.35,
+				0.65,
+				0.02
+			);
+			playConfiguredSound(
+				world,
+				new Vec3d(player.getX(), player.getBodyY(0.45), player.getZ()),
+				SoundEvents.ENTITY_GENERIC_EXPLODE.value(),
+				BURNING_PASSION_CONFIG.overheat.soundVolume,
+				BURNING_PASSION_CONFIG.overheat.soundPitch
+			);
+		}
+		if (BURNING_PASSION_CONFIG.overheat.punishmentDurationTicks > 0) {
+			addConfiguredStatusEffect(player, StatusEffects.SLOWNESS, BURNING_PASSION_CONFIG.overheat.punishmentDurationTicks, BURNING_PASSION_CONFIG.overheat.slownessAmplifier);
+			addConfiguredStatusEffect(player, StatusEffects.WEAKNESS, BURNING_PASSION_CONFIG.overheat.punishmentDurationTicks, BURNING_PASSION_CONFIG.overheat.weaknessAmplifier);
+		}
+		endIgnition(player, currentTick, BurningPassionIgnitionEndReason.OVERHEAT, false, false);
+		startBurningPassionOverheatCooldowns(player.getUuid(), currentTick);
+	}
+
+	private static void startBurningPassionOverheatCooldowns(UUID playerId, int currentTick) {
+		int lockoutTicks = Math.max(0, BURNING_PASSION_CONFIG.overheat.stagedAbilityCooldownTicks);
+		startBurningPassionCooldown(playerId, MagicAbility.IGNITION, currentTick, lockoutTicks, IGNITION_COOLDOWN_END_TICK);
+		startBurningPassionCooldown(playerId, MagicAbility.PHOENIXS_CAGE, currentTick, lockoutTicks, PHOENIXS_CAGE_COOLDOWN_END_TICK);
+		startBurningPassionCooldown(playerId, MagicAbility.PYROTECHNICS_LAW, currentTick, lockoutTicks, PYROTECHNICS_LAW_COOLDOWN_END_TICK);
+		startBurningPassionCooldown(playerId, MagicAbility.IM_THE_FASTEST_THERE_IS, currentTick, lockoutTicks, IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK);
+		if (BURNING_PASSION_CONFIG.overheat.includeOverrideInLockout) {
+			startBurningPassionCooldown(playerId, MagicAbility.OVERRIDE, currentTick, lockoutTicks, OVERRIDE_COOLDOWN_END_TICK);
+		}
+	}
+
+	private static void startBurningPassionCooldown(
+		UUID playerId,
+		MagicAbility ability,
+		int currentTick,
+		int cooldownTicks,
+		Map<UUID, Integer> cooldownMap
+	) {
+		int safeCooldownTicks = Math.max(0, cooldownTicks);
+		if (isCooldownDeferredByOrionsGambit(playerId, ability)) {
+			trackOrionsGambitCooldownOverride(playerId, ability, safeCooldownTicks);
+			cooldownMap.remove(playerId);
+			return;
+		}
+		if (safeCooldownTicks <= 0) {
+			cooldownMap.remove(playerId);
+			return;
+		}
+		cooldownMap.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, safeCooldownTicks, currentTick));
+	}
+
+	private static BurningPassionIgnitionState burningPassionIgnitionState(ServerPlayerEntity player) {
+		BurningPassionIgnitionState state = BURNING_PASSION_IGNITION_STATES.get(player.getUuid());
+		if (state == null) {
+			return null;
+		}
+		return activeAbility(player) == MagicAbility.IGNITION && state.dimension == player.getEntityWorld().getRegistryKey() ? state : null;
+	}
+
+	private static MagicConfig.BurningPassionStageConfig burningPassionStageConfig(int stage) {
+		return switch (stage) {
+			case 1 -> BURNING_PASSION_CONFIG.stageOne;
+			case 2 -> BURNING_PASSION_CONFIG.stageTwo;
+			default -> BURNING_PASSION_CONFIG.stageThree;
+		};
+	}
+
+	private static int burningPassionStageDurationTicks(int stage) {
+		return switch (stage) {
+			case 1 -> Math.max(1, BURNING_PASSION_CONFIG.ignition.stageOneDurationTicks);
+			case 2 -> Math.max(1, BURNING_PASSION_CONFIG.ignition.stageTwoDurationTicks);
+			default -> Math.max(1, BURNING_PASSION_CONFIG.ignition.stageThreeDurationTicks);
+		};
+	}
+
+	private static void syncBurningPassionHud(ServerPlayerEntity player) {
+		BurningPassionIgnitionState state = burningPassionIgnitionState(player);
+		if (state == null) {
+			MagicPlayerData.clearBurningPassionHud(player);
+			return;
+		}
+
+		int stageDuration = burningPassionStageDurationTicks(state.currentStage);
+		int remainingTicks = Math.max(0, stageDuration - Math.max(0, player.getEntityWorld().getServer().getTicks() - state.stageStartTick));
+		int heatTenths = (int) Math.round(MathHelper.clamp(state.heatPercent, 0.0, 100.0) * 10.0);
+		MagicPlayerData.setBurningPassionHud(player, true, state.currentStage, remainingTicks, heatTenths / 10.0);
+	}
+
+	private static boolean canPayBurningPassionHealthDemand(
+		ServerPlayerEntity player,
+		BurningPassionIgnitionState ignitionState,
+		MagicAbility ability
+	) {
+		return canPayBurningPassionHealthDemand(player, ignitionState, ability, true);
+	}
+
+	private static boolean canPayBurningPassionHealthDemand(
+		ServerPlayerEntity player,
+		BurningPassionIgnitionState ignitionState,
+		MagicAbility ability,
+		boolean sendFailureMessage
+	) {
+		double threshold = BURNING_PASSION_CONFIG.heat.healthDemandThresholdPercent;
+		if (ignitionState == null || ignitionState.heatPercent < threshold || isTestingMode(player)) {
+			return true;
+		}
+
+		double healthCostHearts = burningPassionHealthCostHearts(ability);
+		if (healthCostHearts <= 0.0) {
+			return true;
+		}
+		double currentHealthHearts = player.getHealth() / 2.0;
+		double remainingHealthHearts = currentHealthHearts - healthCostHearts;
+		if (remainingHealthHearts + 1.0E-6 < BURNING_PASSION_CONFIG.heat.minimumRemainingHealthHearts) {
+			if (sendFailureMessage) {
+				player.sendMessage(Text.translatable("message.magic.burning_passion.health_too_low"), true);
+			}
+			return false;
+		}
+		return true;
+	}
+
+	private static void payBurningPassionHealthDemand(
+		ServerPlayerEntity player,
+		BurningPassionIgnitionState ignitionState,
+		MagicAbility ability
+	) {
+		double threshold = BURNING_PASSION_CONFIG.heat.healthDemandThresholdPercent;
+		if (ignitionState == null || ignitionState.heatPercent < threshold || isTestingMode(player)) {
+			return;
+		}
+
+		double healthCostHearts = burningPassionHealthCostHearts(ability);
+		if (healthCostHearts <= 0.0) {
+			return;
+		}
+		player.setHealth((float) Math.max(1.0, player.getHealth() - healthCostHearts * 2.0));
+	}
+
+	private static double burningPassionHealthCostHearts(MagicAbility ability) {
+		return switch (ability) {
+			case IGNITION -> BURNING_PASSION_CONFIG.heat.ignitionHealthCostHearts;
+			case PHOENIXS_CAGE -> BURNING_PASSION_CONFIG.heat.phoenixsCageHealthCostHearts;
+			case PYROTECHNICS_LAW -> BURNING_PASSION_CONFIG.heat.pyrotechnicsLawHealthCostHearts;
+			case IM_THE_FASTEST_THERE_IS -> BURNING_PASSION_CONFIG.heat.imTheFastestThereIsHealthCostHearts;
+			case OVERRIDE -> BURNING_PASSION_CONFIG.heat.overrideHealthCostHearts;
+			default -> 0.0;
+		};
+	}
+
+	private static void applyOrRefreshBurningPassionAuraFire(
+		LivingEntity target,
+		UUID casterId,
+		int currentTick,
+		float damagePerTick,
+		int damageIntervalTicks,
+		int refreshTicks,
+		boolean persistent,
+		boolean extinguishWhenWet
+	) {
+		if (damagePerTick <= 0.0F || refreshTicks <= 0) {
+			return;
+		}
+		if (extinguishWhenWet && isBurningPassionFireExtinguished(target)) {
+			BURNING_PASSION_AURA_FIRE_TARGETS.remove(target.getUuid());
+			target.extinguish();
+			return;
+		}
+
+		RegistryKey<World> dimension = target.getEntityWorld().getRegistryKey();
+		BurningPassionAuraFireState existingState = BURNING_PASSION_AURA_FIRE_TARGETS.get(target.getUuid());
+		int expiresTick = currentTick + refreshTicks;
+		if (existingState == null || existingState.dimension != dimension) {
+			BURNING_PASSION_AURA_FIRE_TARGETS.put(
+				target.getUuid(),
+				new BurningPassionAuraFireState(
+					dimension,
+					casterId,
+					expiresTick,
+					currentTick + Math.max(1, damageIntervalTicks),
+					Math.max(0.0F, damagePerTick),
+					Math.max(1, damageIntervalTicks),
+					refreshTicks,
+					persistent,
+					extinguishWhenWet
+				)
+			);
+		} else {
+			existingState.casterId = casterId;
+			existingState.expiresTick = Math.max(existingState.expiresTick, expiresTick);
+			existingState.damagePerTick = Math.max(existingState.damagePerTick, Math.max(0.0F, damagePerTick));
+			existingState.damageIntervalTicks = Math.max(1, damageIntervalTicks);
+			existingState.refreshTicks = Math.max(1, refreshTicks);
+			existingState.persistent = existingState.persistent || persistent;
+			existingState.extinguishWhenWet = extinguishWhenWet;
+		}
+		target.setOnFireForTicks(refreshTicks);
+	}
+
+	private static void applyOrRefreshBurningPassionSelfFire(ServerPlayerEntity player, int stage, int currentTick) {
+		int durationTicks = Math.max(1, BURNING_PASSION_CONFIG.heat.selfFireDurationTicks);
+		int intervalTicks = Math.max(1, BURNING_PASSION_CONFIG.heat.selfFireDamageIntervalTicks);
+		float damagePerTick = Math.max(0.0F, BURNING_PASSION_CONFIG.heat.selfFireDamagePerTick);
+		boolean extinguishWhenWet = BURNING_PASSION_CONFIG.heat.selfFireExtinguishesWhenWetBeforeStageThree && stage < 3;
+		if (extinguishWhenWet && isBurningPassionFireExtinguished(player)) {
+			BURNING_PASSION_SELF_FIRE_TARGETS.remove(player.getUuid());
+			player.extinguish();
+			return;
+		}
+		RegistryKey<World> dimension = player.getEntityWorld().getRegistryKey();
+		BurningPassionAuraFireState existingState = BURNING_PASSION_SELF_FIRE_TARGETS.get(player.getUuid());
+		int expiresTick = currentTick + durationTicks;
+		if (existingState == null || existingState.dimension != dimension) {
+			BURNING_PASSION_SELF_FIRE_TARGETS.put(
+				player.getUuid(),
+				new BurningPassionAuraFireState(
+					dimension,
+					player.getUuid(),
+					expiresTick,
+					currentTick + intervalTicks,
+					damagePerTick,
+					intervalTicks,
+					durationTicks,
+					false,
+					extinguishWhenWet
+				)
+			);
+		} else {
+			existingState.expiresTick = Math.max(existingState.expiresTick, expiresTick);
+			existingState.damagePerTick = Math.max(existingState.damagePerTick, damagePerTick);
+			existingState.damageIntervalTicks = intervalTicks;
+			existingState.refreshTicks = durationTicks;
+			existingState.extinguishWhenWet = extinguishWhenWet;
+		}
+		player.setOnFireForTicks(durationTicks);
+	}
+
+	private static void updateBurningPassionAuraFireTargets(MinecraftServer server, int currentTick) {
+		updateBurningPassionFireMap(server, currentTick, BURNING_PASSION_AURA_FIRE_TARGETS);
+		updateBurningPassionFireMap(server, currentTick, BURNING_PASSION_SELF_FIRE_TARGETS);
+	}
+
+	private static void updateBurningPassionFireMap(
+		MinecraftServer server,
+		int currentTick,
+		Map<UUID, BurningPassionAuraFireState> fireStates
+	) {
+		Iterator<Map.Entry<UUID, BurningPassionAuraFireState>> iterator = fireStates.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, BurningPassionAuraFireState> entry = iterator.next();
+			BurningPassionAuraFireState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension);
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			Entity entity = world.getEntity(entry.getKey());
+			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+
+			if (state.extinguishWhenWet && isBurningPassionFireExtinguished(target)) {
+				target.extinguish();
+				iterator.remove();
+				continue;
+			}
+			if (!state.persistent && currentTick > state.expiresTick) {
+				iterator.remove();
+				continue;
+			}
+
+			int fireTicks = state.persistent
+				? Math.max(target.getFireTicks(), Math.max(TICKS_PER_SECOND, state.refreshTicks))
+				: Math.max(target.getFireTicks(), Math.max(1, state.expiresTick - currentTick + 1));
+			target.setFireTicks(fireTicks);
+			if (state.damagePerTick > 0.0F && currentTick >= state.nextDamageTick) {
+				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().onFire(), state.damagePerTick);
+				state.nextDamageTick = currentTick + state.damageIntervalTicks;
+			}
+		}
+	}
+
+	private static void applyBurningPassionFastestState(
+		ServerPlayerEntity player,
+		BurningPassionIgnitionState ignitionState,
+		int currentTick
+	) {
+		UUID playerId = player.getUuid();
+		if (ignitionState.currentStage != 3 || !MagicConfig.get().abilityAccess.isAbilityUnlocked(playerId, MagicAbility.IM_THE_FASTEST_THERE_IS)) {
+			clearBurningPassionFastestState(playerId);
+			return;
+		}
+		if (imTheFastestThereIsCooldownRemaining(player, currentTick) > 0) {
+			clearBurningPassionFastestState(playerId);
+			return;
+		}
+		Vec3d currentMomentum = burningPassionFastestMomentum(player);
+		boolean aboveThreshold = burningPassionFastestMomentumAboveThreshold(currentMomentum);
+		BurningPassionFastestState state = BURNING_PASSION_FASTEST_STATES.get(playerId);
+		if (state != null && state.dimension != player.getEntityWorld().getRegistryKey()) {
+			clearBurningPassionFastestState(playerId);
+			state = null;
+		}
+		if (state == null) {
+			if (!aboveThreshold) {
+				return;
+			}
+			state = beginBurningPassionFastestTracking(player, currentMomentum);
+		}
+
+		boolean momentumMaintained = aboveThreshold && burningPassionFastestMomentumMaintained(state, currentMomentum);
+		if (momentumMaintained) {
+			state.outOfToleranceTicks = 0;
+			if (state.phase == BurningPassionFastestPhase.BUILD_UP) {
+				state.stableTicks++;
+				if (state.stableTicks >= BURNING_PASSION_CONFIG.imTheFastestThereIs.buildUpTicks) {
+					if (!tryPrimeBurningPassionFastest(player, ignitionState, currentTick, state, currentMomentum)) {
+						clearBurningPassionFastestState(playerId);
+						startImTheFastestThereIsCooldown(playerId, currentTick, BURNING_PASSION_CONFIG.imTheFastestThereIs.failCooldownTicks);
+						return;
+					}
+				}
+			} else if (
+				BURNING_PASSION_CONFIG.imTheFastestThereIs.primedDurationTicks > 0
+				&& currentTick - state.primedStartTick >= BURNING_PASSION_CONFIG.imTheFastestThereIs.primedDurationTicks
+			) {
+				clearBurningPassionFastestState(playerId);
+				startImTheFastestThereIsCooldown(playerId, currentTick, BURNING_PASSION_CONFIG.imTheFastestThereIs.successCooldownTicks);
+				return;
+			}
+		} else {
+			state.outOfToleranceTicks++;
+			if (state.outOfToleranceTicks > BURNING_PASSION_CONFIG.imTheFastestThereIs.graceTicks) {
+				BurningPassionFastestPhase phase = state.phase;
+				clearBurningPassionFastestState(playerId);
+				int cooldownTicks = phase == BurningPassionFastestPhase.PRIMED
+					? BURNING_PASSION_CONFIG.imTheFastestThereIs.successCooldownTicks
+					: BURNING_PASSION_CONFIG.imTheFastestThereIs.failCooldownTicks;
+				startImTheFastestThereIsCooldown(playerId, currentTick, cooldownTicks);
+				if (phase == BurningPassionFastestPhase.PRIMED) {
+					player.sendMessage(Text.translatable("message.magic.burning_passion.fastest.broken"), true);
+				}
+				return;
+			}
+		}
+
+		spawnFastestTrailParticles(player, state.phase == BurningPassionFastestPhase.PRIMED);
+	}
+
+	private static void tryApplyBurningPassionFastestHit(ServerPlayerEntity attacker, LivingEntity target) {
+		if (target == attacker || !target.isAlive()) {
+			return;
+		}
+		if (target instanceof ServerPlayerEntity playerTarget && playerTarget.isSpectator()) {
+			return;
+		}
+		BurningPassionFastestState state = BURNING_PASSION_FASTEST_STATES.get(attacker.getUuid());
+		if (state == null || state.phase != BurningPassionFastestPhase.PRIMED || !(target.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+		int currentTick = world.getServer().getTicks();
+		BurningPassionIgnitionState ignitionState = burningPassionIgnitionState(attacker);
+		if (
+			ignitionState == null
+			|| ignitionState.currentStage != 3
+			|| attacker.getEntityWorld().getRegistryKey() != state.dimension
+			|| imTheFastestThereIsCooldownRemaining(attacker, currentTick) > 0
+			|| !MagicConfig.get().abilityAccess.isAbilityUnlocked(attacker.getUuid(), MagicAbility.IM_THE_FASTEST_THERE_IS)
+		) {
+			clearBurningPassionFastestState(attacker.getUuid());
+			return;
+		}
+		Vec3d currentMomentum = burningPassionFastestMomentum(attacker);
+		if (
+			!burningPassionFastestMomentumAboveThreshold(currentMomentum)
+			|| !burningPassionFastestMomentumMaintained(state, currentMomentum)
+		) {
+			clearBurningPassionFastestState(attacker.getUuid());
+			startImTheFastestThereIsCooldown(attacker.getUuid(), currentTick, BURNING_PASSION_CONFIG.imTheFastestThereIs.successCooldownTicks);
+			attacker.sendMessage(Text.translatable("message.magic.burning_passion.fastest.broken"), true);
+			return;
+		}
+
+		int expiresTick = BURNING_PASSION_CONFIG.imTheFastestThereIs.deathfireDurationTicks <= 0
+			? Integer.MAX_VALUE
+			: currentTick + BURNING_PASSION_CONFIG.imTheFastestThereIs.deathfireDurationTicks;
+		int damageIntervalTicks = Math.max(1, BURNING_PASSION_CONFIG.imTheFastestThereIs.deathfireDamageIntervalTicks);
+		int refreshTicks = Math.max(TICKS_PER_SECOND, damageIntervalTicks * 2);
+		RegistryKey<World> dimension = target.getEntityWorld().getRegistryKey();
+		BURNING_PASSION_DEATHFIRE_TARGETS.put(
+			target.getUuid(),
+			new BurningPassionDeathfireState(
+				dimension,
+				attacker.getUuid(),
+				expiresTick,
+				currentTick + damageIntervalTicks,
+				Math.max(0.0F, BURNING_PASSION_CONFIG.imTheFastestThereIs.deathfireDamagePerTick),
+				damageIntervalTicks
+			)
+		);
+		target.setOnFireForTicks(refreshTicks);
+		world.spawnParticles(
+			ParticleTypes.SOUL_FIRE_FLAME,
+			target.getX(),
+			target.getBodyY(0.45),
+			target.getZ(),
+			Math.max(8, BURNING_PASSION_CONFIG.imTheFastestThereIs.primedBurstParticleCount),
+			0.35,
+			0.45,
+			0.35,
+			0.03
+		);
+	}
+
+	private static void updateBurningPassionDeathfireTargets(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, BurningPassionDeathfireState>> iterator = BURNING_PASSION_DEATHFIRE_TARGETS.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, BurningPassionDeathfireState> entry = iterator.next();
+			BurningPassionDeathfireState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension);
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			Entity entity = world.getEntity(entry.getKey());
+			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+			if (state.expiresTick != Integer.MAX_VALUE && currentTick > state.expiresTick) {
+				iterator.remove();
+				continue;
+			}
+
+			target.setFireTicks(Math.max(target.getFireTicks(), Math.max(TICKS_PER_SECOND, state.damageIntervalTicks * 2)));
+			world.spawnParticles(
+				ParticleTypes.SOUL_FIRE_FLAME,
+				target.getX(),
+				target.getBodyY(0.45),
+				target.getZ(),
+				4,
+				0.22,
+				0.3,
+				0.22,
+				0.015
+			);
+			world.spawnParticles(
+				ParticleTypes.WHITE_ASH,
+				target.getX(),
+				target.getBodyY(0.4),
+				target.getZ(),
+				3,
+				0.24,
+				0.35,
+				0.24,
+				0.01
+			);
+			if (currentTick >= state.nextDamageTick) {
+				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().onFire(), state.damagePerTick);
+				state.nextDamageTick = currentTick + state.damageIntervalTicks;
+			}
+		}
+	}
+
+	private static BurningPassionFastestState clearBurningPassionFastestState(UUID playerId) {
+		return BURNING_PASSION_FASTEST_STATES.remove(playerId);
+	}
+
+	private static BurningPassionFastestState beginBurningPassionFastestTracking(ServerPlayerEntity player, Vec3d referenceMomentum) {
+		BurningPassionFastestState state = new BurningPassionFastestState(
+			player.getEntityWorld().getRegistryKey(),
+			BurningPassionFastestPhase.BUILD_UP,
+			referenceMomentum,
+			0,
+			0,
+			0
+		);
+		BURNING_PASSION_FASTEST_STATES.put(player.getUuid(), state);
+		return state;
+	}
+
+	private static boolean tryPrimeBurningPassionFastest(
+		ServerPlayerEntity player,
+		BurningPassionIgnitionState ignitionState,
+		int currentTick,
+		BurningPassionFastestState state,
+		Vec3d currentMomentum
+	) {
+		int manaCost = (int) Math.ceil(manaFromPercentExact(BURNING_PASSION_CONFIG.imTheFastestThereIs.manaCostPercent));
+		if (!canSpendAbilityCost(player, manaCost)) {
+			return false;
+		}
+		if (!canPayBurningPassionHealthDemand(player, ignitionState, MagicAbility.IM_THE_FASTEST_THERE_IS, false)) {
+			return false;
+		}
+
+		spendAbilityCost(player, manaCost);
+		payBurningPassionHealthDemand(player, ignitionState, MagicAbility.IM_THE_FASTEST_THERE_IS);
+		state.phase = BurningPassionFastestPhase.PRIMED;
+		state.referenceMomentum = currentMomentum;
+		state.stableTicks = 0;
+		state.outOfToleranceTicks = 0;
+		state.primedStartTick = currentTick;
+		spawnFastestActivationEffects(player);
+		spawnFastestPrimedEffects(player);
+		player.sendMessage(Text.translatable("message.magic.burning_passion.fastest.primed"), true);
+		recordOrionsGambitAbilityUse(player, MagicAbility.IM_THE_FASTEST_THERE_IS);
+		return true;
+	}
+
+	private static void spawnIgnitionActivationEffects(ServerPlayerEntity player) {
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+		world.spawnParticles(
+			ParticleTypes.FLAME,
+			player.getX(),
+			player.getBodyY(0.45),
+			player.getZ(),
+			BURNING_PASSION_CONFIG.ignition.activationFlameParticleCount,
+			0.45,
+			0.4,
+			0.45,
+			0.04
+		);
+		world.spawnParticles(
+			ParticleTypes.CAMPFIRE_COSY_SMOKE,
+			player.getX(),
+			player.getBodyY(0.4),
+			player.getZ(),
+			BURNING_PASSION_CONFIG.ignition.activationSmokeParticleCount,
+			0.35,
+			0.25,
+			0.35,
+			0.01
+		);
+		world.spawnParticles(
+			ParticleTypes.LAVA,
+			player.getX(),
+			player.getBodyY(0.45),
+			player.getZ(),
+			BURNING_PASSION_CONFIG.ignition.activationBurstParticleCount,
+			0.28,
+			0.18,
+			0.28,
+			0.02
+		);
+		playConfiguredSound(
+			world,
+			new Vec3d(player.getX(), player.getBodyY(0.45), player.getZ()),
+			SoundEvents.ITEM_FIRECHARGE_USE,
+			BURNING_PASSION_CONFIG.ignition.activationSoundVolume,
+			BURNING_PASSION_CONFIG.ignition.activationSoundPitch
+		);
+	}
+
+	private static void spawnBurningPassionStageParticles(
+		ServerPlayerEntity player,
+		MagicConfig.BurningPassionStageConfig stageConfig,
+		int stage
+	) {
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+		double spread = Math.max(0.25, stageConfig.auraRadius > 0.0 ? Math.min(0.8, stageConfig.auraRadius * 0.06) : 0.45 + stage * 0.08);
+		world.spawnParticles(
+			ParticleTypes.FLAME,
+			player.getX(),
+			player.getBodyY(0.45),
+			player.getZ(),
+			Math.max(4, stageConfig.auraFlameParticleCount),
+			spread,
+			0.38,
+			spread,
+			0.02
+		);
+		world.spawnParticles(
+			ParticleTypes.CAMPFIRE_COSY_SMOKE,
+			player.getX(),
+			player.getBodyY(0.4),
+			player.getZ(),
+			stageConfig.auraSmokeParticleCount,
+			spread,
+			0.25,
+			spread,
+			0.01
+		);
+	}
+
+	private static void spawnPyrotechnicsLawEffects(ServerPlayerEntity player) {
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+		Vec3d center = new Vec3d(player.getX(), player.getBodyY(0.45), player.getZ());
+		world.spawnParticles(ParticleTypes.FLAME, center.x, center.y, center.z, BURNING_PASSION_CONFIG.pyrotechnicsLaw.inwardFlameParticleCount, 0.35, 0.45, 0.35, -0.03);
+		world.spawnParticles(ParticleTypes.WHITE_ASH, center.x, center.y, center.z, BURNING_PASSION_CONFIG.pyrotechnicsLaw.outwardShedParticleCount, 0.45, 0.4, 0.45, 0.03);
+		world.spawnParticles(ParticleTypes.GLOW, center.x, center.y, center.z, BURNING_PASSION_CONFIG.pyrotechnicsLaw.healingBurstParticleCount, 0.25, 0.3, 0.25, 0.02);
+		playConfiguredSound(world, center, SoundEvents.BLOCK_FIRE_EXTINGUISH, BURNING_PASSION_CONFIG.pyrotechnicsLaw.soundVolume, BURNING_PASSION_CONFIG.pyrotechnicsLaw.soundPitch);
+		playConfiguredSound(world, center, SoundEvents.ENTITY_PLAYER_LEVELUP, Math.max(0.0F, BURNING_PASSION_CONFIG.pyrotechnicsLaw.soundVolume * 0.75F), Math.max(0.1F, BURNING_PASSION_CONFIG.pyrotechnicsLaw.soundPitch * 0.95F));
+	}
+
+	private static void spawnFastestActivationEffects(ServerPlayerEntity player) {
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+		playConfiguredSound(
+			world,
+			new Vec3d(player.getX(), player.getBodyY(0.45), player.getZ()),
+			SoundEvents.ENTITY_BLAZE_SHOOT,
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.activationSoundVolume,
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.activationSoundPitch
+		);
+		spawnFastestTrailParticles(player, false);
+	}
+
+	private static void spawnFastestPrimedEffects(ServerPlayerEntity player) {
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+		world.spawnParticles(
+			ParticleTypes.FLAME,
+			player.getX(),
+			player.getBodyY(0.45),
+			player.getZ(),
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.primedBurstParticleCount,
+			0.32,
+			0.35,
+			0.32,
+			0.06
+		);
+		world.spawnParticles(
+			ParticleTypes.WHITE_ASH,
+			player.getX(),
+			player.getBodyY(0.4),
+			player.getZ(),
+			Math.max(4, BURNING_PASSION_CONFIG.imTheFastestThereIs.emberParticleCount),
+			0.28,
+			0.28,
+			0.28,
+			0.02
+		);
+	}
+
+	private static void spawnFastestTrailParticles(ServerPlayerEntity player, boolean primed) {
+		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+		Vec3d velocity = player.getVelocity();
+		Vec3d reverse = velocity.lengthSquared() > 1.0E-5 ? velocity.normalize().multiply(-1.0) : normalizedHorizontalDirection(player.getRotationVector(), player).multiply(-1.0);
+		Vec3d center = new Vec3d(player.getX(), player.getBodyY(0.4), player.getZ()).add(reverse.multiply(0.35));
+		int flameCount = primed ? BURNING_PASSION_CONFIG.imTheFastestThereIs.trailFlameParticleCount * 2 : BURNING_PASSION_CONFIG.imTheFastestThereIs.trailFlameParticleCount;
+		world.spawnParticles(
+			ParticleTypes.FLAME,
+			center.x,
+			center.y,
+			center.z,
+			flameCount,
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.trailSpread,
+			0.12,
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.trailSpread,
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.trailSpeed
+		);
+		world.spawnParticles(
+			ParticleTypes.WHITE_ASH,
+			center.x,
+			center.y,
+			center.z,
+			Math.max(0, BURNING_PASSION_CONFIG.imTheFastestThereIs.emberParticleCount),
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.trailSpread,
+			0.08,
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.trailSpread,
+			BURNING_PASSION_CONFIG.imTheFastestThereIs.trailSpeed * 0.6
+		);
+	}
+
+	private static double squaredDistanceToSegment(Vec3d point, Vec3d start, Vec3d end) {
+		Vec3d segment = end.subtract(start);
+		double segmentLengthSq = segment.lengthSquared();
+		if (segmentLengthSq <= 1.0E-6) {
+			return point.squaredDistanceTo(start);
+		}
+		double projection = MathHelper.clamp(point.subtract(start).dotProduct(segment) / segmentLengthSq, 0.0, 1.0);
+		Vec3d projected = start.add(segment.multiply(projection));
+		return point.squaredDistanceTo(projected);
+	}
+
+	private static double horizontalDistance(Vec3d first, Vec3d second) {
+		double dx = first.x - second.x;
+		double dz = first.z - second.z;
+		return Math.sqrt(dx * dx + dz * dz);
+	}
+
+	private static Vec3d burningPassionFastestMomentum(ServerPlayerEntity player) {
+		Vec3d velocity = player.getVelocity();
+		return new Vec3d(velocity.x, 0.0, velocity.z);
+	}
+
+	private static boolean burningPassionFastestMomentumAboveThreshold(Vec3d momentum) {
+		double threshold = Math.max(0.0, BURNING_PASSION_CONFIG.imTheFastestThereIs.movementThresholdBlocksPerTick);
+		return momentum.lengthSquared() >= threshold * threshold;
+	}
+
+	private static boolean burningPassionFastestMomentumMaintained(BurningPassionFastestState state, Vec3d currentMomentum) {
+		double tolerance = Math.max(0.0, BURNING_PASSION_CONFIG.imTheFastestThereIs.momentumToleranceBlocksPerTick);
+		return currentMomentum.squaredDistanceTo(state.referenceMomentum) <= tolerance * tolerance;
+	}
+
+	private static boolean isBurningPassionFireExtinguished(LivingEntity target) {
+		BlockPos pos = BlockPos.ofFloored(target.getX(), target.getY(), target.getZ());
+		return target.isTouchingWater()
+			|| target.isSubmergedInWater()
+			|| target.getEntityWorld().hasRain(pos);
+	}
+
+	private static boolean isBurningPassionCoolingInWater(LivingEntity target) {
+		return target.isTouchingWater() || target.isSubmergedInWater();
+	}
+
+	private static void updatePhoenixsCageLines(MinecraftServer server, int currentTick) {
+		Iterator<PhoenixsCageLineState> iterator = PHOENIXS_CAGE_LINES.iterator();
+		while (iterator.hasNext()) {
+			PhoenixsCageLineState state = iterator.next();
+			ServerWorld world = server.getWorld(state.dimension);
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+			if (currentTick >= state.expiresTick) {
+				discardPhoenixsCageDisplays(world, state);
+				iterator.remove();
+				continue;
+			}
+
+			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(state.casterId);
+			if (caster == null || !caster.isAlive()) {
+				discardPhoenixsCageDisplays(world, state);
+				iterator.remove();
+				continue;
+			}
+			BurningPassionIgnitionState ignitionState = BURNING_PASSION_IGNITION_STATES.get(state.casterId);
+			if (ignitionState == null || ignitionState.dimension != state.dimension) {
+				discardPhoenixsCageDisplays(world, state);
+				iterator.remove();
+				continue;
+			}
+
+			spawnPhoenixsCageAmbientParticles(world, state);
+			for (ServerPlayerEntity target : server.getPlayerManager().getPlayerList()) {
+				if (target == caster || target.isSpectator() || target.getEntityWorld().getRegistryKey() != state.dimension) {
+					continue;
+				}
+
+				int nextHitTick = state.nextHitTickByTarget.getOrDefault(target.getUuid(), Integer.MIN_VALUE);
+				if (currentTick < nextHitTick || !isTargetTouchingPhoenixsCageLine(target, state)) {
+					continue;
+				}
+
+				state.nextHitTickByTarget.put(target.getUuid(), currentTick + BURNING_PASSION_CONFIG.phoenixsCage.hitCooldownTicks);
+				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().onFire(), BURNING_PASSION_CONFIG.phoenixsCage.collisionTrueDamage);
+				target.setOnFireForTicks(BURNING_PASSION_CONFIG.phoenixsCage.fireDurationTicks);
+				world.spawnParticles(
+					ParticleTypes.FLAME,
+					target.getX(),
+					target.getBodyY(0.45),
+					target.getZ(),
+					10,
+					0.22,
+					0.3,
+					0.22,
+					0.03
+				);
+			}
+		}
+	}
+
+	private static boolean clearPhoenixsCageLinesByCaster(UUID casterId, MinecraftServer server) {
+		boolean removed = false;
+		Iterator<PhoenixsCageLineState> iterator = PHOENIXS_CAGE_LINES.iterator();
+		while (iterator.hasNext()) {
+			PhoenixsCageLineState state = iterator.next();
+			if (!casterId.equals(state.casterId)) {
+				continue;
+			}
+			ServerWorld world = server == null ? null : server.getWorld(state.dimension);
+			if (world != null) {
+				discardPhoenixsCageDisplays(world, state);
+			}
+			iterator.remove();
+			removed = true;
+		}
+		return removed;
+	}
+
+	private static PhoenixsCageLineState createPhoenixsCageLine(ServerPlayerEntity player, ServerWorld world, int currentTick) {
+		Vec3d forward = normalizedHorizontalDirection(player.getRotationVector(), player);
+		Vec3d eyePos = player.getEyePos();
+		Vec3d baseStart = new Vec3d(player.getX(), player.getY() + 0.6, player.getZ()).add(forward.multiply(Math.max(1.25, BURNING_PASSION_CONFIG.phoenixsCage.placementPlayerClearanceBlocks + 0.25)));
+		Vec3d maxEnd = baseStart.add(forward.multiply(BURNING_PASSION_CONFIG.phoenixsCage.lengthBlocks));
+		BlockHitResult blockHit = world.raycast(
+			new RaycastContext(
+				eyePos,
+				maxEnd.add(0.0, 0.2, 0.0),
+				RaycastContext.ShapeType.COLLIDER,
+				RaycastContext.FluidHandling.NONE,
+				player
+			)
+		);
+		double targetLength = BURNING_PASSION_CONFIG.phoenixsCage.lengthBlocks;
+		if (blockHit.getType() == HitResult.Type.BLOCK) {
+			targetLength = Math.min(targetLength, Math.max(0.0, baseStart.distanceTo(blockHit.getPos()) - 0.3));
+		}
+
+		double spacing = Math.max(0.25, BURNING_PASSION_CONFIG.phoenixsCage.segmentSpacingBlocks);
+		List<Vec3d> points = new ArrayList<>();
+		List<ServerPlayerEntity> players = world.getPlayers();
+		for (double distance = 0.0; distance <= targetLength + 1.0E-6; distance += spacing) {
+			Vec3d samplePoint = baseStart.add(forward.multiply(distance));
+			Vec3d groundAnchor = findFrostGroundAnchor(world, samplePoint, 2, 5);
+			if (groundAnchor == null) {
+				if (BURNING_PASSION_CONFIG.phoenixsCage.avoidSolidBlocks) {
+					continue;
+				}
+				groundAnchor = new Vec3d(samplePoint.x, samplePoint.y - 0.4, samplePoint.z);
+			}
+			Vec3d linePoint = new Vec3d(samplePoint.x, groundAnchor.y + BURNING_PASSION_CONFIG.phoenixsCage.verticalOffset, samplePoint.z);
+			BlockPos blockPos = BlockPos.ofFloored(linePoint);
+			if (
+				BURNING_PASSION_CONFIG.phoenixsCage.avoidSolidBlocks
+				&& !world.getBlockState(blockPos).getCollisionShape(world, blockPos).isEmpty()
+			) {
+				continue;
+			}
+			if (isPhoenixsCagePlacementBlocked(linePoint, players)) {
+				continue;
+			}
+			if (!points.isEmpty() && horizontalDistance(points.get(points.size() - 1), linePoint) < 0.05) {
+				continue;
+			}
+			points.add(linePoint);
+		}
+		if (points.size() < 2) {
+			return null;
+		}
+
+		PhoenixsCageLineState lineState = new PhoenixsCageLineState(
+			player.getUuid(),
+			world.getRegistryKey(),
+			currentTick + BURNING_PASSION_CONFIG.phoenixsCage.durationTicks,
+			points
+		);
+		spawnPhoenixsCageDisplays(world, lineState);
+		return lineState;
+	}
+
+	private static boolean isPhoenixsCagePlacementBlocked(Vec3d linePoint, List<ServerPlayerEntity> players) {
+		double clearanceSq = BURNING_PASSION_CONFIG.phoenixsCage.placementPlayerClearanceBlocks * BURNING_PASSION_CONFIG.phoenixsCage.placementPlayerClearanceBlocks;
+		if (clearanceSq <= 0.0) {
+			return false;
+		}
+		for (ServerPlayerEntity other : players) {
+			if (other.isSpectator()) {
+				continue;
+			}
+			Vec3d standingPos = new Vec3d(other.getX(), other.getY(), other.getZ());
+			if (linePoint.squaredDistanceTo(standingPos) <= clearanceSq) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static void spawnPhoenixsCageDisplays(ServerWorld world, PhoenixsCageLineState state) {
+		int displaySegments = Math.max(0, BURNING_PASSION_CONFIG.phoenixsCage.coreBlockDisplaySegments);
+		if (displaySegments <= 0 || state.points.size() < 2) {
+			return;
+		}
+		for (int index = 0; index < displaySegments; index++) {
+			double progress = displaySegments == 1 ? 0.0 : index / (double) (displaySegments - 1);
+			int pointIndex = MathHelper.clamp((int) Math.round(progress * (state.points.size() - 1)), 0, state.points.size() - 1);
+			Vec3d point = state.points.get(pointIndex);
+			DisplayEntity.BlockDisplayEntity display = new DisplayEntity.BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
+			display.refreshPositionAndAngles(point.x, point.y, point.z, horizontalYawFromDirection(state.forward()), 0.0F);
+			((BlockDisplayEntityAccessorMixin) display).magic$setBlockState(Blocks.FIRE.getDefaultState());
+			((DisplayEntityAccessorMixin) display).magic$setTeleportDuration(1);
+			((DisplayEntityAccessorMixin) display).magic$setInterpolationDuration(1);
+			((DisplayEntityAccessorMixin) display).magic$setTransformation(
+				new AffineTransformation(
+					new Vector3f(-0.5F, 0.0F, -0.5F),
+					new Quaternionf(),
+					new Vector3f(0.9F, 0.9F, 0.9F),
+					new Quaternionf()
+				)
+			);
+			((DisplayEntityAccessorMixin) display).magic$setDisplayWidth(0.9F);
+			((DisplayEntityAccessorMixin) display).magic$setDisplayHeight(0.9F);
+			((DisplayEntityAccessorMixin) display).magic$setViewRange(1.5F);
+			display.setNoGravity(true);
+			display.setSilent(true);
+			if (world.spawnEntity(display)) {
+				state.displayEntityIds.add(display.getUuid());
+			}
+		}
+	}
+
+	private static void discardPhoenixsCageDisplays(ServerWorld world, PhoenixsCageLineState state) {
+		for (UUID displayId : state.displayEntityIds) {
+			Entity entity = world.getEntity(displayId);
+			if (entity != null) {
+				entity.discard();
+			}
+		}
+		state.displayEntityIds.clear();
+	}
+
+	private static void spawnPhoenixsCageCastEffects(ServerWorld world, PhoenixsCageLineState state) {
+		if (state.points.isEmpty()) {
+			return;
+		}
+		Vec3d start = state.points.get(0);
+		playConfiguredSound(world, start, SoundEvents.ITEM_FIRECHARGE_USE, 1.0F, 1.15F);
+		spawnPhoenixsCageAmbientParticles(world, state);
+	}
+
+	private static void spawnPhoenixsCageAmbientParticles(ServerWorld world, PhoenixsCageLineState state) {
+		for (Vec3d point : state.points) {
+			if (BURNING_PASSION_CONFIG.phoenixsCage.flameParticleCount > 0) {
+				world.spawnParticles(
+					ParticleTypes.FLAME,
+					point.x,
+					point.y,
+					point.z,
+					BURNING_PASSION_CONFIG.phoenixsCage.flameParticleCount,
+					BURNING_PASSION_CONFIG.phoenixsCage.particleSpread,
+					0.18,
+					BURNING_PASSION_CONFIG.phoenixsCage.particleSpread,
+					BURNING_PASSION_CONFIG.phoenixsCage.flameParticleSpeed
+				);
+			}
+			if (BURNING_PASSION_CONFIG.phoenixsCage.smokeParticleCount > 0) {
+				world.spawnParticles(
+					ParticleTypes.CAMPFIRE_COSY_SMOKE,
+					point.x,
+					point.y + 0.05,
+					point.z,
+					BURNING_PASSION_CONFIG.phoenixsCage.smokeParticleCount,
+					BURNING_PASSION_CONFIG.phoenixsCage.particleSpread,
+					0.12,
+					BURNING_PASSION_CONFIG.phoenixsCage.particleSpread,
+					0.01
+				);
+			}
+			if (BURNING_PASSION_CONFIG.phoenixsCage.emberParticleCount > 0) {
+				world.spawnParticles(
+					ParticleTypes.WHITE_ASH,
+					point.x,
+					point.y + 0.03,
+					point.z,
+					BURNING_PASSION_CONFIG.phoenixsCage.emberParticleCount,
+					BURNING_PASSION_CONFIG.phoenixsCage.particleSpread,
+					0.08,
+					BURNING_PASSION_CONFIG.phoenixsCage.particleSpread,
+					0.008
+				);
+			}
+		}
+	}
+
+	private static boolean isTargetTouchingPhoenixsCageLine(ServerPlayerEntity target, PhoenixsCageLineState state) {
+		Vec3d targetPos = new Vec3d(target.getX(), target.getBodyY(0.15), target.getZ());
+		double radius = Math.max(0.1, BURNING_PASSION_CONFIG.phoenixsCage.collisionRadius);
+		double radiusSq = radius * radius;
+		for (int index = 1; index < state.points.size(); index++) {
+			Vec3d start = state.points.get(index - 1);
+			Vec3d end = state.points.get(index);
+			if (squaredDistanceToSegment(targetPos, start, end) <= radiusSq) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static double burningPassionPhoenixUpkeepHeatPerTick(UUID casterId, int currentTick) {
+		int activeLineCount = 0;
+		for (PhoenixsCageLineState lineState : PHOENIXS_CAGE_LINES) {
+			if (casterId.equals(lineState.casterId) && lineState.expiresTick > currentTick) {
+				activeLineCount++;
+			}
+		}
+		if (activeLineCount <= 0) {
+			return 0.0;
+		}
+		double contribution = Math.max(0.0, BURNING_PASSION_CONFIG.phoenixsCage.firstLineHeatPerSecond);
+		double totalPerSecond = 0.0;
+		for (int index = 0; index < activeLineCount; index++) {
+			totalPerSecond += contribution;
+			contribution *= Math.max(1.0, BURNING_PASSION_CONFIG.phoenixsCage.additionalLineMultiplier);
+		}
+		totalPerSecond = Math.min(totalPerSecond, Math.max(0.0, BURNING_PASSION_CONFIG.phoenixsCage.maxUpkeepHeatPerSecond));
+		return totalPerSecond / TICKS_PER_SECOND;
+	}
+
+	private static void updateOverrideMeteors(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, OverrideMeteorState>> iterator = OVERRIDE_METEOR_STATES.entrySet().iterator();
+		boolean domainStateChanged = false;
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, OverrideMeteorState> entry = iterator.next();
+			OverrideMeteorState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension);
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			updateOverrideMeteorVisual(world, state, currentTick);
+			if (currentTick < state.impactTick) {
+				continue;
+			}
+
+			impactOverrideMeteor(server, world, state, currentTick);
+			discardOverrideMeteorDisplay(server, state);
+			iterator.remove();
+			domainStateChanged = true;
+		}
+		if (domainStateChanged) {
+			persistDomainRuntimeState(server);
+		}
+	}
+
+	private static void impactOverrideMeteor(
+		MinecraftServer server,
+		ServerWorld world,
+		OverrideMeteorState state,
+		int currentTick
+	) {
+		int flashParticles = Math.max(0, BURNING_PASSION_CONFIG.override.impactFlashParticleCount);
+		int debrisParticles = Math.max(0, BURNING_PASSION_CONFIG.override.debrisParticleCount);
+		int radialBurstParticles = Math.max(0, BURNING_PASSION_CONFIG.override.radialFireBurstParticleCount);
+		world.spawnParticles(
+			ParticleTypes.FLAME,
+			state.impactCenter.x,
+			state.impactCenter.y + 0.1,
+			state.impactCenter.z,
+			flashParticles,
+			state.impactRadius * 0.24,
+			0.45,
+			state.impactRadius * 0.24,
+			0.18
+		);
+		world.spawnParticles(
+			ParticleTypes.LAVA,
+			state.impactCenter.x,
+			state.impactCenter.y + 0.18,
+			state.impactCenter.z,
+			Math.max(1, radialBurstParticles / 3),
+			state.impactRadius * 0.16,
+			0.22,
+			state.impactRadius * 0.16,
+			0.12
+		);
+		world.spawnParticles(
+			ParticleTypes.EXPLOSION,
+			state.impactCenter.x,
+			state.impactCenter.y + 0.2,
+			state.impactCenter.z,
+			Math.max(2, flashParticles / 18),
+			state.impactRadius * 0.18,
+			0.18,
+			state.impactRadius * 0.18,
+			0.02
+		);
+		world.spawnParticles(
+			ParticleTypes.EXPLOSION_EMITTER,
+			state.impactCenter.x,
+			state.impactCenter.y + 0.2,
+			state.impactCenter.z,
+			Math.max(2, flashParticles / 70),
+			state.impactRadius * 0.1,
+			0.08,
+			state.impactRadius * 0.1,
+			0.0
+		);
+		world.spawnParticles(
+			ParticleTypes.WHITE_ASH,
+			state.impactCenter.x,
+			state.impactCenter.y + 0.1,
+			state.impactCenter.z,
+			debrisParticles,
+			state.impactRadius * 0.26,
+			0.5,
+			state.impactRadius * 0.26,
+			0.05
+		);
+		world.spawnParticles(
+			ParticleTypes.ASH,
+			state.impactCenter.x,
+			state.impactCenter.y + 0.08,
+			state.impactCenter.z,
+			Math.max(1, debrisParticles / 2),
+			state.impactRadius * 0.22,
+			0.35,
+			state.impactRadius * 0.22,
+			0.04
+		);
+		spawnOverrideImpactRings(world, state);
+		playConfiguredSound(world, state.impactCenter, SoundEvents.ENTITY_GENERIC_EXPLODE.value(), BURNING_PASSION_CONFIG.override.impactSoundVolume, BURNING_PASSION_CONFIG.override.impactSoundPitch);
+		playConfiguredSound(world, state.impactCenter, SoundEvents.ENTITY_DRAGON_FIREBALL_EXPLODE, Math.max(0.0F, BURNING_PASSION_CONFIG.override.impactSoundVolume * 0.9F), Math.max(0.1F, BURNING_PASSION_CONFIG.override.impactSoundPitch * 1.15F));
+
+		for (UUID ownerId : state.targetDomainOwnerIds) {
+			DomainExpansionState domainState = DOMAIN_EXPANSIONS.remove(ownerId);
+			if (domainState == null) {
+				continue;
+			}
+			endOwnedDomain(ownerId, domainState, server, currentTick);
+			ServerPlayerEntity owner = server.getPlayerManager().getPlayer(ownerId);
+			if (owner != null) {
+				if (activeAbility(owner) == domainState.ability) {
+					setActiveAbility(owner, MagicAbility.NONE);
+				}
+				applyDomainInstabilityPenalty(owner);
+			}
+		}
+
+		Box impactBox = new Box(
+			state.impactCenter.x - state.impactRadius,
+			world.getBottomY(),
+			state.impactCenter.z - state.impactRadius,
+			state.impactCenter.x + state.impactRadius,
+			world.getTopYInclusive() + 1.0,
+			state.impactCenter.z + state.impactRadius
+		);
+		Predicate<Entity> filter = entity ->
+			entity instanceof LivingEntity living
+				&& living.isAlive()
+				&& entity.getUuid() != state.casterId
+				&& (!(entity instanceof PlayerEntity player) || !player.isSpectator())
+				&& (
+					(entity instanceof ServerPlayerEntity && BURNING_PASSION_CONFIG.override.affectPlayers)
+					|| (!(entity instanceof PlayerEntity) && BURNING_PASSION_CONFIG.override.affectMobs)
+				);
+		for (Entity entity : world.getOtherEntities(null, impactBox, filter)) {
+			if (!(entity instanceof LivingEntity target)) {
+				continue;
+			}
+			double dx = target.getX() - state.impactCenter.x;
+			double dz = target.getZ() - state.impactCenter.z;
+			if (dx * dx + dz * dz > state.impactRadius * state.impactRadius) {
+				continue;
+			}
+			dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().genericKill(), BURNING_PASSION_CONFIG.override.impactDamage);
+		}
+	}
+
+	private static void spawnOverrideImpactRings(ServerWorld world, OverrideMeteorState state) {
+		int shockwaveParticles = Math.max(0, BURNING_PASSION_CONFIG.override.shockwaveParticleCount);
+		for (int index = 0; index < shockwaveParticles; index++) {
+			double angle = (Math.PI * 2.0 * index) / Math.max(1, shockwaveParticles);
+			double x = state.impactCenter.x + Math.cos(angle) * state.impactRadius;
+			double z = state.impactCenter.z + Math.sin(angle) * state.impactRadius;
+			double velocityX = Math.cos(angle) * 0.18;
+			double velocityZ = Math.sin(angle) * 0.18;
+			world.spawnParticles(ParticleTypes.CLOUD, x, state.impactCenter.y + 0.05, z, 0, velocityX, 0.02, velocityZ, 1.0);
+			world.spawnParticles(ParticleTypes.EXPLOSION, x, state.impactCenter.y + 0.08, z, 0, velocityX * 0.15, 0.01, velocityZ * 0.15, 1.0);
+			world.spawnParticles(ParticleTypes.WHITE_ASH, x, state.impactCenter.y + 0.03, z, 0, velocityX * 0.9, 0.05, velocityZ * 0.9, 1.0);
+		}
+		int radialFireParticles = Math.max(0, BURNING_PASSION_CONFIG.override.radialFireBurstParticleCount);
+		for (int index = 0; index < radialFireParticles; index++) {
+			double angle = (Math.PI * 2.0 * index) / Math.max(1, radialFireParticles);
+			double velocityX = Math.cos(angle) * (0.08 + state.impactRadius * 0.01);
+			double velocityZ = Math.sin(angle) * (0.08 + state.impactRadius * 0.01);
+			world.spawnParticles(ParticleTypes.FLAME, state.impactCenter.x, state.impactCenter.y + 0.18, state.impactCenter.z, 0, velocityX, 0.08, velocityZ, 1.0);
+			world.spawnParticles(ParticleTypes.LAVA, state.impactCenter.x, state.impactCenter.y + 0.16, state.impactCenter.z, 0, velocityX * 0.85, 0.12, velocityZ * 0.85, 1.0);
+			world.spawnParticles(ParticleTypes.WHITE_ASH, state.impactCenter.x, state.impactCenter.y + 0.12, state.impactCenter.z, 0, velocityX * 0.7, 0.04, velocityZ * 0.7, 1.0);
+			world.spawnParticles(ParticleTypes.ASH, state.impactCenter.x, state.impactCenter.y + 0.1, state.impactCenter.z, 0, velocityX * 0.55, 0.03, velocityZ * 0.55, 1.0);
+		}
+	}
+
+	private static void updateOverrideMeteorVisual(ServerWorld world, OverrideMeteorState state, int currentTick) {
+		double progress = MathHelper.clamp((currentTick - state.startTick) / (double) Math.max(1, state.impactTick - state.startTick), 0.0, 1.0);
+		double currentY = state.spawnY - (state.spawnY - state.impactCenter.y) * progress;
+		if (state.displayEntityId != null) {
+			Entity entity = world.getEntity(state.displayEntityId);
+			if (entity != null) {
+				entity.refreshPositionAndAngles(state.impactCenter.x, currentY, state.impactCenter.z, 0.0F, 0.0F);
+			}
+		}
+		if (
+			BURNING_PASSION_CONFIG.override.warningSoundIntervalTicks > 0
+			&& currentTick >= state.nextWarningSoundTick
+		) {
+			playConfiguredSound(
+				world,
+				new Vec3d(state.impactCenter.x, currentY, state.impactCenter.z),
+				SoundEvents.ENTITY_BLAZE_SHOOT,
+				BURNING_PASSION_CONFIG.override.warningSoundVolume,
+				BURNING_PASSION_CONFIG.override.warningSoundPitch
+			);
+			state.nextWarningSoundTick = currentTick + BURNING_PASSION_CONFIG.override.warningSoundIntervalTicks;
+		}
+		spawnOverrideTelegraphParticles(world, state, currentY);
+	}
+
+	private static void spawnOverrideTelegraphParticles(ServerWorld world, OverrideMeteorState state, double currentY) {
+		double meteorScale = Math.max(0.5, BURNING_PASSION_CONFIG.override.meteorCoreDisplayScale);
+		double coreSpread = Math.max(0.45, meteorScale * 0.14);
+		double smokeSpread = Math.max(0.55, meteorScale * 0.16);
+		double trailSpread = Math.max(0.2, meteorScale * 0.08);
+		int telegraphParticles = Math.max(0, BURNING_PASSION_CONFIG.override.telegraphParticleCount);
+		for (int index = 0; index < telegraphParticles; index++) {
+			double angle = (Math.PI * 2.0 * index) / Math.max(1, telegraphParticles);
+			double x = state.impactCenter.x + Math.cos(angle) * state.impactRadius;
+			double z = state.impactCenter.z + Math.sin(angle) * state.impactRadius;
+			world.spawnParticles(ParticleTypes.FLAME, x, state.impactCenter.y + 0.04, z, 0, 0.0, 0.02, 0.0, 1.0);
+		}
+		world.spawnParticles(
+			ParticleTypes.FLAME,
+			state.impactCenter.x,
+			currentY,
+			state.impactCenter.z,
+			BURNING_PASSION_CONFIG.override.meteorCoreParticleCount,
+			coreSpread,
+			coreSpread,
+			coreSpread,
+			0.03
+		);
+		world.spawnParticles(
+			ParticleTypes.LARGE_SMOKE,
+			state.impactCenter.x,
+			currentY,
+			state.impactCenter.z,
+			BURNING_PASSION_CONFIG.override.meteorSmokeParticleCount,
+			smokeSpread,
+			smokeSpread,
+			smokeSpread,
+			0.02
+		);
+		double trailHeight = Math.max(0.0, state.spawnY - currentY);
+		int trailSteps = Math.max(1, (int) Math.ceil(trailHeight / 2.0));
+		for (int step = 0; step < trailSteps; step++) {
+			double y = currentY + step * 2.0;
+			world.spawnParticles(
+				ParticleTypes.FLAME,
+				state.impactCenter.x,
+				y,
+				state.impactCenter.z,
+				Math.max(0, BURNING_PASSION_CONFIG.override.meteorTrailParticleCount / trailSteps),
+				trailSpread,
+				trailSpread + 0.1,
+				trailSpread,
+				0.01
+			);
+			world.spawnParticles(
+				ParticleTypes.WHITE_ASH,
+				state.impactCenter.x,
+				y,
+				state.impactCenter.z,
+				Math.max(0, BURNING_PASSION_CONFIG.override.meteorEmberParticleCount / trailSteps),
+				trailSpread + 0.05,
+				trailSpread + 0.15,
+				trailSpread + 0.05,
+				0.008
+			);
+		}
+	}
+
+	private static OverrideMeteorState createOverrideMeteorState(
+		ServerPlayerEntity player,
+		ServerWorld world,
+		Vec3d impactCenter,
+		double impactRadius,
+		List<UUID> targetDomainOwnerIds,
+		int currentTick
+	) {
+		UUID displayId = null;
+		DisplayEntity.BlockDisplayEntity display = new DisplayEntity.BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
+		display.refreshPositionAndAngles(
+			impactCenter.x,
+			impactCenter.y + BURNING_PASSION_CONFIG.override.meteorSpawnHeight,
+			impactCenter.z,
+			0.0F,
+			0.0F
+		);
+		((BlockDisplayEntityAccessorMixin) display).magic$setBlockState(Blocks.MAGMA_BLOCK.getDefaultState());
+		((DisplayEntityAccessorMixin) display).magic$setTeleportDuration(1);
+		((DisplayEntityAccessorMixin) display).magic$setInterpolationDuration(1);
+		float meteorScale = (float) Math.max(0.5, BURNING_PASSION_CONFIG.override.meteorCoreDisplayScale);
+		((DisplayEntityAccessorMixin) display).magic$setTransformation(
+			new AffineTransformation(
+				new Vector3f(-meteorScale * 0.5F, 0.0F, -meteorScale * 0.5F),
+				new Quaternionf(),
+				new Vector3f(meteorScale, meteorScale, meteorScale),
+				new Quaternionf()
+			)
+		);
+		((DisplayEntityAccessorMixin) display).magic$setDisplayWidth(meteorScale);
+		((DisplayEntityAccessorMixin) display).magic$setDisplayHeight(meteorScale);
+		((DisplayEntityAccessorMixin) display).magic$setViewRange(Math.max(2.5F, meteorScale * 1.75F));
+		display.setNoGravity(true);
+		display.setSilent(true);
+		if (world.spawnEntity(display)) {
+			displayId = display.getUuid();
+		}
+		return new OverrideMeteorState(
+			world.getRegistryKey(),
+			player.getUuid(),
+			impactCenter,
+			impactCenter.y + BURNING_PASSION_CONFIG.override.meteorSpawnHeight,
+			impactRadius,
+			currentTick,
+			currentTick + BURNING_PASSION_CONFIG.override.fallDurationTicks,
+			currentTick,
+			displayId,
+			targetDomainOwnerIds
+		);
+	}
+
+	private static List<UUID> qualifyingOverrideDomains(ServerPlayerEntity player, Vec3d impactCenter, double impactRadius) {
+		List<UUID> qualifyingOwners = new ArrayList<>();
+		double bestDistanceSq = Double.MAX_VALUE;
+		UUID nearestOwner = null;
+		RegistryKey<World> dimension = player.getEntityWorld().getRegistryKey();
+		for (Map.Entry<UUID, DomainExpansionState> entry : DOMAIN_EXPANSIONS.entrySet()) {
+			DomainExpansionState domainState = entry.getValue();
+			if (!domainState.dimension.equals(dimension)) {
+				continue;
+			}
+
+			boolean qualifies = false;
+			if (BURNING_PASSION_CONFIG.override.allowCastInsideContainingDomain && isInsideDomainInterior(player, domainState)) {
+				qualifies = true;
+			}
+			if (!qualifies && BURNING_PASSION_CONFIG.override.allowCastWhenDomainFullyContained) {
+				double dx = domainState.centerX - impactCenter.x;
+				double dz = domainState.centerZ - impactCenter.z;
+				double centerDistance = Math.sqrt(dx * dx + dz * dz);
+				qualifies = centerDistance + domainState.radius <= impactRadius;
+			}
+			if (!qualifies) {
+				continue;
+			}
+
+			double dx = domainState.centerX - impactCenter.x;
+			double dz = domainState.centerZ - impactCenter.z;
+			double distanceSq = dx * dx + dz * dz;
+			if (distanceSq < bestDistanceSq) {
+				bestDistanceSq = distanceSq;
+				nearestOwner = entry.getKey();
+			}
+			if (BURNING_PASSION_CONFIG.override.destroyAllQualifyingDomains) {
+				qualifyingOwners.add(entry.getKey());
+			}
+		}
+		if (!BURNING_PASSION_CONFIG.override.destroyAllQualifyingDomains && nearestOwner != null) {
+			qualifyingOwners.add(nearestOwner);
+		}
+		return qualifyingOwners;
+	}
+
+	private static Vec3d resolveOverrideImpactCenter(ServerWorld world, ServerPlayerEntity player) {
+		Vec3d groundAnchor = findFrostGroundAnchor(world, new Vec3d(player.getX(), player.getY(), player.getZ()), 4, 8);
+		if (groundAnchor != null) {
+			return groundAnchor;
+		}
+		return new Vec3d(player.getX(), player.getY() - 0.1, player.getZ());
+	}
+
+	private static double burningPassionOverrideImpactRadius() {
+		return Math.max(1.0, DOMAIN_EXPANSION_RADIUS * BURNING_PASSION_CONFIG.override.impactRadiusMultiplierFromStandardDomainRadius);
+	}
+
+	private static boolean clearOverrideMeteorState(UUID playerId, MinecraftServer server) {
+		OverrideMeteorState state = OVERRIDE_METEOR_STATES.remove(playerId);
+		if (state == null) {
+			return false;
+		}
+		discardOverrideMeteorDisplay(server, state);
+		return true;
+	}
+
+	private static void discardOverrideMeteorDisplay(MinecraftServer server, OverrideMeteorState state) {
+		if (server == null || state == null || state.displayEntityId == null) {
+			return;
+		}
+		ServerWorld world = server.getWorld(state.dimension);
+		if (world == null) {
+			return;
+		}
+		Entity entity = world.getEntity(state.displayEntityId);
+		if (entity != null) {
+			entity.discard();
+		}
 	}
 
 	private static void handleSpotlightRequest(ServerPlayerEntity player) {
@@ -3865,6 +5732,9 @@ public final class MagicAbilityManager {
 	static void cancelOwnedNonDomainMagicOnTarget(ServerPlayerEntity target, int currentTick) {
 		MagicAbility targetAbility = activeAbility(target);
 		boolean targetOwnsDomain = DOMAIN_EXPANSIONS.containsKey(target.getUuid()) || isDomainExpansion(targetAbility);
+		if (targetAbility == MagicAbility.IGNITION) {
+			endIgnition(target, currentTick, BurningPassionIgnitionEndReason.INVALID, true, false);
+		}
 		if (targetAbility == MagicAbility.BELOW_FREEZING) {
 			endFrostStagedMode(target, currentTick, FrostStageEndReason.INVALID, true, false);
 		}
@@ -3892,6 +5762,7 @@ public final class MagicAbilityManager {
 		if (targetAbility == MagicAbility.ORIONS_GAMBIT) {
 			endOrionsGambit(target, OrionGambitEndReason.MANUAL_CANCEL, currentTick, false);
 		}
+		clearOverrideMeteorState(target.getUuid(), target.getEntityWorld().getServer());
 		clearComedicAssistantState(target.getUuid());
 		GreedRuntime.cancelActiveAbilities(target, currentTick);
 
@@ -3929,6 +5800,9 @@ public final class MagicAbilityManager {
 		if (!isBankruptcyProtectedAbility(MagicAbility.PLUS_ULTRA, preserveMaximumAbilities, preserveDomainAbilities) && targetAbility == MagicAbility.PLUS_ULTRA) {
 			endPlusUltra(target, currentTick, PlusUltraEndMode.FULL, false);
 		}
+		if (!isBankruptcyProtectedAbility(MagicAbility.OVERRIDE, preserveMaximumAbilities, preserveDomainAbilities)) {
+			clearOverrideMeteorState(targetId, target.getEntityWorld().getServer());
+		}
 		if (!isBankruptcyProtectedAbility(MagicAbility.TILL_DEATH_DO_US_PART, preserveMaximumAbilities, preserveDomainAbilities)) {
 			if (targetAbility == MagicAbility.TILL_DEATH_DO_US_PART) {
 				deactivateTillDeathDoUsPart(target, TillDeathDoUsPartEndReason.MANUAL_CANCEL, true);
@@ -3938,6 +5812,9 @@ public final class MagicAbilityManager {
 		}
 
 		if (!protectedActiveAbility) {
+			if (targetAbility == MagicAbility.IGNITION) {
+				endIgnition(target, currentTick, BurningPassionIgnitionEndReason.LOCKED, true, false);
+			}
 			if (targetAbility == MagicAbility.BELOW_FREEZING) {
 				endFrostStagedMode(target, currentTick, FrostStageEndReason.LOCKED, true, false);
 			}
@@ -5077,6 +6954,19 @@ public final class MagicAbilityManager {
 		addDomainClashDamage(clash, attackerId, clashDamage, server, server.getTicks());
 	}
 
+	public static void onLivingEntityDeathProtectorTriggered(LivingEntity entity) {
+		if (entity == null) {
+			return;
+		}
+		if (BURNING_PASSION_DEATHFIRE_TARGETS.remove(entity.getUuid()) != null) {
+			entity.extinguish();
+		}
+	}
+
+	public static void onPlayerDeathProtectorTriggered(ServerPlayerEntity player) {
+		onLivingEntityDeathProtectorTriggered(player);
+	}
+
 	private static void onLivingEntityAfterDamage(LivingEntity entity, DamageSource source, float damageTaken) {
 		if (entity == null || source == null || damageTaken <= 0.0F || entity.getEntityWorld().isClient()) {
 			return;
@@ -5087,6 +6977,7 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		tryApplyBurningPassionFastestHit(attacker, entity);
 		if (!isValidComedicAssistantTarget(entity)) {
 			return;
 		}
@@ -5796,6 +7687,18 @@ public final class MagicAbilityManager {
 		MARTYRS_FLAME_COOLDOWN_END_TICK.clear();
 		MARTYRS_FLAME_DRAIN_BUFFER.clear();
 		MARTYRS_FLAME_BURNING_TARGETS.clear();
+		BURNING_PASSION_IGNITION_STATES.clear();
+		BURNING_PASSION_AURA_FIRE_TARGETS.clear();
+		BURNING_PASSION_SELF_FIRE_TARGETS.clear();
+		PHOENIXS_CAGE_LINES.clear();
+		BURNING_PASSION_FASTEST_STATES.clear();
+		BURNING_PASSION_DEATHFIRE_TARGETS.clear();
+		OVERRIDE_METEOR_STATES.clear();
+		IGNITION_COOLDOWN_END_TICK.clear();
+		PHOENIXS_CAGE_COOLDOWN_END_TICK.clear();
+		PYROTECHNICS_LAW_COOLDOWN_END_TICK.clear();
+		IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.clear();
+		OVERRIDE_COOLDOWN_END_TICK.clear();
 		TEST_MODE_PLAYERS.clear();
 		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.clear();
 		TILL_DEATH_DO_US_PART_STATES.clear();
@@ -5825,6 +7728,18 @@ public final class MagicAbilityManager {
 		MARTYRS_FLAME_COOLDOWN_END_TICK.clear();
 		MARTYRS_FLAME_DRAIN_BUFFER.clear();
 		MARTYRS_FLAME_BURNING_TARGETS.clear();
+		BURNING_PASSION_IGNITION_STATES.clear();
+		BURNING_PASSION_AURA_FIRE_TARGETS.clear();
+		BURNING_PASSION_SELF_FIRE_TARGETS.clear();
+		PHOENIXS_CAGE_LINES.clear();
+		BURNING_PASSION_FASTEST_STATES.clear();
+		BURNING_PASSION_DEATHFIRE_TARGETS.clear();
+		OVERRIDE_METEOR_STATES.clear();
+		IGNITION_COOLDOWN_END_TICK.clear();
+		PHOENIXS_CAGE_COOLDOWN_END_TICK.clear();
+		PYROTECHNICS_LAW_COOLDOWN_END_TICK.clear();
+		IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.clear();
+		OVERRIDE_COOLDOWN_END_TICK.clear();
 		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.clear();
 		TILL_DEATH_DO_US_PART_STATES.clear();
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
@@ -6245,6 +8160,10 @@ public final class MagicAbilityManager {
 		updateFrostHelplessTargets(server, currentTick);
 		updateEnhancedFireTargets(server, currentTick);
 		updateMartyrsFlameBurningTargets(server, currentTick);
+		updateBurningPassionAuraFireTargets(server, currentTick);
+		updatePhoenixsCageLines(server, currentTick);
+		updateBurningPassionDeathfireTargets(server, currentTick);
+		updateOverrideMeteors(server, currentTick);
 		updateComedicAssistantCarries(server, currentTick);
 		updateDomainClashes(server, currentTick);
 		updateDomainExpansions(server, currentTick);
@@ -6760,6 +8679,9 @@ public final class MagicAbilityManager {
 			if (activeAbility == MagicAbility.BELOW_FREEZING) {
 				endFrostStagedMode(player, currentTick, FrostStageEndReason.INVALID, false, false);
 			}
+			if (activeAbility == MagicAbility.IGNITION) {
+				endIgnition(player, currentTick, BurningPassionIgnitionEndReason.INVALID, false, false);
+			}
 			if (activeAbility == MagicAbility.ABSOLUTE_ZERO) {
 				deactivateAbsoluteZero(player);
 			}
@@ -6794,6 +8716,11 @@ public final class MagicAbilityManager {
 
 		if (activeAbility == MagicAbility.BELOW_FREEZING) {
 			applyBelowFreezing(player, currentTick);
+			return;
+		}
+
+		if (activeAbility == MagicAbility.IGNITION) {
+			applyIgnition(player, currentTick);
 			return;
 		}
 
@@ -10013,6 +11940,41 @@ public final class MagicAbilityManager {
 		return Math.max(0, PLUS_ULTRA_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
 	}
 
+	private static int ignitionCooldownRemaining(ServerPlayerEntity player, int currentTick) {
+		if (isTestingMode(player) || isOrionsGambitCooldownSuppressed(player)) {
+			return 0;
+		}
+		return Math.max(0, IGNITION_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
+	}
+
+	private static int phoenixsCageCooldownRemaining(ServerPlayerEntity player, int currentTick) {
+		if (isTestingMode(player) || isOrionsGambitCooldownSuppressed(player)) {
+			return 0;
+		}
+		return Math.max(0, PHOENIXS_CAGE_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
+	}
+
+	private static int pyrotechnicsLawCooldownRemaining(ServerPlayerEntity player, int currentTick) {
+		if (isTestingMode(player) || isOrionsGambitCooldownSuppressed(player)) {
+			return 0;
+		}
+		return Math.max(0, PYROTECHNICS_LAW_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
+	}
+
+	private static int imTheFastestThereIsCooldownRemaining(ServerPlayerEntity player, int currentTick) {
+		if (isTestingMode(player) || isOrionsGambitCooldownSuppressed(player)) {
+			return 0;
+		}
+		return Math.max(0, IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
+	}
+
+	private static int overrideCooldownRemaining(ServerPlayerEntity player, int currentTick) {
+		if (isTestingMode(player) || isOrionsGambitCooldownSuppressed(player)) {
+			return 0;
+		}
+		return Math.max(0, OVERRIDE_COOLDOWN_END_TICK.getOrDefault(player.getUuid(), 0) - currentTick);
+	}
+
 	private static void startComedicRewriteCooldown(UUID playerId, int currentTick) {
 		if (isCooldownDeferredByOrionsGambit(playerId, MagicAbility.COMEDIC_REWRITE) || COMEDIC_REWRITE_COOLDOWN_TICKS <= 0) {
 			COMEDIC_REWRITE_COOLDOWN_END_TICK.remove(playerId);
@@ -10055,6 +12017,23 @@ public final class MagicAbilityManager {
 		PLUS_ULTRA_COOLDOWN_END_TICK.put(
 			playerId,
 			currentTick + adjustedCooldownTicks(playerId, MagicAbility.PLUS_ULTRA, safeCooldownTicks, currentTick)
+		);
+	}
+
+	private static void startImTheFastestThereIsCooldown(UUID playerId, int currentTick, int cooldownTicks) {
+		int safeCooldownTicks = Math.max(0, cooldownTicks);
+		if (isCooldownDeferredByOrionsGambit(playerId, MagicAbility.IM_THE_FASTEST_THERE_IS)) {
+			trackOrionsGambitCooldownOverride(playerId, MagicAbility.IM_THE_FASTEST_THERE_IS, safeCooldownTicks);
+			IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.remove(playerId);
+			return;
+		}
+		if (safeCooldownTicks <= 0) {
+			IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.remove(playerId);
+			return;
+		}
+		IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.put(
+			playerId,
+			currentTick + adjustedCooldownTicks(playerId, MagicAbility.IM_THE_FASTEST_THERE_IS, safeCooldownTicks, currentTick)
 		);
 	}
 
@@ -10148,6 +12127,12 @@ public final class MagicAbilityManager {
 		return isTestingMode(player) || isOrionsGambitManaCostSuppressed(player) || MagicPlayerData.getMana(player) >= Math.max(0, adjustedManaCost);
 	}
 
+	private static boolean hasFullManaBar(ServerPlayerEntity player) {
+		return isTestingMode(player)
+			|| isOrionsGambitManaCostSuppressed(player)
+			|| MagicPlayerData.getMana(player) >= MagicPlayerData.MAX_MANA;
+	}
+
 	private static void spendAbilityCost(ServerPlayerEntity player, int manaCost) {
 		int adjustedManaCost = GreedDomainRuntime.adjustManaCost(player, manaCost);
 		if (isTestingMode(player)) {
@@ -10158,6 +12143,18 @@ public final class MagicAbilityManager {
 
 		if (!isOrionsGambitManaCostSuppressed(player) && adjustedManaCost > 0) {
 			MagicPlayerData.setMana(player, Math.max(0, MagicPlayerData.getMana(player) - adjustedManaCost));
+		}
+		MagicPlayerData.setDepletedRecoveryMode(player, false);
+	}
+
+	private static void consumeFullManaBar(ServerPlayerEntity player) {
+		if (isTestingMode(player)) {
+			MagicPlayerData.setMana(player, MagicPlayerData.MAX_MANA);
+			MagicPlayerData.setDepletedRecoveryMode(player, false);
+			return;
+		}
+		if (!isOrionsGambitManaCostSuppressed(player)) {
+			MagicPlayerData.setMana(player, 0);
 		}
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
 	}
@@ -10190,6 +12187,66 @@ public final class MagicAbilityManager {
 		MagicPlayerData.unlock(player, school);
 		MagicPlayerData.refillMana(player);
 		return true;
+	}
+
+	public static int forceBurningPassionOverride(ServerPlayerEntity player) {
+		if (player == null) {
+			return 0;
+		}
+		if (!MagicPlayerData.hasMagic(player)) {
+			player.sendMessage(Text.translatable("message.magic.no_access"), true);
+			return 0;
+		}
+		if (MagicPlayerData.getSchool(player) != MagicSchool.BURNING_PASSION) {
+			player.sendMessage(Text.translatable("message.magic.ability.wrong_school", MagicSchool.BURNING_PASSION.displayName()), true);
+			return 0;
+		}
+		if (isMagicSuppressed(player)) {
+			player.sendMessage(Text.translatable("message.magic.empty_embrace.magic_blocked"), true);
+			return 0;
+		}
+		if (isLockedByForeignLoveDomain(player)) {
+			player.sendMessage(Text.translatable("message.magic.love_domain.abilities_locked"), true);
+			return 0;
+		}
+		if (!MagicConfig.get().abilityAccess.isAbilityUnlocked(player.getUuid(), MagicAbility.OVERRIDE)) {
+			player.sendMessage(Text.translatable("message.magic.ability.locked", MagicAbility.OVERRIDE.displayName()), true);
+			return 0;
+		}
+		if (player.getEntityWorld().getServer() == null) {
+			return 0;
+		}
+
+		int currentTick = player.getEntityWorld().getServer().getTicks();
+		MagicAbility currentActiveAbility = activeAbility(player);
+		if (currentActiveAbility == MagicAbility.ABSOLUTE_ZERO) {
+			player.sendMessage(Text.translatable("message.magic.frost.maximum_locked"), true);
+			return 0;
+		}
+		if (currentActiveAbility == MagicAbility.ORIONS_GAMBIT) {
+			player.sendMessage(Text.translatable("message.magic.ability.orions_gambit_locked"), true);
+			return 0;
+		}
+		if (currentActiveAbility == MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
+			player.sendMessage(Text.translatable("message.magic.constellation.still_charging", MagicAbility.SAGITTARIUS_ASTRAL_ARROW.displayName()), true);
+			return 0;
+		}
+		if (currentActiveAbility == MagicAbility.PLUS_ULTRA) {
+			player.sendMessage(Text.translatable("message.magic.ability.plus_ultra_locked"), true);
+			return 0;
+		}
+		if (GreedDomainRuntime.isMagicSealed(player, currentTick)) {
+			player.sendMessage(Text.translatable("message.magic.greed.magic_sealed"), true);
+			return 0;
+		}
+		if (currentActiveAbility != MagicAbility.OVERRIDE && GreedDomainRuntime.beforeAbilityUse(player, MagicAbility.OVERRIDE, currentTick)) {
+			return 0;
+		}
+		if (GreedRuntime.isAbilityUseLocked(player, currentTick)) {
+			player.sendMessage(Text.translatable("message.magic.greed.ability_locked"), true);
+			return 0;
+		}
+		return tryStartOverride(player, currentTick, true) ? 1 : 0;
 	}
 
 	public static int setFrostStage(ServerPlayerEntity player, int stage) {
@@ -10259,6 +12316,7 @@ public final class MagicAbilityManager {
 		return switch (activeAbility) {
 			case NONE -> false;
 			case BELOW_FREEZING -> false;
+			case IGNITION -> false;
 			case HERCULES_BURDEN_OF_THE_SKY -> HERCULES_DISABLE_MANA_REGEN_WHILE_ACTIVE;
 			case SAGITTARIUS_ASTRAL_ARROW -> SAGITTARIUS_DISABLE_MANA_REGEN_DURING_WINDUP;
 			case ASTRAL_CATACLYSM -> ASTRAL_CATACLYSM_DISABLE_MANA_REGEN_WHILE_ACTIVE;
@@ -12556,7 +14614,14 @@ public final class MagicAbilityManager {
 				MagicAbility.ORIONS_GAMBIT,
 				MagicAbility.ASTRAL_CATACLYSM
 			);
-			case BURNING_PASSION -> List.of(MagicAbility.MARTYRS_FLAME);
+			case BURNING_PASSION -> List.of(
+				MagicAbility.MARTYRS_FLAME,
+				MagicAbility.IGNITION,
+				MagicAbility.PHOENIXS_CAGE,
+				MagicAbility.PYROTECHNICS_LAW,
+				MagicAbility.IM_THE_FASTEST_THERE_IS,
+				MagicAbility.OVERRIDE
+			);
 			case GREED -> List.of(
 				MagicAbility.APPRAISERS_MARK,
 				MagicAbility.TOLLKEEPERS_CLAIM,
@@ -12575,6 +14640,11 @@ public final class MagicAbilityManager {
 
 		return switch (ability) {
 			case MARTYRS_FLAME -> martyrsFlameCooldownRemaining(player, currentTick);
+			case IGNITION -> ignitionCooldownRemaining(player, currentTick);
+			case PHOENIXS_CAGE -> phoenixsCageCooldownRemaining(player, currentTick);
+			case PYROTECHNICS_LAW -> pyrotechnicsLawCooldownRemaining(player, currentTick);
+			case IM_THE_FASTEST_THERE_IS -> imTheFastestThereIsCooldownRemaining(player, currentTick);
+			case OVERRIDE -> overrideCooldownRemaining(player, currentTick);
 			case BELOW_FREEZING -> belowFreezingCooldownRemaining(player, currentTick);
 			case FROST_ASCENT -> frostAscentCooldownRemaining(player, currentTick);
 			case WITTY_ONE_LINER -> wittyOneLinerCooldownRemaining(player, currentTick);
@@ -12882,6 +14952,56 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		if (ability == MagicAbility.IGNITION) {
+			int cooldownTicks = Math.max(0, BURNING_PASSION_CONFIG.ignition.cooldownTicks);
+			if (isCooldownDeferredByOrionsGambit(playerId, ability) || cooldownTicks <= 0) {
+				IGNITION_COOLDOWN_END_TICK.remove(playerId);
+				return;
+			}
+			IGNITION_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, cooldownTicks, currentTick));
+			return;
+		}
+
+		if (ability == MagicAbility.PHOENIXS_CAGE) {
+			int cooldownTicks = Math.max(0, BURNING_PASSION_CONFIG.phoenixsCage.cooldownTicks);
+			if (isCooldownDeferredByOrionsGambit(playerId, ability) || cooldownTicks <= 0) {
+				PHOENIXS_CAGE_COOLDOWN_END_TICK.remove(playerId);
+				return;
+			}
+			PHOENIXS_CAGE_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, cooldownTicks, currentTick));
+			return;
+		}
+
+		if (ability == MagicAbility.PYROTECHNICS_LAW) {
+			int cooldownTicks = Math.max(0, BURNING_PASSION_CONFIG.pyrotechnicsLaw.cooldownTicks);
+			if (isCooldownDeferredByOrionsGambit(playerId, ability) || cooldownTicks <= 0) {
+				PYROTECHNICS_LAW_COOLDOWN_END_TICK.remove(playerId);
+				return;
+			}
+			PYROTECHNICS_LAW_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, cooldownTicks, currentTick));
+			return;
+		}
+
+		if (ability == MagicAbility.IM_THE_FASTEST_THERE_IS) {
+			int cooldownTicks = Math.max(0, BURNING_PASSION_CONFIG.imTheFastestThereIs.successCooldownTicks);
+			if (isCooldownDeferredByOrionsGambit(playerId, ability) || cooldownTicks <= 0) {
+				IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.remove(playerId);
+				return;
+			}
+			IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, cooldownTicks, currentTick));
+			return;
+		}
+
+		if (ability == MagicAbility.OVERRIDE) {
+			int cooldownTicks = Math.max(0, BURNING_PASSION_CONFIG.override.cooldownTicks);
+			if (isCooldownDeferredByOrionsGambit(playerId, ability) || cooldownTicks <= 0) {
+				OVERRIDE_COOLDOWN_END_TICK.remove(playerId);
+				return;
+			}
+			OVERRIDE_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, cooldownTicks, currentTick));
+			return;
+		}
+
 		if (ability == MagicAbility.ABSOLUTE_ZERO) {
 			if (isCooldownDeferredByOrionsGambit(playerId, ability) || ABSOLUTE_ZERO_COOLDOWN_TICKS <= 0) {
 				ABSOLUTE_ZERO_COOLDOWN_END_TICK.remove(playerId);
@@ -13139,7 +15259,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean isMaximumAbility(MagicAbility ability) {
-		return ability == MagicAbility.PLUS_ULTRA || ability == MagicAbility.ABSOLUTE_ZERO;
+		return ability == MagicAbility.PLUS_ULTRA || ability == MagicAbility.ABSOLUTE_ZERO || ability == MagicAbility.OVERRIDE;
 	}
 
 	private static boolean isBankruptcyProtectedAbility(
@@ -13716,6 +15836,9 @@ public final class MagicAbilityManager {
 		if (martyrsFlameActive) {
 			deactivateMartyrsFlame(player, true);
 		}
+		if (activeAbility == MagicAbility.IGNITION) {
+			endIgnition(player, player.getEntityWorld().getServer().getTicks(), BurningPassionIgnitionEndReason.CASTER_DIED, true, false);
+		}
 		if (activeAbility == MagicAbility.BELOW_FREEZING) {
 			endFrostStagedMode(player, player.getEntityWorld().getServer().getTicks(), FrostStageEndReason.CASTER_DIED, true, false);
 		}
@@ -13746,6 +15869,7 @@ public final class MagicAbilityManager {
 		if (activeAbility == MagicAbility.PLUS_ULTRA) {
 			endPlusUltra(player, player.getEntityWorld().getServer().getTicks(), PlusUltraEndMode.FULL, false);
 		}
+		clearOverrideMeteorState(player.getUuid(), player.getEntityWorld().getServer());
 
 		setActiveAbility(player, MagicAbility.NONE);
 	}
@@ -14066,6 +16190,35 @@ public final class MagicAbilityManager {
 			return MARTYRS_FLAME_COOLDOWN_END_TICK.remove(playerId) != null ? 1 : 0;
 		}
 
+		if (ability == MagicAbility.IGNITION) {
+			boolean removed = IGNITION_COOLDOWN_END_TICK.remove(playerId) != null;
+			removed |= BURNING_PASSION_IGNITION_STATES.containsKey(playerId);
+			endIgnition(player, player.getEntityWorld().getServer().getTicks(), BurningPassionIgnitionEndReason.CLEAR_ALL, false, false);
+			return removed ? 1 : 0;
+		}
+
+		if (ability == MagicAbility.PHOENIXS_CAGE) {
+			boolean removed = PHOENIXS_CAGE_COOLDOWN_END_TICK.remove(playerId) != null;
+			removed |= clearPhoenixsCageLinesByCaster(playerId, player.getEntityWorld().getServer());
+			return removed ? 1 : 0;
+		}
+
+		if (ability == MagicAbility.PYROTECHNICS_LAW) {
+			return PYROTECHNICS_LAW_COOLDOWN_END_TICK.remove(playerId) != null ? 1 : 0;
+		}
+
+		if (ability == MagicAbility.IM_THE_FASTEST_THERE_IS) {
+			boolean removed = IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.remove(playerId) != null;
+			removed |= clearBurningPassionFastestState(playerId) != null;
+			return removed ? 1 : 0;
+		}
+
+		if (ability == MagicAbility.OVERRIDE) {
+			boolean removed = OVERRIDE_COOLDOWN_END_TICK.remove(playerId) != null;
+			removed |= clearOverrideMeteorState(playerId, player.getEntityWorld().getServer());
+			return removed ? 1 : 0;
+		}
+
 		if (ability == MagicAbility.BELOW_FREEZING) {
 			boolean removed = BELOW_FREEZING_COOLDOWN_END_TICK.remove(playerId) != null;
 			removed |= FROST_STAGE_STATES.remove(playerId) != null;
@@ -14192,6 +16345,11 @@ public final class MagicAbilityManager {
 		return resetCooldown(player, MagicAbility.BELOW_FREEZING)
 			+ resetCooldown(player, MagicAbility.FROST_ASCENT)
 			+ resetCooldown(player, MagicAbility.MARTYRS_FLAME)
+			+ resetCooldown(player, MagicAbility.IGNITION)
+			+ resetCooldown(player, MagicAbility.PHOENIXS_CAGE)
+			+ resetCooldown(player, MagicAbility.PYROTECHNICS_LAW)
+			+ resetCooldown(player, MagicAbility.IM_THE_FASTEST_THERE_IS)
+			+ resetCooldown(player, MagicAbility.OVERRIDE)
 			+ resetCooldown(player, MagicAbility.APPRAISERS_MARK)
 			+ resetCooldown(player, MagicAbility.TOLLKEEPERS_CLAIM)
 			+ resetCooldown(player, MagicAbility.KINGS_DUES)
@@ -14216,6 +16374,26 @@ public final class MagicAbilityManager {
 
 	public static void clearLockedAbilityState(ServerPlayerEntity player, MagicAbility ability) {
 		if (player == null) {
+			return;
+		}
+
+		if (
+			ability == MagicAbility.IGNITION
+			|| ability == MagicAbility.PHOENIXS_CAGE
+			|| ability == MagicAbility.PYROTECHNICS_LAW
+			|| ability == MagicAbility.IM_THE_FASTEST_THERE_IS
+		) {
+			endIgnition(player, player.getEntityWorld().getServer().getTicks(), BurningPassionIgnitionEndReason.LOCKED, false, false);
+			IGNITION_COOLDOWN_END_TICK.remove(player.getUuid());
+			PHOENIXS_CAGE_COOLDOWN_END_TICK.remove(player.getUuid());
+			PYROTECHNICS_LAW_COOLDOWN_END_TICK.remove(player.getUuid());
+			IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.remove(player.getUuid());
+			return;
+		}
+
+		if (ability == MagicAbility.OVERRIDE) {
+			clearOverrideMeteorState(player.getUuid(), player.getEntityWorld().getServer());
+			OVERRIDE_COOLDOWN_END_TICK.remove(player.getUuid());
 			return;
 		}
 
@@ -14287,6 +16465,10 @@ public final class MagicAbilityManager {
 		if (MARTYRS_FLAME_BURNING_TARGETS.remove(playerId) != null) {
 			player.extinguish();
 		}
+		endIgnition(player, server.getTicks(), BurningPassionIgnitionEndReason.CLEAR_ALL, false, false);
+		clearPhoenixsCageLinesByCaster(playerId, server);
+		clearBurningPassionFastestState(playerId);
+		clearOverrideMeteorState(playerId, server);
 
 		boolean domainStateChanged = false;
 
@@ -14298,6 +16480,11 @@ public final class MagicAbilityManager {
 		}
 
 		MARTYRS_FLAME_COOLDOWN_END_TICK.remove(playerId);
+		IGNITION_COOLDOWN_END_TICK.remove(playerId);
+		PHOENIXS_CAGE_COOLDOWN_END_TICK.remove(playerId);
+		PYROTECHNICS_LAW_COOLDOWN_END_TICK.remove(playerId);
+		IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.remove(playerId);
+		OVERRIDE_COOLDOWN_END_TICK.remove(playerId);
 		BELOW_FREEZING_COOLDOWN_END_TICK.remove(playerId);
 		FROST_ASCENT_COOLDOWN_END_TICK.remove(playerId);
 		WITTY_ONE_LINER_COOLDOWN_END_TICK.remove(playerId);
@@ -14339,6 +16526,10 @@ public final class MagicAbilityManager {
 		ABSOLUTE_ZERO_NEXT_DAMAGE_TICK.remove(playerId);
 		PLANCK_HEAT_STATES.remove(playerId);
 		PLANCK_HEAT_FROST_NEXT_DAMAGE_TICK.remove(playerId);
+		BURNING_PASSION_IGNITION_STATES.remove(playerId);
+		BURNING_PASSION_AURA_FIRE_TARGETS.remove(playerId);
+		BURNING_PASSION_SELF_FIRE_TARGETS.remove(playerId);
+		BURNING_PASSION_DEATHFIRE_TARGETS.remove(playerId);
 		LOVE_POWER_ACTIVE_THIS_SECOND.remove(playerId);
 		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.remove(playerId);
 		CASSIOPEIA_PASSIVE_ENABLED.remove(playerId);
@@ -14452,6 +16643,8 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		endIgnition(player, server.getTicks(), BurningPassionIgnitionEndReason.INVALID, false, false);
+		clearOverrideMeteorState(player.getUuid(), server);
 		endFrostStagedMode(player, server.getTicks(), FrostStageEndReason.INVALID, false, false);
 		clearFrostMaximumState(player, false);
 		clearPlusUltraRuntimeState(player, false);
@@ -15080,6 +17273,181 @@ public final class MagicAbilityManager {
 		private MartyrsFlameBurnState(RegistryKey<World> dimension, int expiresTick) {
 			this.dimension = dimension;
 			this.expiresTick = expiresTick;
+		}
+	}
+
+	private enum BurningPassionIgnitionEndReason {
+		MANUAL,
+		NATURAL,
+		OVERHEAT,
+		INVALID,
+		LOCKED,
+		CLEAR_ALL,
+		CASTER_DIED
+	}
+
+	private enum BurningPassionFastestPhase {
+		BUILD_UP,
+		PRIMED
+	}
+
+	private static final class BurningPassionIgnitionState {
+		private final RegistryKey<World> dimension;
+		private int currentStage;
+		private int stageStartTick;
+		private double heatPercent;
+		private final Map<UUID, Boolean> auraPlayersInside = new HashMap<>();
+		private final Map<UUID, Integer> boundaryCooldownEndTickByTarget = new HashMap<>();
+
+		private BurningPassionIgnitionState(RegistryKey<World> dimension, int currentStage, int stageStartTick, double heatPercent) {
+			this.dimension = dimension;
+			this.currentStage = currentStage;
+			this.stageStartTick = stageStartTick;
+			this.heatPercent = Math.max(0.0, heatPercent);
+		}
+	}
+
+	private static final class BurningPassionAuraFireState {
+		private final RegistryKey<World> dimension;
+		private UUID casterId;
+		private int expiresTick;
+		private int nextDamageTick;
+		private float damagePerTick;
+		private int damageIntervalTicks;
+		private int refreshTicks;
+		private boolean persistent;
+		private boolean extinguishWhenWet;
+
+		private BurningPassionAuraFireState(
+			RegistryKey<World> dimension,
+			UUID casterId,
+			int expiresTick,
+			int nextDamageTick,
+			float damagePerTick,
+			int damageIntervalTicks,
+			int refreshTicks,
+			boolean persistent,
+			boolean extinguishWhenWet
+		) {
+			this.dimension = dimension;
+			this.casterId = casterId;
+			this.expiresTick = expiresTick;
+			this.nextDamageTick = nextDamageTick;
+			this.damagePerTick = damagePerTick;
+			this.damageIntervalTicks = damageIntervalTicks;
+			this.refreshTicks = refreshTicks;
+			this.persistent = persistent;
+			this.extinguishWhenWet = extinguishWhenWet;
+		}
+	}
+
+	private static final class PhoenixsCageLineState {
+		private final UUID casterId;
+		private final RegistryKey<World> dimension;
+		private final int expiresTick;
+		private final List<Vec3d> points;
+		private final List<UUID> displayEntityIds = new ArrayList<>();
+		private final Map<UUID, Integer> nextHitTickByTarget = new HashMap<>();
+
+		private PhoenixsCageLineState(UUID casterId, RegistryKey<World> dimension, int expiresTick, List<Vec3d> points) {
+			this.casterId = casterId;
+			this.dimension = dimension;
+			this.expiresTick = expiresTick;
+			this.points = List.copyOf(points);
+		}
+
+		private Vec3d forward() {
+			if (points.size() < 2) {
+				return new Vec3d(1.0, 0.0, 0.0);
+			}
+			return normalizedHorizontalDirection(points.get(points.size() - 1).subtract(points.get(0)), null);
+		}
+	}
+
+	private static final class BurningPassionFastestState {
+		private final RegistryKey<World> dimension;
+		private BurningPassionFastestPhase phase;
+		private Vec3d referenceMomentum;
+		private int stableTicks;
+		private int outOfToleranceTicks;
+		private int primedStartTick;
+
+		private BurningPassionFastestState(
+			RegistryKey<World> dimension,
+			BurningPassionFastestPhase phase,
+			Vec3d referenceMomentum,
+			int stableTicks,
+			int outOfToleranceTicks,
+			int primedStartTick
+		) {
+			this.dimension = dimension;
+			this.phase = phase;
+			this.referenceMomentum = referenceMomentum;
+			this.stableTicks = stableTicks;
+			this.outOfToleranceTicks = outOfToleranceTicks;
+			this.primedStartTick = primedStartTick;
+		}
+	}
+
+	private static final class BurningPassionDeathfireState {
+		private final RegistryKey<World> dimension;
+		private final UUID casterId;
+		private final int expiresTick;
+		private int nextDamageTick;
+		private final float damagePerTick;
+		private final int damageIntervalTicks;
+
+		private BurningPassionDeathfireState(
+			RegistryKey<World> dimension,
+			UUID casterId,
+			int expiresTick,
+			int nextDamageTick,
+			float damagePerTick,
+			int damageIntervalTicks
+		) {
+			this.dimension = dimension;
+			this.casterId = casterId;
+			this.expiresTick = expiresTick;
+			this.nextDamageTick = nextDamageTick;
+			this.damagePerTick = damagePerTick;
+			this.damageIntervalTicks = damageIntervalTicks;
+		}
+	}
+
+	private static final class OverrideMeteorState {
+		private final RegistryKey<World> dimension;
+		private final UUID casterId;
+		private final Vec3d impactCenter;
+		private final double spawnY;
+		private final double impactRadius;
+		private final int startTick;
+		private final int impactTick;
+		private int nextWarningSoundTick;
+		private final UUID displayEntityId;
+		private final List<UUID> targetDomainOwnerIds;
+
+		private OverrideMeteorState(
+			RegistryKey<World> dimension,
+			UUID casterId,
+			Vec3d impactCenter,
+			double spawnY,
+			double impactRadius,
+			int startTick,
+			int impactTick,
+			int nextWarningSoundTick,
+			UUID displayEntityId,
+			List<UUID> targetDomainOwnerIds
+		) {
+			this.dimension = dimension;
+			this.casterId = casterId;
+			this.impactCenter = impactCenter;
+			this.spawnY = spawnY;
+			this.impactRadius = impactRadius;
+			this.startTick = startTick;
+			this.impactTick = impactTick;
+			this.nextWarningSoundTick = nextWarningSoundTick;
+			this.displayEntityId = displayEntityId;
+			this.targetDomainOwnerIds = List.copyOf(targetDomainOwnerIds);
 		}
 	}
 

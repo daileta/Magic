@@ -292,6 +292,7 @@ public final class MagicConfig {
 		public ParticlesConfig particles = new ParticlesConfig();
 		public LoveAtFirstSightConfig loveAtFirstSight = new LoveAtFirstSightConfig();
 		public MartyrsFlameConfig martyrsFlame = new MartyrsFlameConfig();
+		public BurningPassionConfig burningPassion = new BurningPassionConfig();
 		public DomainControlConfig domainControl = new DomainControlConfig();
 		@SerializedName(value = "emptyEmbrace", alternate = { "manipulation" })
 		public EmptyEmbraceConfig emptyEmbrace = new EmptyEmbraceConfig();
@@ -335,6 +336,9 @@ public final class MagicConfig {
 			}
 			if (martyrsFlame == null) {
 				martyrsFlame = new MartyrsFlameConfig();
+			}
+			if (burningPassion == null) {
+				burningPassion = new BurningPassionConfig();
 			}
 			if (domainControl == null) {
 				domainControl = new DomainControlConfig();
@@ -390,6 +394,7 @@ public final class MagicConfig {
 
 			mana.normalize();
 			martyrsFlame.normalize();
+			burningPassion.normalize();
 			loveAtFirstSight.normalize();
 			jesterSpotlight.normalize();
 			jesterWittyOneLiner.normalize();
@@ -541,6 +546,455 @@ public final class MagicConfig {
 			fireParticleIntervalTicks = Math.max(1, fireParticleIntervalTicks);
 			fireFlameParticleCount = Math.max(0, fireFlameParticleCount);
 			fireSmokeParticleCount = Math.max(0, fireSmokeParticleCount);
+		}
+	}
+
+	public static final class BurningPassionConfig {
+		public BurningPassionHudConfig hud = new BurningPassionHudConfig();
+		public BurningPassionIgnitionConfig ignition = new BurningPassionIgnitionConfig();
+		public BurningPassionHeatConfig heat = new BurningPassionHeatConfig();
+		public BurningPassionOverheatConfig overheat = new BurningPassionOverheatConfig();
+		public BurningPassionStageConfig stageOne = defaultStageOne();
+		public BurningPassionStageConfig stageTwo = defaultStageTwo();
+		public BurningPassionStageConfig stageThree = defaultStageThree();
+		public PhoenixsCageConfig phoenixsCage = new PhoenixsCageConfig();
+		public PyrotechnicsLawConfig pyrotechnicsLaw = new PyrotechnicsLawConfig();
+		public ImTheFastestThereIsConfig imTheFastestThereIs = new ImTheFastestThereIsConfig();
+		public OverrideConfig override = new OverrideConfig();
+
+		private void normalize() {
+			if (hud == null) {
+				hud = new BurningPassionHudConfig();
+			}
+			if (ignition == null) {
+				ignition = new BurningPassionIgnitionConfig();
+			}
+			if (heat == null) {
+				heat = new BurningPassionHeatConfig();
+			}
+			if (overheat == null) {
+				overheat = new BurningPassionOverheatConfig();
+			}
+			if (stageOne == null) {
+				stageOne = defaultStageOne();
+			}
+			if (stageTwo == null) {
+				stageTwo = defaultStageTwo();
+			}
+			if (stageThree == null) {
+				stageThree = defaultStageThree();
+			}
+			if (phoenixsCage == null) {
+				phoenixsCage = new PhoenixsCageConfig();
+			}
+			if (pyrotechnicsLaw == null) {
+				pyrotechnicsLaw = new PyrotechnicsLawConfig();
+			}
+			if (imTheFastestThereIs == null) {
+				imTheFastestThereIs = new ImTheFastestThereIsConfig();
+			}
+			if (override == null) {
+				override = new OverrideConfig();
+			}
+
+			hud.normalize();
+			ignition.normalize();
+			heat.normalize();
+			overheat.normalize();
+			stageOne.normalize();
+			stageTwo.normalize();
+			stageThree.normalize();
+			phoenixsCage.normalize();
+			pyrotechnicsLaw.normalize();
+			imTheFastestThereIs.normalize();
+			override.normalize();
+		}
+
+		private static BurningPassionStageConfig defaultStageOne() {
+			BurningPassionStageConfig config = new BurningPassionStageConfig();
+			config.auraEnabled = true;
+			config.auraRadius = 15.0;
+			config.fireDamagePerTick = 0.25F;
+			config.speedAmplifier = 1;
+			config.boundaryHeatGainPercent = 1.5;
+			config.boundaryTriggerCooldownTicks = 2 * 20;
+			config.waterHeatPerSecond = -0.5;
+			return config;
+		}
+
+		private static BurningPassionStageConfig defaultStageTwo() {
+			BurningPassionStageConfig config = new BurningPassionStageConfig();
+			config.auraEnabled = true;
+			config.auraRadius = 5.0;
+			config.fireDamagePerTick = 0.5F;
+			config.speedAmplifier = 4;
+			config.strengthAmplifier = 2;
+			config.regenerationAmplifier = 0;
+			config.boundaryHeatGainPercent = 5.0;
+			config.boundaryTriggerCooldownTicks = 2 * 20;
+			config.persistentFireUntilExtinguished = true;
+			config.extraStepHeightBlocks = 1.0;
+			return config;
+		}
+
+		private static BurningPassionStageConfig defaultStageThree() {
+			BurningPassionStageConfig config = new BurningPassionStageConfig();
+			config.auraEnabled = false;
+			config.speedAmplifier = 9;
+			config.strengthAmplifier = 2;
+			config.regenerationAmplifier = 1;
+			config.passiveHeatPerSecond = 0.5;
+			config.extraStepHeightBlocks = 2.0;
+			return config;
+		}
+	}
+
+	public static final class BurningPassionHudConfig {
+		public boolean timerEnabled = true;
+		public boolean heatTextEnabled = true;
+		public boolean heatBarEnabled = true;
+		public boolean hideDuringDomainClash = true;
+		public boolean timerBottomRightAnchor = true;
+		public String stageOneTimerLabelFormat = "Stage 2 in %time%";
+		public String stageTwoTimerLabelFormat = "Stage 3 in %time%";
+		public String stageThreeTimerLabelFormat = "Ignition ends in %time%";
+		public String heatLabelFormat = "HEAT: %heat%%";
+		public String textColorHex = "#FFFFFF";
+		public String heatTextColorHex = "#FFB56B";
+		public String outlineColorHex = "#000000";
+		public String heatBarStartColorHex = "#FFB347";
+		public String heatBarEndColorHex = "#FF3B1F";
+		public int lineSpacing = 12;
+		public int heatBarYOffset = 13;
+		public int stageTextYOffset = 33;
+		public int heatTextYOffset = 26;
+		public int heatBarHeight = 4;
+
+		private void normalize() {
+			if (stageOneTimerLabelFormat == null) {
+				stageOneTimerLabelFormat = "Stage 2 in %time%";
+			}
+			if (stageTwoTimerLabelFormat == null) {
+				stageTwoTimerLabelFormat = "Stage 3 in %time%";
+			}
+			if (stageThreeTimerLabelFormat == null) {
+				stageThreeTimerLabelFormat = "Ignition ends in %time%";
+			}
+			if (heatLabelFormat == null) {
+				heatLabelFormat = "HEAT: %heat%%";
+			}
+			if (textColorHex == null) {
+				textColorHex = "#FFFFFF";
+			}
+			if (heatTextColorHex == null) {
+				heatTextColorHex = "#FFB56B";
+			}
+			if (outlineColorHex == null) {
+				outlineColorHex = "#000000";
+			}
+			if (heatBarStartColorHex == null) {
+				heatBarStartColorHex = "#FFB347";
+			}
+			if (heatBarEndColorHex == null) {
+				heatBarEndColorHex = "#FF3B1F";
+			}
+			lineSpacing = Math.max(8, lineSpacing);
+			heatBarYOffset = Math.max(4, heatBarYOffset);
+			stageTextYOffset = Math.max(heatBarYOffset + 8, stageTextYOffset);
+			heatTextYOffset = Math.max(heatBarYOffset + 6, heatTextYOffset);
+			heatBarHeight = Math.max(2, heatBarHeight);
+		}
+	}
+
+	public static final class BurningPassionIgnitionConfig {
+		public int cooldownTicks = 0;
+		public boolean allowManualCancel = true;
+		public boolean manualCancelStartsCooldown = false;
+		public boolean naturalEndStartsCooldown = false;
+		public int stageOneDurationTicks = 2 * 60 * 20;
+		public int stageTwoDurationTicks = 3 * 60 * 20;
+		public int stageThreeDurationTicks = 5 * 60 * 20;
+		public int effectRefreshTicks = 40;
+		public int activationFlameParticleCount = 28;
+		public int activationSmokeParticleCount = 1;
+		public int activationBurstParticleCount = 14;
+		public float activationSoundVolume = 1.0F;
+		public float activationSoundPitch = 0.85F;
+		public float cancelSoundVolume = 0.9F;
+		public float cancelSoundPitch = 0.7F;
+
+		private void normalize() {
+			cooldownTicks = Math.max(0, cooldownTicks);
+			stageOneDurationTicks = Math.max(1, stageOneDurationTicks);
+			stageTwoDurationTicks = Math.max(1, stageTwoDurationTicks);
+			stageThreeDurationTicks = Math.max(1, stageThreeDurationTicks);
+			effectRefreshTicks = Math.max(1, effectRefreshTicks);
+			activationFlameParticleCount = Math.max(0, activationFlameParticleCount);
+			activationSmokeParticleCount = Math.max(0, activationSmokeParticleCount);
+			activationBurstParticleCount = Math.max(0, activationBurstParticleCount);
+			activationSoundVolume = Math.max(0.0F, activationSoundVolume);
+			activationSoundPitch = Math.max(0.0F, activationSoundPitch);
+			cancelSoundVolume = Math.max(0.0F, cancelSoundVolume);
+			cancelSoundPitch = Math.max(0.0F, cancelSoundPitch);
+		}
+	}
+
+	public static final class BurningPassionHeatConfig {
+		public double selfFireThresholdPercent = 50.0;
+		public double healthDemandThresholdPercent = 75.0;
+		public double overheatThresholdPercent = 100.0;
+		public int selfFireDurationTicks = 40;
+		public int selfFireDamageIntervalTicks = 10;
+		public float selfFireDamagePerTick = 0.25F;
+		public boolean selfFireExtinguishesWhenWetBeforeStageThree = true;
+		public double minimumRemainingHealthHearts = 1.0;
+		public double ignitionHealthCostHearts = 0.0;
+		public double phoenixsCageHealthCostHearts = 1.0;
+		public double pyrotechnicsLawHealthCostHearts = 1.0;
+		public double imTheFastestThereIsHealthCostHearts = 0.0;
+		public double overrideHealthCostHearts = 0.0;
+
+		private void normalize() {
+			selfFireThresholdPercent = MathHelper.clamp(selfFireThresholdPercent, 0.0, 100.0);
+			healthDemandThresholdPercent = MathHelper.clamp(healthDemandThresholdPercent, selfFireThresholdPercent, 100.0);
+			overheatThresholdPercent = MathHelper.clamp(overheatThresholdPercent, healthDemandThresholdPercent, 100.0);
+			selfFireDurationTicks = Math.max(1, selfFireDurationTicks);
+			selfFireDamageIntervalTicks = Math.max(1, selfFireDamageIntervalTicks);
+			selfFireDamagePerTick = Math.max(0.0F, selfFireDamagePerTick);
+			minimumRemainingHealthHearts = Math.max(0.5, minimumRemainingHealthHearts);
+			ignitionHealthCostHearts = Math.max(0.0, ignitionHealthCostHearts);
+			phoenixsCageHealthCostHearts = Math.max(0.0, phoenixsCageHealthCostHearts);
+			pyrotechnicsLawHealthCostHearts = Math.max(0.0, pyrotechnicsLawHealthCostHearts);
+			imTheFastestThereIsHealthCostHearts = Math.max(0.0, imTheFastestThereIsHealthCostHearts);
+			overrideHealthCostHearts = Math.max(0.0, overrideHealthCostHearts);
+		}
+	}
+
+	public static final class BurningPassionOverheatConfig {
+		public int stagedAbilityCooldownTicks = 30 * 20;
+		public boolean includeOverrideInLockout = false;
+		public int punishmentDurationTicks = 8 * 20;
+		public int slownessAmplifier = 4;
+		public int weaknessAmplifier = 2;
+		public int flameBurstParticleCount = 64;
+		public int smokeParticleCount = 42;
+		public float soundVolume = 1.2F;
+		public float soundPitch = 0.6F;
+
+		private void normalize() {
+			stagedAbilityCooldownTicks = Math.max(0, stagedAbilityCooldownTicks);
+			punishmentDurationTicks = Math.max(0, punishmentDurationTicks);
+			slownessAmplifier = Math.max(-1, slownessAmplifier);
+			weaknessAmplifier = Math.max(-1, weaknessAmplifier);
+			flameBurstParticleCount = Math.max(0, flameBurstParticleCount);
+			smokeParticleCount = Math.max(0, smokeParticleCount);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
+		}
+	}
+
+	public static final class BurningPassionStageConfig {
+		public boolean auraEnabled = false;
+		public double auraRadius = 0.0;
+		public int fireRefreshTicks = 40;
+		public int fireDamageIntervalTicks = 10;
+		public float fireDamagePerTick = 0.0F;
+		public boolean persistentFireUntilExtinguished = false;
+		public boolean extinguishWhenWet = true;
+		public int speedAmplifier = -1;
+		public int strengthAmplifier = -1;
+		public int regenerationAmplifier = -1;
+		public double boundaryHeatGainPercent = 0.0;
+		public int boundaryTriggerCooldownTicks = 0;
+		public double passiveHeatPerSecond = 0.0;
+		public int auraFlameParticleCount = 12;
+		public int auraSmokeParticleCount = 0;
+		public double waterHeatPerSecond = 0.0;
+		public double extraStepHeightBlocks = 0.0;
+
+		private void normalize() {
+			auraRadius = Math.max(0.0, auraRadius);
+			fireRefreshTicks = Math.max(1, fireRefreshTicks);
+			fireDamageIntervalTicks = Math.max(1, fireDamageIntervalTicks);
+			fireDamagePerTick = Math.max(0.0F, fireDamagePerTick);
+			speedAmplifier = Math.max(-1, speedAmplifier);
+			strengthAmplifier = Math.max(-1, strengthAmplifier);
+			regenerationAmplifier = Math.max(-1, regenerationAmplifier);
+			boundaryHeatGainPercent = Math.max(0.0, boundaryHeatGainPercent);
+			boundaryTriggerCooldownTicks = Math.max(0, boundaryTriggerCooldownTicks);
+			passiveHeatPerSecond = Math.max(0.0, passiveHeatPerSecond);
+			auraFlameParticleCount = Math.max(0, auraFlameParticleCount);
+			auraSmokeParticleCount = Math.max(0, auraSmokeParticleCount);
+			waterHeatPerSecond = MathHelper.clamp(waterHeatPerSecond, -100.0, 100.0);
+			extraStepHeightBlocks = MathHelper.clamp(extraStepHeightBlocks, 0.0, 10.0);
+		}
+	}
+
+	public static final class PhoenixsCageConfig {
+		public double manaCostPercent = 0.0;
+		public int cooldownTicks = 0;
+		public double lengthBlocks = 40.0;
+		public int durationTicks = 5 * 20;
+		public double collisionRadius = 0.8;
+		public float collisionTrueDamage = 5.0F;
+		public int fireDurationTicks = 4 * 20;
+		public int hitCooldownTicks = 10;
+		public double placementPlayerClearanceBlocks = 1.0;
+		public double segmentSpacingBlocks = 1.0;
+		public double verticalOffset = 0.1;
+		public boolean avoidSolidBlocks = true;
+		public double firstLineHeatPerSecond = 2.5;
+		public double additionalLineMultiplier = 2.0;
+		public double maxUpkeepHeatPerSecond = 20.0;
+		public int coreBlockDisplaySegments = 12;
+		public int flameParticleCount = 14;
+		public int smokeParticleCount = 0;
+		public int emberParticleCount = 10;
+		public double particleSpread = 0.2;
+		public double flameParticleSpeed = 0.01;
+
+		private void normalize() {
+			manaCostPercent = MathHelper.clamp(manaCostPercent, 0.0, 100.0);
+			cooldownTicks = Math.max(0, cooldownTicks);
+			lengthBlocks = Math.max(1.0, lengthBlocks);
+			durationTicks = Math.max(1, durationTicks);
+			collisionRadius = Math.max(0.1, collisionRadius);
+			collisionTrueDamage = Math.max(0.0F, collisionTrueDamage);
+			fireDurationTicks = Math.max(0, fireDurationTicks);
+			hitCooldownTicks = Math.max(1, hitCooldownTicks);
+			placementPlayerClearanceBlocks = Math.max(0.0, placementPlayerClearanceBlocks);
+			segmentSpacingBlocks = Math.max(0.25, segmentSpacingBlocks);
+			verticalOffset = Math.max(-2.0, Math.min(2.0, verticalOffset));
+			firstLineHeatPerSecond = Math.max(0.0, firstLineHeatPerSecond);
+			additionalLineMultiplier = Math.max(1.0, additionalLineMultiplier);
+			maxUpkeepHeatPerSecond = Math.max(0.0, maxUpkeepHeatPerSecond);
+			coreBlockDisplaySegments = Math.max(0, coreBlockDisplaySegments);
+			flameParticleCount = Math.max(0, flameParticleCount);
+			smokeParticleCount = Math.max(0, smokeParticleCount);
+			emberParticleCount = Math.max(0, emberParticleCount);
+			particleSpread = Math.max(0.0, particleSpread);
+			flameParticleSpeed = Math.max(0.0, flameParticleSpeed);
+		}
+	}
+
+	public static final class PyrotechnicsLawConfig {
+		public boolean requiresFullMana = true;
+		public boolean consumeFullMana = true;
+		public int cooldownTicks = 0;
+		public double heatReductionPercent = 20.0;
+		public double healHearts = 5.0;
+		public int stageSetbackTicks = 30 * 20;
+		public int inwardFlameParticleCount = 32;
+		public int outwardShedParticleCount = 26;
+		public int healingBurstParticleCount = 18;
+		public float soundVolume = 1.0F;
+		public float soundPitch = 1.2F;
+
+		private void normalize() {
+			cooldownTicks = Math.max(0, cooldownTicks);
+			heatReductionPercent = MathHelper.clamp(heatReductionPercent, 0.0, 100.0);
+			healHearts = Math.max(0.0, healHearts);
+			stageSetbackTicks = Math.max(0, stageSetbackTicks);
+			inwardFlameParticleCount = Math.max(0, inwardFlameParticleCount);
+			outwardShedParticleCount = Math.max(0, outwardShedParticleCount);
+			healingBurstParticleCount = Math.max(0, healingBurstParticleCount);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
+		}
+	}
+
+	public static final class ImTheFastestThereIsConfig {
+		public double manaCostPercent = 0.0;
+		public int failCooldownTicks = 0;
+		public int successCooldownTicks = 0;
+		public double movementThresholdBlocksPerTick = 0.05;
+		public double momentumToleranceBlocksPerTick = 0.03;
+		public int graceTicks = 0;
+		public int buildUpTicks = 30 * 20;
+		public int primedDurationTicks = 0;
+		public int deathfireDurationTicks = 0;
+		public int deathfireDamageIntervalTicks = 10;
+		public float deathfireDamagePerTick = 4.0F;
+		public int trailFlameParticleCount = 12;
+		public int emberParticleCount = 8;
+		public int primedBurstParticleCount = 18;
+		public double trailSpread = 0.15;
+		public double trailSpeed = 0.02;
+		public float activationSoundVolume = 1.0F;
+		public float activationSoundPitch = 1.45F;
+
+		private void normalize() {
+			manaCostPercent = MathHelper.clamp(manaCostPercent, 0.0, 100.0);
+			failCooldownTicks = Math.max(0, failCooldownTicks);
+			successCooldownTicks = Math.max(0, successCooldownTicks);
+			movementThresholdBlocksPerTick = Math.max(0.0, movementThresholdBlocksPerTick);
+			momentumToleranceBlocksPerTick = Math.max(0.0, momentumToleranceBlocksPerTick);
+			graceTicks = Math.max(0, graceTicks);
+			buildUpTicks = Math.max(1, buildUpTicks);
+			primedDurationTicks = Math.max(0, primedDurationTicks);
+			deathfireDurationTicks = Math.max(0, deathfireDurationTicks);
+			deathfireDamageIntervalTicks = Math.max(1, deathfireDamageIntervalTicks);
+			deathfireDamagePerTick = Math.max(0.0F, deathfireDamagePerTick);
+			trailFlameParticleCount = Math.max(0, trailFlameParticleCount);
+			emberParticleCount = Math.max(0, emberParticleCount);
+			primedBurstParticleCount = Math.max(0, primedBurstParticleCount);
+			trailSpread = Math.max(0.0, trailSpread);
+			trailSpeed = Math.max(0.0, trailSpeed);
+			activationSoundVolume = Math.max(0.0F, activationSoundVolume);
+			activationSoundPitch = Math.max(0.0F, activationSoundPitch);
+		}
+	}
+
+	public static final class OverrideConfig {
+		public boolean requiresFullMana = true;
+		public boolean consumeFullMana = true;
+		public int cooldownTicks = 30 * 60 * 20;
+		public double meteorSpawnHeight = 35.0;
+		public int fallDurationTicks = 60;
+		public double impactRadiusMultiplierFromStandardDomainRadius = 2.0;
+		public boolean allowCastInsideContainingDomain = true;
+		public boolean allowCastWhenDomainFullyContained = true;
+		public boolean destroyAllQualifyingDomains = true;
+		public float impactDamage = 2048.0F;
+		public boolean affectPlayers = true;
+		public boolean affectMobs = true;
+		public double meteorCoreDisplayScale = 8.0;
+		public int telegraphParticleCount = 72;
+		public int meteorCoreParticleCount = 56;
+		public int meteorTrailParticleCount = 72;
+		public int meteorSmokeParticleCount = 1;
+		public int meteorEmberParticleCount = 48;
+		public int impactFlashParticleCount = 520;
+		public int shockwaveParticleCount = 560;
+		public int radialFireBurstParticleCount = 420;
+		public int debrisParticleCount = 180;
+		public int warningSoundIntervalTicks = 10;
+		public float warningSoundVolume = 0.95F;
+		public float warningSoundPitch = 0.6F;
+		public float impactSoundVolume = 1.4F;
+		public float impactSoundPitch = 0.55F;
+
+		private void normalize() {
+			cooldownTicks = Math.max(0, cooldownTicks);
+			meteorSpawnHeight = Math.max(1.0, meteorSpawnHeight);
+			fallDurationTicks = Math.max(1, fallDurationTicks);
+			impactRadiusMultiplierFromStandardDomainRadius = Math.max(0.25, impactRadiusMultiplierFromStandardDomainRadius);
+			impactDamage = Math.max(0.0F, impactDamage);
+			meteorCoreDisplayScale = Math.max(0.5, meteorCoreDisplayScale);
+			telegraphParticleCount = Math.max(0, telegraphParticleCount);
+			meteorCoreParticleCount = Math.max(0, meteorCoreParticleCount);
+			meteorTrailParticleCount = Math.max(0, meteorTrailParticleCount);
+			meteorSmokeParticleCount = Math.max(0, meteorSmokeParticleCount);
+			meteorEmberParticleCount = Math.max(0, meteorEmberParticleCount);
+			impactFlashParticleCount = Math.max(0, impactFlashParticleCount);
+			shockwaveParticleCount = Math.max(0, shockwaveParticleCount);
+			radialFireBurstParticleCount = Math.max(0, radialFireBurstParticleCount);
+			debrisParticleCount = Math.max(0, debrisParticleCount);
+			warningSoundIntervalTicks = Math.max(1, warningSoundIntervalTicks);
+			warningSoundVolume = Math.max(0.0F, warningSoundVolume);
+			warningSoundPitch = Math.max(0.0F, warningSoundPitch);
+			impactSoundVolume = Math.max(0.0F, impactSoundVolume);
+			impactSoundPitch = Math.max(0.0F, impactSoundPitch);
 		}
 	}
 

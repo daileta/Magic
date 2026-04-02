@@ -54,6 +54,8 @@ public final class ManaHudOverlay {
 	private static final int FROST_HUD_TEXT_COLOR = 0xFFFFFF;
 	private static final int FROST_OUTLINE_COLOR = 0xFF000000;
 	private static final int FROST_STAGE_HUD_BACKGROUND = 0x70000000;
+	private static final int BURNING_PASSION_HUD_BACKGROUND = 0x70000000;
+	private static final int BURNING_PASSION_HEAT_BAR_BACKGROUND = 0x66000000;
 	private static final int LOVE_COLOR = 0xFF77CC;
 	private static final int BURNING_PASSION_COLOR = 0xFF8A3D;
 	private static final int JESTER_COLOR = 0xFFD54A;
@@ -149,6 +151,8 @@ public final class ManaHudOverlay {
 			renderGreedCoins(drawContext, client, textY);
 		} else if (school == MagicSchool.FROST) {
 			renderFrostStageHud(drawContext, client, textY);
+		} else if (school == MagicSchool.BURNING_PASSION) {
+			renderBurningPassionHud(drawContext, client, x, y, textY);
 		}
 		drawContext.drawTextWithShadow(client.textRenderer, schoolName, textX, textY, colorForSchool(school));
 	}
@@ -404,6 +408,104 @@ public final class ManaHudOverlay {
 		drawOutlinedText(drawContext, client, Text.literal(displayLine), lineX, lineY, textColor, outlineColor);
 	}
 
+	private static void renderBurningPassionHud(
+		DrawContext drawContext,
+		MinecraftClient client,
+		int manaBarX,
+		int manaBarY,
+		int schoolTextY
+	) {
+		if (client.player == null || MagicPlayerData.getSchool(client.player) != MagicSchool.BURNING_PASSION) {
+			return;
+		}
+
+		MagicConfig.BurningPassionHudConfig hud = MagicConfig.get().burningPassion.hud;
+		if (hud.hideDuringDomainClash && MagicPlayerData.isDomainClashActive(client.player)) {
+			return;
+		}
+
+		int currentStage = MagicPlayerData.getBurningPassionStage(client.player);
+		int remainingTicks = MagicPlayerData.getBurningPassionStageRemainingTicks(client.player);
+		double heatPercent = MagicPlayerData.getBurningPassionHeatPercent(client.player);
+		if (!MagicPlayerData.isBurningPassionStageActive(client.player) && currentStage <= 0 && remainingTicks <= 0 && heatPercent <= 0.0) {
+			return;
+		}
+
+		Text stageLine = burningPassionStageHudText(hud, currentStage, remainingTicks);
+		Text heatLine = burningPassionHeatHudText(hud, heatPercent);
+		int textColor = withOpaqueAlpha(
+			ensureReadableHudColor(parseHexColor(hud.textColorHex, FROST_HUD_TEXT_COLOR), FROST_HUD_TEXT_COLOR)
+		);
+		int heatColor = withOpaqueAlpha(
+			ensureReadableHudColor(parseHexColor(hud.heatTextColorHex, 0xFFB56B), 0xFFB56B)
+		);
+		int outlineColor = withOpaqueAlpha(parseHexColor(hud.outlineColorHex, FROST_OUTLINE_COLOR));
+		int heatBarStartColor = withOpaqueAlpha(parseHexColor(hud.heatBarStartColorHex, 0xFFB347));
+		int heatBarEndColor = withOpaqueAlpha(parseHexColor(hud.heatBarEndColorHex, 0xFF3B1F));
+		int centerX = manaBarX + BAR_WIDTH / 2;
+		if (hud.heatBarEnabled) {
+			int heatBarY = manaBarY - hud.heatBarYOffset;
+			int heatBarHeight = hud.heatBarHeight;
+			int heatFillWidth = MathHelper.clamp((int) Math.round((heatPercent / 100.0) * BAR_WIDTH), 0, BAR_WIDTH);
+			drawContext.fill(manaBarX, heatBarY, manaBarX + BAR_WIDTH, heatBarY + heatBarHeight, BURNING_PASSION_HEAT_BAR_BACKGROUND);
+			if (heatFillWidth > 0) {
+				drawGradientRect(
+					drawContext,
+					manaBarX,
+					heatBarY,
+					manaBarX + heatFillWidth,
+					heatBarY + heatBarHeight,
+					heatBarStartColor,
+					heatBarEndColor
+				);
+			}
+		}
+
+		if (heatLine != null && hud.heatTextEnabled) {
+			String heatText = heatLine.getString();
+			if (!heatText.isBlank()) {
+				drawCenteredHudBoxedText(
+					drawContext,
+					client,
+					Text.literal(heatText),
+					centerX,
+					manaBarY - hud.heatTextYOffset,
+					heatColor,
+					outlineColor
+				);
+			}
+		}
+
+		if (stageLine != null && hud.timerEnabled) {
+			String stageText = stageLine.getString();
+			if (!stageText.isBlank()) {
+				if (hud.timerBottomRightAnchor) {
+					int lineWidth = client.textRenderer.getWidth(stageText);
+					int lineX = drawContext.getScaledWindowWidth() - lineWidth - GREED_COINS_MARGIN - GREED_COINS_BOX_PADDING_X;
+					int lineY = schoolTextY - client.textRenderer.fontHeight - GREED_COINS_SCHOOL_GAP;
+					drawContext.fill(
+						lineX - GREED_COINS_BOX_PADDING_X,
+						lineY - GREED_COINS_BOX_PADDING_Y,
+						lineX + lineWidth + GREED_COINS_BOX_PADDING_X,
+						lineY + client.textRenderer.fontHeight + GREED_COINS_BOX_PADDING_Y,
+						BURNING_PASSION_HUD_BACKGROUND
+					);
+					drawOutlinedText(drawContext, client, Text.literal(stageText), lineX, lineY, textColor, outlineColor);
+				} else {
+					drawCenteredHudBoxedText(
+						drawContext,
+						client,
+						Text.literal(stageText),
+						centerX,
+						manaBarY - hud.stageTextYOffset,
+						textColor,
+						outlineColor
+					);
+				}
+			}
+		}
+	}
+
 	private static void renderInstructions(DrawContext drawContext, MinecraftClient client, int centerX, int centerY, float alpha) {
 		Text[] lines = {
 			Text.translatable("overlay.magic.domain_clash.instructions.line1"),
@@ -539,6 +641,80 @@ public final class ManaHudOverlay {
 		return Text.literal(
 			formatHudLabel(hud.timerLabelFormat, nextStage, timeText, fallback)
 		);
+	}
+
+	private static Text burningPassionStageHudText(
+		MagicConfig.BurningPassionHudConfig hud,
+		int currentStage,
+		int remainingTicks
+	) {
+		if (currentStage <= 0 || remainingTicks < 0) {
+			return null;
+		}
+		String timeText = formatRemainingTime(remainingTicks);
+		String fallback = switch (currentStage) {
+			case 1 -> Text.translatable("overlay.magic.burning_passion.stage_one.timer", timeText).getString();
+			case 2 -> Text.translatable("overlay.magic.burning_passion.stage_two.timer", timeText).getString();
+			case 3 -> Text.translatable("overlay.magic.burning_passion.stage_three.timer", timeText).getString();
+			default -> "";
+		};
+		String template = switch (currentStage) {
+			case 1 -> hud.stageOneTimerLabelFormat;
+			case 2 -> hud.stageTwoTimerLabelFormat;
+			case 3 -> hud.stageThreeTimerLabelFormat;
+			default -> "";
+		};
+		return fallback.isBlank() ? null : Text.literal(formatBurningPassionHudText(template, fallback, timeText, null));
+	}
+
+	private static Text burningPassionHeatHudText(MagicConfig.BurningPassionHudConfig hud, double heatPercent) {
+		String fallback = Text.translatable("overlay.magic.burning_passion.heat", String.format(java.util.Locale.ROOT, "%.1f", heatPercent)).getString();
+		return Text.literal(
+			formatBurningPassionHudText(
+				hud.heatLabelFormat,
+				fallback,
+				null,
+				String.format(java.util.Locale.ROOT, "%.1f", heatPercent)
+			)
+		);
+	}
+
+	private static void drawCenteredHudBoxedText(
+		DrawContext drawContext,
+		MinecraftClient client,
+		Text text,
+		int centerX,
+		int y,
+		int textColor,
+		int outlineColor
+	) {
+		int lineWidth = client.textRenderer.getWidth(text);
+		int lineX = centerX - lineWidth / 2;
+		drawContext.fill(
+			lineX - GREED_COINS_BOX_PADDING_X,
+			y - GREED_COINS_BOX_PADDING_Y,
+			lineX + lineWidth + GREED_COINS_BOX_PADDING_X,
+			y + client.textRenderer.fontHeight + GREED_COINS_BOX_PADDING_Y,
+			BURNING_PASSION_HUD_BACKGROUND
+		);
+		drawOutlinedText(drawContext, client, text, lineX, y, textColor, outlineColor);
+	}
+
+	private static void drawGradientRect(
+		DrawContext drawContext,
+		int left,
+		int top,
+		int right,
+		int bottom,
+		int startColor,
+		int endColor
+	) {
+		int width = Math.max(1, right - left);
+		for (int offset = 0; offset < width; offset++) {
+			float progress = width <= 1 ? 1.0F : offset / (float) (width - 1);
+			int color = interpolateColor(startColor, endColor, progress);
+			drawContext.fill(left + offset, top, left + offset + 1, bottom, color);
+		}
 	}
 
 	private static void drawCenteredScaledOutlinedText(
@@ -810,6 +986,31 @@ public final class ManaHudOverlay {
 		return value.isBlank() ? fallback : value;
 	}
 
+	private static String formatBurningPassionHudText(String template, String fallback, String time, String heat) {
+		if (template == null || template.isBlank()) {
+			return fallback;
+		}
+		String value = template
+			.replace("%time%", time == null ? "" : time)
+			.replace("%heat%", heat == null ? "" : heat);
+		if (value.contains("%s")) {
+			try {
+				if (time != null && heat != null) {
+					value = value.formatted(time, heat);
+				} else if (time != null) {
+					value = value.formatted(time);
+				} else if (heat != null) {
+					value = value.formatted(heat);
+				} else {
+					value = value.formatted();
+				}
+			} catch (RuntimeException exception) {
+				return fallback;
+			}
+		}
+		return value.isBlank() ? fallback : value;
+	}
+
 	private static int parseHexColor(String rawColor, int fallbackColor) {
 		if (rawColor == null || rawColor.isBlank()) {
 			return fallbackColor;
@@ -843,6 +1044,23 @@ public final class ManaHudOverlay {
 
 	private static int withOpaqueAlpha(int color) {
 		return 0xFF000000 | (color & 0x00FFFFFF);
+	}
+
+	private static int interpolateColor(int startColor, int endColor, float progress) {
+		float clamped = MathHelper.clamp(progress, 0.0F, 1.0F);
+		int startAlpha = (startColor >> 24) & 0xFF;
+		int startRed = (startColor >> 16) & 0xFF;
+		int startGreen = (startColor >> 8) & 0xFF;
+		int startBlue = startColor & 0xFF;
+		int endAlpha = (endColor >> 24) & 0xFF;
+		int endRed = (endColor >> 16) & 0xFF;
+		int endGreen = (endColor >> 8) & 0xFF;
+		int endBlue = endColor & 0xFF;
+		int alpha = Math.round(MathHelper.lerp(clamped, startAlpha, endAlpha));
+		int red = Math.round(MathHelper.lerp(clamped, startRed, endRed));
+		int green = Math.round(MathHelper.lerp(clamped, startGreen, endGreen));
+		int blue = Math.round(MathHelper.lerp(clamped, startBlue, endBlue));
+		return (alpha << 24) | (red << 16) | (green << 8) | blue;
 	}
 
 	private static void resetDomainClashVisualState() {

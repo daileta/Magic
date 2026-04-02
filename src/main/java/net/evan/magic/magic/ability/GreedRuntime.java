@@ -1795,6 +1795,7 @@ public final class GreedRuntime {
 		return ability == MagicAbility.ABSOLUTE_ZERO
 			|| ability == MagicAbility.FROST_DOMAIN_EXPANSION
 			|| ability == MagicAbility.LOVE_DOMAIN_EXPANSION
+			|| ability == MagicAbility.OVERRIDE
 			|| ability == MagicAbility.PLUS_ULTRA
 			|| ability == MagicAbility.ASTRAL_CATACLYSM
 			|| ability == MagicAbility.GREED_DOMAIN_EXPANSION;

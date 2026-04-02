@@ -146,6 +146,34 @@ public final class MagicPlayerData {
 			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
 	);
 
+	private static final AttachmentType<Boolean> BURNING_PASSION_STAGE_ACTIVE = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "burning_passion_stage_active"),
+		builder -> builder
+			.initializer(() -> false)
+			.syncWith(PacketCodecs.BOOLEAN, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> BURNING_PASSION_STAGE = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "burning_passion_stage"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> BURNING_PASSION_STAGE_REMAINING_TICKS = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "burning_passion_stage_remaining_ticks"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Integer> BURNING_PASSION_HEAT_TENTHS = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "burning_passion_heat_tenths"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
+	);
+
 	private MagicPlayerData() {
 	}
 
@@ -187,6 +215,7 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, GREED_COINS, 0, 0);
 		clearFrostStageHud(player);
+		clearBurningPassionHud(player);
 	}
 
 	public static void clear(PlayerEntity player) {
@@ -205,6 +234,7 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, DOMAIN_SECONDARY_TIMER_SECONDS, 0, 0);
 		setAttachedIfChanged(target, GREED_COINS, 0, 0);
 		clearFrostStageHud(player);
+		clearBurningPassionHud(player);
 	}
 
 	public static int getMana(PlayerEntity player) {
@@ -390,6 +420,39 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, FROST_HIGHEST_UNLOCKED_STAGE, 0, 0);
 		setAttachedIfChanged(target, FROST_STAGE_PROGRESS_TICKS, 0, 0);
 		setAttachedIfChanged(target, FROST_STAGE_REQUIRED_TICKS, 0, 0);
+	}
+
+	public static boolean isBurningPassionStageActive(PlayerEntity player) {
+		return target(player).getAttachedOrElse(BURNING_PASSION_STAGE_ACTIVE, false);
+	}
+
+	public static int getBurningPassionStage(PlayerEntity player) {
+		return MathHelper.clamp(target(player).getAttachedOrElse(BURNING_PASSION_STAGE, 0), 0, 3);
+	}
+
+	public static int getBurningPassionStageRemainingTicks(PlayerEntity player) {
+		return Math.max(0, target(player).getAttachedOrElse(BURNING_PASSION_STAGE_REMAINING_TICKS, 0));
+	}
+
+	public static double getBurningPassionHeatPercent(PlayerEntity player) {
+		return MathHelper.clamp(target(player).getAttachedOrElse(BURNING_PASSION_HEAT_TENTHS, 0) / 10.0, 0.0, 100.0);
+	}
+
+	public static void setBurningPassionHud(PlayerEntity player, boolean active, int currentStage, int remainingTicks, double heatPercent) {
+		AttachmentTarget target = target(player);
+		setAttachedIfChanged(target, BURNING_PASSION_STAGE_ACTIVE, active, false);
+		setAttachedIfChanged(target, BURNING_PASSION_STAGE, MathHelper.clamp(currentStage, 0, 3), 0);
+		setAttachedIfChanged(target, BURNING_PASSION_STAGE_REMAINING_TICKS, Math.max(0, remainingTicks), 0);
+		int heatTenths = MathHelper.clamp((int) Math.round(MathHelper.clamp(heatPercent, 0.0, 100.0) * 10.0), 0, 1000);
+		setAttachedIfChanged(target, BURNING_PASSION_HEAT_TENTHS, heatTenths, 0);
+	}
+
+	public static void clearBurningPassionHud(PlayerEntity player) {
+		AttachmentTarget target = target(player);
+		setAttachedIfChanged(target, BURNING_PASSION_STAGE_ACTIVE, false, false);
+		setAttachedIfChanged(target, BURNING_PASSION_STAGE, 0, 0);
+		setAttachedIfChanged(target, BURNING_PASSION_STAGE_REMAINING_TICKS, 0, 0);
+		setAttachedIfChanged(target, BURNING_PASSION_HEAT_TENTHS, 0, 0);
 	}
 
 	private static AttachmentTarget target(PlayerEntity player) {

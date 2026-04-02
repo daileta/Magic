@@ -33,7 +33,11 @@ public abstract class LivingEntityMixin {
 	@Inject(method = "tryUseDeathProtector", at = @At("RETURN"))
 	private void magic$recordGreedTotemTrigger(DamageSource source, CallbackInfoReturnable<Boolean> cir) {
 		LivingEntity self = (LivingEntity) (Object) this;
-		if (cir.getReturnValueZ() && self instanceof ServerPlayerEntity serverPlayer) {
+		if (!cir.getReturnValueZ()) {
+			return;
+		}
+		MagicAbilityManager.onLivingEntityDeathProtectorTriggered(self);
+		if (self instanceof ServerPlayerEntity serverPlayer) {
 			GreedRuntime.onPlayerDeathProtectorTriggered(serverPlayer, source);
 		}
 	}
