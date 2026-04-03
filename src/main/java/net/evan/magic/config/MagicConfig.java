@@ -601,9 +601,9 @@ public final class MagicConfig {
 			ignition.normalize();
 			heat.normalize();
 			overheat.normalize();
-			stageOne.normalize();
-			stageTwo.normalize();
-			stageThree.normalize();
+			stageOne.normalize(defaultStageOne());
+			stageTwo.normalize(defaultStageTwo());
+			stageThree.normalize(defaultStageThree());
 			phoenixsCage.normalize();
 			pyrotechnicsLaw.normalize();
 			imTheFastestThereIs.normalize();
@@ -816,13 +816,13 @@ public final class MagicConfig {
 		public int regenerationAmplifier = -1;
 		public double boundaryHeatGainPercent = 0.0;
 		public int boundaryTriggerCooldownTicks = 0;
-		public double passiveHeatPerSecond = 0.0;
+		public Double passiveHeatPerSecond = null;
 		public int auraFlameParticleCount = 12;
 		public int auraSmokeParticleCount = 0;
-		public double waterHeatPerSecond = 0.0;
+		public Double waterHeatPerSecond = null;
 		public double extraStepHeightBlocks = 0.0;
 
-		private void normalize() {
+		private void normalize(BurningPassionStageConfig defaults) {
 			auraRadius = Math.max(0.0, auraRadius);
 			fireRefreshTicks = Math.max(1, fireRefreshTicks);
 			fireDamageIntervalTicks = Math.max(1, fireDamageIntervalTicks);
@@ -833,10 +833,12 @@ public final class MagicConfig {
 			regenerationAmplifier = Math.max(-1, regenerationAmplifier);
 			boundaryHeatGainPercent = Math.max(0.0, boundaryHeatGainPercent);
 			boundaryTriggerCooldownTicks = Math.max(0, boundaryTriggerCooldownTicks);
-			passiveHeatPerSecond = MathHelper.clamp(passiveHeatPerSecond, -100.0, 100.0);
+			double defaultPassiveHeatPerSecond = defaults == null || defaults.passiveHeatPerSecond == null ? 0.0 : defaults.passiveHeatPerSecond;
+			passiveHeatPerSecond = MathHelper.clamp(passiveHeatPerSecond == null ? defaultPassiveHeatPerSecond : passiveHeatPerSecond, -100.0, 100.0);
 			auraFlameParticleCount = Math.max(0, auraFlameParticleCount);
 			auraSmokeParticleCount = Math.max(0, auraSmokeParticleCount);
-			waterHeatPerSecond = MathHelper.clamp(waterHeatPerSecond, -100.0, 100.0);
+			double defaultWaterHeatPerSecond = defaults == null || defaults.waterHeatPerSecond == null ? 0.0 : defaults.waterHeatPerSecond;
+			waterHeatPerSecond = MathHelper.clamp(waterHeatPerSecond == null ? defaultWaterHeatPerSecond : waterHeatPerSecond, -100.0, 100.0);
 			extraStepHeightBlocks = MathHelper.clamp(extraStepHeightBlocks, 0.0, 10.0);
 		}
 	}

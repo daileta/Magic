@@ -714,10 +714,13 @@ public final class MagicAbilityManager {
 	private static final Set<UUID> CASSIOPEIA_PASSIVE_ENABLED = new HashSet<>();
 	private static final Map<UUID, Set<UUID>> CASSIOPEIA_LAST_OUTLINED_PLAYERS = new HashMap<>();
 	private static final Map<UUID, FrostbiteState> FROSTBITTEN_TARGETS = new HashMap<>();
+	private static final Map<UUID, FrostbiteState> FROST_DOMAIN_FROSTBITTEN_TARGETS = new HashMap<>();
+	private static final Map<UUID, FrostDomainPulseStatusState> FROST_DOMAIN_PULSE_STATUS_TARGETS = new HashMap<>();
 	private static final Map<UUID, FrostStageState> FROST_STAGE_STATES = new HashMap<>();
 	private static final Map<UUID, FrostMaximumState> FROST_MAXIMUM_STATES = new HashMap<>();
 	private static final List<FrostSpikeWaveState> FROST_SPIKE_WAVES = new ArrayList<>();
 	private static final Map<UUID, FrostFreezeState> FROST_FROZEN_TARGETS = new HashMap<>();
+	private static final Map<UUID, FrostFreezeState> FROST_DOMAIN_FROZEN_TARGETS = new HashMap<>();
 	private static final Map<UUID, FrostFearState> FROST_MAXIMUM_FEAR_TARGETS = new HashMap<>();
 	private static final Map<UUID, FrostHelplessState> FROST_HELPLESS_TARGETS = new HashMap<>();
 	private static final Map<UUID, FrostPackedIceState> FROST_PACKED_ICE_TARGETS = new HashMap<>();
@@ -2733,7 +2736,7 @@ public final class MagicAbilityManager {
 				}
 
 				state.nextHitTickByTarget.put(target.getUuid(), currentTick + BURNING_PASSION_CONFIG.phoenixsCage.hitCooldownTicks);
-				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().onFire(), BURNING_PASSION_CONFIG.phoenixsCage.collisionTrueDamage);
+				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().magic(), BURNING_PASSION_CONFIG.phoenixsCage.collisionTrueDamage);
 				target.setOnFireForTicks(BURNING_PASSION_CONFIG.phoenixsCage.fireDurationTicks);
 				world.spawnParticles(
 					ParticleTypes.FLAME,
@@ -2943,13 +2946,14 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean isTargetTouchingPhoenixsCageLine(ServerPlayerEntity target, PhoenixsCageLineState state) {
-		Vec3d targetPos = new Vec3d(target.getX(), target.getBodyY(0.15), target.getZ());
 		double radius = Math.max(0.1, BURNING_PASSION_CONFIG.phoenixsCage.collisionRadius);
 		double radiusSq = radius * radius;
+		Box collisionBox = target.getBoundingBox().expand(radius);
+		Vec3d targetFeetPos = new Vec3d(target.getX(), target.getY() + 0.05, target.getZ());
 		for (int index = 1; index < state.points.size(); index++) {
 			Vec3d start = state.points.get(index - 1);
 			Vec3d end = state.points.get(index);
-			if (squaredDistanceToSegment(targetPos, start, end) <= radiusSq) {
+			if (collisionBox.raycast(start, end).isPresent() || squaredDistanceToSegment(targetFeetPos, start, end) <= radiusSq) {
 				return true;
 			}
 		}
@@ -4687,7 +4691,20 @@ public final class MagicAbilityManager {
 	}
 
 	private static void applyFrostFreeze(LivingEntity target, UUID casterId, int expiresTick) {
-		FROST_FROZEN_TARGETS.put(
+		storeFrostFreezeState(FROST_FROZEN_TARGETS, target, casterId, expiresTick);
+	}
+
+	private static void applyDomainFrostFreeze(LivingEntity target, UUID casterId, int expiresTick) {
+		storeFrostFreezeState(FROST_DOMAIN_FROZEN_TARGETS, target, casterId, expiresTick);
+	}
+
+	private static void storeFrostFreezeState(
+		Map<UUID, FrostFreezeState> targetStates,
+		LivingEntity target,
+		UUID casterId,
+		int expiresTick
+	) {
+		targetStates.put(
 			target.getUuid(),
 			new FrostFreezeState(
 				target.getEntityWorld().getRegistryKey(),
@@ -4765,7 +4782,17 @@ public final class MagicAbilityManager {
 	}
 
 	private static void updateFrostFrozenTargets(MinecraftServer server, int currentTick) {
-		Iterator<Map.Entry<UUID, FrostFreezeState>> iterator = FROST_FROZEN_TARGETS.entrySet().iterator();
+		updateFrostFrozenTargetStates(server, currentTick, FROST_FROZEN_TARGETS, false);
+		updateFrostFrozenTargetStates(server, currentTick, FROST_DOMAIN_FROZEN_TARGETS, true);
+	}
+
+	private static void updateFrostFrozenTargetStates(
+		MinecraftServer server,
+		int currentTick,
+		Map<UUID, FrostFreezeState> targetStates,
+		boolean suppressDuringClash
+	) {
+		Iterator<Map.Entry<UUID, FrostFreezeState>> iterator = targetStates.entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<UUID, FrostFreezeState> entry = iterator.next();
 			FrostFreezeState state = entry.getValue();
@@ -4776,6 +4803,10 @@ public final class MagicAbilityManager {
 			}
 			Entity entity = world.getEntity(entry.getKey());
 			if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+			if (suppressDuringClash && isDomainExpansionEffectSuppressedByClash(state.casterId)) {
 				iterator.remove();
 				continue;
 			}
@@ -4884,7 +4915,9 @@ public final class MagicAbilityManager {
 	private static void clearFrostEffectsByCaster(UUID casterId, boolean clearMaximumEffects, MinecraftServer server) {
 		FROST_SPIKE_WAVES.removeIf(state -> casterId.equals(state.casterId));
 		FROSTBITTEN_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
+		FROST_DOMAIN_FROSTBITTEN_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
 		FROST_FROZEN_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
+		FROST_DOMAIN_FROZEN_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
 		if (clearMaximumEffects) {
 			FROST_MAXIMUM_FEAR_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
 			Iterator<Map.Entry<UUID, FrostPackedIceState>> iterator = FROST_PACKED_ICE_TARGETS.entrySet().iterator();
@@ -4909,6 +4942,8 @@ public final class MagicAbilityManager {
 
 	private static void clearFrostControlledTargetState(UUID targetId, MinecraftServer server) {
 		FROST_FROZEN_TARGETS.remove(targetId);
+		FROST_DOMAIN_FROZEN_TARGETS.remove(targetId);
+		FROST_DOMAIN_PULSE_STATUS_TARGETS.remove(targetId);
 		FROST_MAXIMUM_FEAR_TARGETS.remove(targetId);
 		FROST_HELPLESS_TARGETS.remove(targetId);
 		FrostPackedIceState packedIceState = FROST_PACKED_ICE_TARGETS.remove(targetId);
@@ -5591,6 +5626,9 @@ public final class MagicAbilityManager {
 
 	private static boolean isFrostFrozen(LivingEntity entity) {
 		FrostFreezeState state = FROST_FROZEN_TARGETS.get(entity.getUuid());
+		if (state == null || state.dimension != entity.getEntityWorld().getRegistryKey()) {
+			state = FROST_DOMAIN_FROZEN_TARGETS.get(entity.getUuid());
+		}
 		return state != null && state.dimension == entity.getEntityWorld().getRegistryKey();
 	}
 
@@ -6472,10 +6510,10 @@ public final class MagicAbilityManager {
 
 		for (LivingEntity target : collectLivingEntitiesInsideDomain(world, state, ownerId)) {
 			if (FROST_CONFIG.domain.applySlowness && pulseDurationTicks > 0 && pulseAmplifier >= 0) {
-				refreshStatusEffect(target, StatusEffects.SLOWNESS, pulseDurationTicks, pulseAmplifier, true, true, true);
+				refreshTrackedFrostDomainSlowness(target, ownerId, currentTick, pulseDurationTicks, pulseAmplifier);
 			}
 			if (FROST_CONFIG.domain.applyFrost && pulseDurationTicks > 0 && FROST_CONFIG.domain.frostDamagePerTick > 0.0F) {
-				applyOrRefreshFrostbite(
+				applyOrRefreshDomainFrostbite(
 					target,
 					ownerId,
 					currentTick,
@@ -6486,10 +6524,10 @@ public final class MagicAbilityManager {
 				);
 			}
 			if (FROST_CONFIG.domain.applyBlindness && blindnessDurationTicks > 0) {
-				refreshStatusEffect(target, StatusEffects.BLINDNESS, blindnessDurationTicks, 0, true, true, true);
+				refreshTrackedFrostDomainBlindness(target, ownerId, currentTick, blindnessDurationTicks);
 			}
 			if (FROST_CONFIG.domain.applyFreeze && freezeDurationTicks > 0) {
-				applyFrostFreeze(target, ownerId, currentTick + freezeDurationTicks);
+				applyDomainFrostFreeze(target, ownerId, currentTick + freezeDurationTicks);
 			}
 			world.spawnParticles(ParticleTypes.SNOWFLAKE, target.getX(), target.getBodyY(0.5), target.getZ(), 10, 0.3, 0.6, 0.3, 0.03);
 			world.spawnParticles(ParticleTypes.WHITE_ASH, target.getX(), target.getBodyY(0.5), target.getZ(), 6, 0.25, 0.5, 0.25, 0.02);
@@ -7757,10 +7795,14 @@ public final class MagicAbilityManager {
 		GREED_DOMAIN_COOLDOWN_END_TICK.clear();
 		MAGIC_DAMAGE_PENDING_ATTACKER.clear();
 		DOMAIN_PENDING_RETURNS.clear();
+		FROSTBITTEN_TARGETS.clear();
+		FROST_DOMAIN_FROSTBITTEN_TARGETS.clear();
+		FROST_DOMAIN_PULSE_STATUS_TARGETS.clear();
 		FROST_STAGE_STATES.clear();
 		FROST_MAXIMUM_STATES.clear();
 		FROST_SPIKE_WAVES.clear();
 		FROST_FROZEN_TARGETS.clear();
+		FROST_DOMAIN_FROZEN_TARGETS.clear();
 		FROST_MAXIMUM_FEAR_TARGETS.clear();
 		FROST_HELPLESS_TARGETS.clear();
 		FROST_PACKED_ICE_TARGETS.clear();
@@ -8240,6 +8282,7 @@ public final class MagicAbilityManager {
 		updateFrostSpikeWaves(server, currentTick);
 		updateFrostbittenTargets(server, currentTick);
 		updateFrostFrozenTargets(server, currentTick);
+		updateFrostDomainPulseStatusTargets(server, currentTick);
 		updateFrostMaximumFearTargets(server, currentTick);
 		updateFrostPackedIceTargets(server, currentTick);
 		updateFrostHelplessTargets(server, currentTick);
@@ -14174,10 +14217,53 @@ public final class MagicAbilityManager {
 		boolean refreshDuration,
 		boolean stackDamage
 	) {
+		storeOrRefreshFrostbiteState(
+			FROSTBITTEN_TARGETS,
+			target,
+			casterId,
+			currentTick,
+			durationTicks,
+			damagePerTick,
+			refreshDuration,
+			stackDamage
+		);
+	}
+
+	private static void applyOrRefreshDomainFrostbite(
+		LivingEntity target,
+		UUID casterId,
+		int currentTick,
+		int durationTicks,
+		float damagePerTick,
+		boolean refreshDuration,
+		boolean stackDamage
+	) {
+		storeOrRefreshFrostbiteState(
+			FROST_DOMAIN_FROSTBITTEN_TARGETS,
+			target,
+			casterId,
+			currentTick,
+			durationTicks,
+			damagePerTick,
+			refreshDuration,
+			stackDamage
+		);
+	}
+
+	private static void storeOrRefreshFrostbiteState(
+		Map<UUID, FrostbiteState> targetStates,
+		LivingEntity target,
+		UUID casterId,
+		int currentTick,
+		int durationTicks,
+		float damagePerTick,
+		boolean refreshDuration,
+		boolean stackDamage
+	) {
 		UUID targetId = target.getUuid();
 		RegistryKey<World> dimension = target.getEntityWorld().getRegistryKey();
 		int expiresTick = currentTick + Math.max(0, durationTicks);
-		FrostbiteState state = FROSTBITTEN_TARGETS.get(targetId);
+		FrostbiteState state = targetStates.get(targetId);
 		boolean newApplication = false;
 		if (state == null || state.dimension != dimension) {
 			state = new FrostbiteState(
@@ -14187,7 +14273,7 @@ public final class MagicAbilityManager {
 				currentTick + FROSTBITE_DAMAGE_INTERVAL_TICKS,
 				Math.max(0.0F, damagePerTick)
 			);
-			FROSTBITTEN_TARGETS.put(targetId, state);
+			targetStates.put(targetId, state);
 			newApplication = true;
 		} else {
 			state.casterId = casterId;
@@ -14208,7 +14294,17 @@ public final class MagicAbilityManager {
 	}
 
 	private static void updateFrostbittenTargets(MinecraftServer server, int currentTick) {
-		Iterator<Map.Entry<UUID, FrostbiteState>> iterator = FROSTBITTEN_TARGETS.entrySet().iterator();
+		updateFrostbiteTargetStates(server, currentTick, FROSTBITTEN_TARGETS, false);
+		updateFrostbiteTargetStates(server, currentTick, FROST_DOMAIN_FROSTBITTEN_TARGETS, true);
+	}
+
+	private static void updateFrostbiteTargetStates(
+		MinecraftServer server,
+		int currentTick,
+		Map<UUID, FrostbiteState> targetStates,
+		boolean suppressDuringClash
+	) {
+		Iterator<Map.Entry<UUID, FrostbiteState>> iterator = targetStates.entrySet().iterator();
 
 		while (iterator.hasNext()) {
 			Map.Entry<UUID, FrostbiteState> entry = iterator.next();
@@ -14230,6 +14326,10 @@ public final class MagicAbilityManager {
 				iterator.remove();
 				continue;
 			}
+			if (suppressDuringClash && isDomainExpansionEffectSuppressedByClash(state.casterId)) {
+				iterator.remove();
+				continue;
+			}
 
 			applyFrostbiteControlEffects(target);
 			spawnTargetSnowParticles(target);
@@ -14239,6 +14339,139 @@ public final class MagicAbilityManager {
 				state.nextDamageTick = currentTick + FROSTBITE_DAMAGE_INTERVAL_TICKS;
 			}
 		}
+	}
+
+	private static void updateFrostDomainPulseStatusTargets(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, FrostDomainPulseStatusState>> iterator = FROST_DOMAIN_PULSE_STATUS_TARGETS.entrySet().iterator();
+
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, FrostDomainPulseStatusState> entry = iterator.next();
+			FrostDomainPulseStatusState state = entry.getValue();
+			ServerWorld world = server.getWorld(state.dimension);
+
+			if (world == null) {
+				iterator.remove();
+				continue;
+			}
+
+			Entity entity = world.getEntity(entry.getKey());
+			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+
+			boolean slownessActive = currentTick <= state.slownessExpiresTick;
+			boolean blindnessActive = currentTick <= state.blindnessExpiresTick;
+			if (!slownessActive && !blindnessActive) {
+				iterator.remove();
+				continue;
+			}
+
+			if (!isDomainExpansionEffectSuppressedByClash(state.casterId)) {
+				continue;
+			}
+
+			removeTrackedFrostDomainStatusEffect(
+				target,
+				StatusEffects.SLOWNESS,
+				state.slownessAmplifier,
+				Math.max(0, state.slownessExpiresTick - currentTick)
+			);
+			removeTrackedFrostDomainStatusEffect(
+				target,
+				StatusEffects.BLINDNESS,
+				state.blindnessAmplifier,
+				Math.max(0, state.blindnessExpiresTick - currentTick)
+			);
+			iterator.remove();
+		}
+	}
+
+	private static boolean isDomainExpansionEffectSuppressedByClash(UUID casterId) {
+		return DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS && domainClashStateForParticipant(casterId) != null;
+	}
+
+	private static void refreshTrackedFrostDomainSlowness(
+		LivingEntity target,
+		UUID casterId,
+		int currentTick,
+		int durationTicks,
+		int amplifier
+	) {
+		refreshStatusEffect(target, StatusEffects.SLOWNESS, durationTicks, amplifier, true, true, true);
+		StatusEffectInstance existing = target.getStatusEffect(StatusEffects.SLOWNESS);
+		if (
+			existing == null
+			|| existing.getAmplifier() != amplifier
+			|| !existing.isAmbient()
+			|| !existing.shouldShowParticles()
+			|| !existing.shouldShowIcon()
+			|| existing.getDuration() > durationTicks + 2
+			|| existing.getDuration() < Math.max(0, durationTicks - 2)
+		) {
+			return;
+		}
+		FrostDomainPulseStatusState state = getOrCreateFrostDomainPulseStatusState(target, casterId);
+		state.slownessAmplifier = amplifier;
+		state.slownessExpiresTick = currentTick + durationTicks;
+	}
+
+	private static void refreshTrackedFrostDomainBlindness(
+		LivingEntity target,
+		UUID casterId,
+		int currentTick,
+		int durationTicks
+	) {
+		refreshStatusEffect(target, StatusEffects.BLINDNESS, durationTicks, 0, true, true, true);
+		StatusEffectInstance existing = target.getStatusEffect(StatusEffects.BLINDNESS);
+		if (
+			existing == null
+			|| existing.getAmplifier() != 0
+			|| !existing.isAmbient()
+			|| !existing.shouldShowParticles()
+			|| !existing.shouldShowIcon()
+			|| existing.getDuration() > durationTicks + 2
+			|| existing.getDuration() < Math.max(0, durationTicks - 2)
+		) {
+			return;
+		}
+		FrostDomainPulseStatusState state = getOrCreateFrostDomainPulseStatusState(target, casterId);
+		state.blindnessAmplifier = 0;
+		state.blindnessExpiresTick = currentTick + durationTicks;
+	}
+
+	private static FrostDomainPulseStatusState getOrCreateFrostDomainPulseStatusState(LivingEntity target, UUID casterId) {
+		UUID targetId = target.getUuid();
+		RegistryKey<World> dimension = target.getEntityWorld().getRegistryKey();
+		FrostDomainPulseStatusState state = FROST_DOMAIN_PULSE_STATUS_TARGETS.get(targetId);
+		if (state == null || state.dimension != dimension || !state.casterId.equals(casterId)) {
+			state = new FrostDomainPulseStatusState(dimension, casterId);
+			FROST_DOMAIN_PULSE_STATUS_TARGETS.put(targetId, state);
+		}
+		return state;
+	}
+
+	private static void removeTrackedFrostDomainStatusEffect(
+		LivingEntity target,
+		RegistryEntry<StatusEffect> effect,
+		int amplifier,
+		int expectedRemainingDuration
+	) {
+		if (amplifier < 0) {
+			return;
+		}
+		StatusEffectInstance existing = target.getStatusEffect(effect);
+		if (
+			existing == null
+			|| existing.getAmplifier() != amplifier
+			|| !existing.isAmbient()
+			|| !existing.shouldShowParticles()
+			|| !existing.shouldShowIcon()
+			|| existing.getDuration() > expectedRemainingDuration + 2
+		) {
+			return;
+		}
+		target.removeStatusEffect(effect);
 	}
 
 	private static void applyOrRefreshEnhancedFire(LivingEntity target, UUID casterId, int currentTick, int durationTicks) {
@@ -16641,6 +16874,9 @@ public final class MagicAbilityManager {
 		SPOTLIGHT_PASSIVE_ENABLED.remove(playerId);
 		COMEDIC_REWRITE_PASSIVE_ENABLED.remove(playerId);
 		FROSTBITTEN_TARGETS.remove(playerId);
+		FROST_DOMAIN_FROSTBITTEN_TARGETS.remove(playerId);
+		FROST_DOMAIN_PULSE_STATUS_TARGETS.remove(playerId);
+		FROST_DOMAIN_FROZEN_TARGETS.remove(playerId);
 		ENHANCED_FIRE_TARGETS.remove(playerId);
 		LOVE_LOCKED_TARGETS.remove(playerId);
 		TILL_DEATH_DO_US_PART_STATES.remove(playerId);
@@ -17773,6 +18009,24 @@ public final class MagicAbilityManager {
 			this.expiresTick = expiresTick;
 			this.nextDamageTick = nextDamageTick;
 			this.damagePerTick = damagePerTick;
+		}
+	}
+
+	private static final class FrostDomainPulseStatusState {
+		private final RegistryKey<World> dimension;
+		private final UUID casterId;
+		private int slownessAmplifier;
+		private int slownessExpiresTick;
+		private int blindnessAmplifier;
+		private int blindnessExpiresTick;
+
+		private FrostDomainPulseStatusState(RegistryKey<World> dimension, UUID casterId) {
+			this.dimension = dimension;
+			this.casterId = casterId;
+			this.slownessAmplifier = -1;
+			this.slownessExpiresTick = Integer.MIN_VALUE;
+			this.blindnessAmplifier = -1;
+			this.blindnessExpiresTick = Integer.MIN_VALUE;
 		}
 	}
 
