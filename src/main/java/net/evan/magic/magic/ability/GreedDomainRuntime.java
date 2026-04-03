@@ -415,7 +415,9 @@ final class GreedDomainRuntime {
 		MinecraftServer server = player.getEntityWorld().getServer();
 		removeDisplaysForTarget(server, player.getUuid());
 		removeDisplaysOwnedBy(server, player.getUuid());
+		clearDeathEndedDebtPenalties(player.getUuid());
 		removePersistentMarksOwnedBy(player.getUuid());
+		removePenaltyAttributeModifiers(player);
 	}
 
 	static void clearAllRuntimeState(ServerPlayerEntity player) {
@@ -1438,6 +1440,20 @@ final class GreedDomainRuntime {
 		}
 	}
 
+	private static void clearDeathEndedDebtPenalties(UUID targetId) {
+		ArrayList<DebtPenaltyState> penalties = DEBT_PENALTIES.get(targetId);
+		if (penalties == null || penalties.isEmpty()) {
+			return;
+		}
+		penalties.removeIf(state -> {
+			state.clearStatPenalty();
+			return !state.hasAnyTimedEffect();
+		});
+		if (penalties.isEmpty()) {
+			DEBT_PENALTIES.remove(targetId);
+		}
+	}
+
 	private static void removePenaltyAttributeModifiers(ServerPlayerEntity player) {
 		removePenaltyAttributeModifier(player.getAttributeInstance(EntityAttributes.ATTACK_DAMAGE), GREED_ATTACK_DAMAGE_MODIFIER_ID);
 		removePenaltyAttributeModifier(player.getAttributeInstance(EntityAttributes.ARMOR), GREED_ARMOR_MODIFIER_ID);
@@ -2081,6 +2097,17 @@ final class GreedDomainRuntime {
 		private double knockbackResistanceMultiplier = 1.0;
 		private double scaleMultiplier = 1.0;
 		private int statPenaltyEndTick;
+
+		private void clearStatPenalty() {
+			outgoingDamageMultiplier = 1.0;
+			armorEffectivenessMultiplier = 1.0;
+			movementSpeedMultiplier = 1.0;
+			attackSpeedMultiplier = 1.0;
+			maxHealthMultiplier = 1.0;
+			knockbackResistanceMultiplier = 1.0;
+			scaleMultiplier = 1.0;
+			statPenaltyEndTick = 0;
+		}
 
 		private boolean hasAnyTimedEffect() {
 			return manaRegenEndTick > 0

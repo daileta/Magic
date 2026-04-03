@@ -46,6 +46,7 @@ import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.EntityPosition;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ExperienceOrbEntity;
@@ -3585,6 +3586,28 @@ public final class MagicAbilityManager {
 	}
 
 	private static void updatePlusUltraPose(ServerPlayerEntity player, boolean shouldUseFlyingPose) {
+		EntityPose desiredPose = shouldUseFlyingPose && PLUS_ULTRA_ELYTRA_POSE_WHILE_FLYING && !player.isSpectator()
+			? EntityPose.GLIDING
+			: defaultPlusUltraPose(player);
+		if (player.getPose() != desiredPose) {
+			player.setPose(desiredPose);
+		}
+	}
+
+	private static EntityPose defaultPlusUltraPose(ServerPlayerEntity player) {
+		if (player.isSleeping()) {
+			return EntityPose.SLEEPING;
+		}
+		if (player.isSwimming()) {
+			return EntityPose.SWIMMING;
+		}
+		if (player.isGliding()) {
+			return EntityPose.GLIDING;
+		}
+		if (player.isUsingRiptide()) {
+			return EntityPose.SPIN_ATTACK;
+		}
+		return player.isSneaking() && !player.getAbilities().flying ? EntityPose.CROUCHING : EntityPose.STANDING;
 	}
 
 	private static PlusUltraState clearPlusUltraRuntimeState(ServerPlayerEntity player, boolean clearOutlinePayload) {
@@ -8919,7 +8942,7 @@ public final class MagicAbilityManager {
 			return;
 		}
 		if (!linkedPlayer.isAlive()) {
-			caster.setHealth(0.0F);
+			dealTrackedMagicDamage(caster, state.linkedPlayerId, caster.getDamageSources().magic(), Float.MAX_VALUE);
 			deactivateTillDeathDoUsPart(caster, TillDeathDoUsPartEndReason.LINK_TARGET_DIED, false);
 			return;
 		}
@@ -14309,13 +14332,21 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		DamageSource resolvedSource = resolveTrackedMagicDamageSource(target, source, world);
 		UUID targetId = target.getUuid();
 		MAGIC_DAMAGE_PENDING_ATTACKER.put(targetId, casterId);
 		try {
-			target.damage(world, source, amount);
+			target.damage(world, resolvedSource, amount);
 		} finally {
 			MAGIC_DAMAGE_PENDING_ATTACKER.remove(targetId, casterId);
 		}
+	}
+
+	private static DamageSource resolveTrackedMagicDamageSource(LivingEntity target, DamageSource source, ServerWorld world) {
+		if (!(target instanceof ServerPlayerEntity) || !source.isIn(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+			return source;
+		}
+		return world.getDamageSources().magic();
 	}
 
 	private static void cleanseCommonNegativeEffects(LivingEntity entity) {
@@ -16707,7 +16738,7 @@ public final class MagicAbilityManager {
 		if (reason == TillDeathDoUsPartEndReason.CASTER_DIED) {
 			ServerPlayerEntity linkedPlayer = player.getEntityWorld().getServer().getPlayerManager().getPlayer(state.linkedPlayerId);
 			if (linkedPlayer != null && linkedPlayer.isAlive()) {
-				linkedPlayer.setHealth(0.0F);
+				dealTrackedMagicDamage(linkedPlayer, casterId, linkedPlayer.getDamageSources().magic(), Float.MAX_VALUE);
 			}
 		}
 
