@@ -1703,9 +1703,13 @@ public final class MagicAbilityManager {
 			state.auraPlayersInside.clear();
 		}
 
-		double passiveHeatPerTick = stageConfig.passiveHeatPerSecond <= 0.0 ? 0.0 : stageConfig.passiveHeatPerSecond / TICKS_PER_SECOND;
-		if (passiveHeatPerTick > 0.0) {
-			state.heatPercent = Math.min(BURNING_PASSION_CONFIG.heat.overheatThresholdPercent, state.heatPercent + passiveHeatPerTick);
+		double passiveHeatPerTick = stageConfig.passiveHeatPerSecond / TICKS_PER_SECOND;
+		if (Math.abs(passiveHeatPerTick) > 1.0E-6) {
+			state.heatPercent = MathHelper.clamp(
+				state.heatPercent + passiveHeatPerTick,
+				0.0,
+				BURNING_PASSION_CONFIG.heat.overheatThresholdPercent
+			);
 		}
 		if (stageConfig.waterHeatPerSecond != 0.0 && isBurningPassionCoolingInWater(player)) {
 			state.heatPercent = MathHelper.clamp(
@@ -1813,6 +1817,8 @@ public final class MagicAbilityManager {
 				player.getUuid(),
 				currentTick,
 				stageConfig.fireDamagePerTick,
+				stageConfig.fireResistantTargetDamageMultiplier,
+				stageConfig.fireDamageIgnoresFireResistance,
 				stageConfig.fireDamageIntervalTicks,
 				stageConfig.fireRefreshTicks,
 				stageConfig.persistentFireUntilExtinguished,
@@ -2065,6 +2071,8 @@ public final class MagicAbilityManager {
 		UUID casterId,
 		int currentTick,
 		float damagePerTick,
+		double fireResistantTargetDamageMultiplier,
+		boolean fireDamageIgnoresFireResistance,
 		int damageIntervalTicks,
 		int refreshTicks,
 		boolean persistent,
@@ -2091,6 +2099,8 @@ public final class MagicAbilityManager {
 					expiresTick,
 					currentTick + Math.max(1, damageIntervalTicks),
 					Math.max(0.0F, damagePerTick),
+					Math.max(0.0, fireResistantTargetDamageMultiplier),
+					fireDamageIgnoresFireResistance,
 					Math.max(1, damageIntervalTicks),
 					refreshTicks,
 					persistent,
@@ -2101,6 +2111,11 @@ public final class MagicAbilityManager {
 			existingState.casterId = casterId;
 			existingState.expiresTick = Math.max(existingState.expiresTick, expiresTick);
 			existingState.damagePerTick = Math.max(existingState.damagePerTick, Math.max(0.0F, damagePerTick));
+			existingState.fireResistantTargetDamageMultiplier = Math.max(
+				existingState.fireResistantTargetDamageMultiplier,
+				Math.max(0.0, fireResistantTargetDamageMultiplier)
+			);
+			existingState.fireDamageIgnoresFireResistance = existingState.fireDamageIgnoresFireResistance || fireDamageIgnoresFireResistance;
 			existingState.damageIntervalTicks = Math.max(1, damageIntervalTicks);
 			existingState.refreshTicks = Math.max(1, refreshTicks);
 			existingState.persistent = existingState.persistent || persistent;
@@ -2131,6 +2146,8 @@ public final class MagicAbilityManager {
 					expiresTick,
 					currentTick + intervalTicks,
 					damagePerTick,
+					Math.max(0.0, BURNING_PASSION_CONFIG.heat.selfFireResistantDamageMultiplier),
+					BURNING_PASSION_CONFIG.heat.selfFireIgnoresFireResistance,
 					intervalTicks,
 					durationTicks,
 					false,
@@ -2140,6 +2157,11 @@ public final class MagicAbilityManager {
 		} else {
 			existingState.expiresTick = Math.max(existingState.expiresTick, expiresTick);
 			existingState.damagePerTick = Math.max(existingState.damagePerTick, damagePerTick);
+			existingState.fireResistantTargetDamageMultiplier = Math.max(
+				existingState.fireResistantTargetDamageMultiplier,
+				Math.max(0.0, BURNING_PASSION_CONFIG.heat.selfFireResistantDamageMultiplier)
+			);
+			existingState.fireDamageIgnoresFireResistance = existingState.fireDamageIgnoresFireResistance || BURNING_PASSION_CONFIG.heat.selfFireIgnoresFireResistance;
 			existingState.damageIntervalTicks = intervalTicks;
 			existingState.refreshTicks = durationTicks;
 			existingState.extinguishWhenWet = extinguishWhenWet;
@@ -2188,10 +2210,43 @@ public final class MagicAbilityManager {
 				: Math.max(target.getFireTicks(), Math.max(1, state.expiresTick - currentTick + 1));
 			target.setFireTicks(fireTicks);
 			if (state.damagePerTick > 0.0F && currentTick >= state.nextDamageTick) {
-				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().onFire(), state.damagePerTick);
+				dealBurningPassionFireDamage(
+					target,
+					state.casterId,
+					world,
+					state.damagePerTick,
+					state.fireResistantTargetDamageMultiplier,
+					state.fireDamageIgnoresFireResistance
+				);
 				state.nextDamageTick = currentTick + state.damageIntervalTicks;
 			}
 		}
+	}
+
+	private static void dealBurningPassionFireDamage(
+		LivingEntity target,
+		UUID casterId,
+		ServerWorld world,
+		float damagePerTick,
+		double fireResistantTargetDamageMultiplier,
+		boolean fireDamageIgnoresFireResistance
+	) {
+		if (damagePerTick <= 0.0F) {
+			return;
+		}
+		boolean fireResistant = target.hasStatusEffect(StatusEffects.FIRE_RESISTANCE);
+		float resolvedDamage = damagePerTick;
+		DamageSource source = world.getDamageSources().onFire();
+		if (fireResistant) {
+			resolvedDamage = (float) (resolvedDamage * Math.max(0.0, fireResistantTargetDamageMultiplier));
+			if (resolvedDamage <= 0.0F) {
+				return;
+			}
+			if (fireDamageIgnoresFireResistance || Math.abs(fireResistantTargetDamageMultiplier - 1.0) > 1.0E-6) {
+				source = world.getDamageSources().magic();
+			}
+		}
+		dealTrackedMagicDamage(target, casterId, source, resolvedDamage);
 	}
 
 	private static void applyBurningPassionFastestState(
@@ -2371,7 +2426,14 @@ public final class MagicAbilityManager {
 				0.01
 			);
 			if (currentTick >= state.nextDamageTick) {
-				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().onFire(), state.damagePerTick);
+				dealBurningPassionFireDamage(
+					target,
+					state.casterId,
+					world,
+					state.damagePerTick,
+					BURNING_PASSION_CONFIG.imTheFastestThereIs.deathfireResistantDamageMultiplier,
+					BURNING_PASSION_CONFIG.imTheFastestThereIs.deathfireIgnoresFireResistance
+				);
 				state.nextDamageTick = currentTick + state.damageIntervalTicks;
 			}
 		}
@@ -17344,6 +17406,8 @@ public final class MagicAbilityManager {
 		private int expiresTick;
 		private int nextDamageTick;
 		private float damagePerTick;
+		private double fireResistantTargetDamageMultiplier;
+		private boolean fireDamageIgnoresFireResistance;
 		private int damageIntervalTicks;
 		private int refreshTicks;
 		private boolean persistent;
@@ -17355,6 +17419,8 @@ public final class MagicAbilityManager {
 			int expiresTick,
 			int nextDamageTick,
 			float damagePerTick,
+			double fireResistantTargetDamageMultiplier,
+			boolean fireDamageIgnoresFireResistance,
 			int damageIntervalTicks,
 			int refreshTicks,
 			boolean persistent,
@@ -17365,6 +17431,8 @@ public final class MagicAbilityManager {
 			this.expiresTick = expiresTick;
 			this.nextDamageTick = nextDamageTick;
 			this.damagePerTick = damagePerTick;
+			this.fireResistantTargetDamageMultiplier = fireResistantTargetDamageMultiplier;
+			this.fireDamageIgnoresFireResistance = fireDamageIgnoresFireResistance;
 			this.damageIntervalTicks = damageIntervalTicks;
 			this.refreshTicks = refreshTicks;
 			this.persistent = persistent;

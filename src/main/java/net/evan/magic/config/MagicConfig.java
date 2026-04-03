@@ -615,9 +615,11 @@ public final class MagicConfig {
 			config.auraEnabled = true;
 			config.auraRadius = 15.0;
 			config.fireDamagePerTick = 0.25F;
+			config.fireResistantTargetDamageMultiplier = 0.0;
 			config.speedAmplifier = 1;
 			config.boundaryHeatGainPercent = 1.5;
 			config.boundaryTriggerCooldownTicks = 2 * 20;
+			config.passiveHeatPerSecond = -1.5;
 			config.waterHeatPerSecond = -0.5;
 			return config;
 		}
@@ -627,12 +629,14 @@ public final class MagicConfig {
 			config.auraEnabled = true;
 			config.auraRadius = 5.0;
 			config.fireDamagePerTick = 0.5F;
+			config.fireResistantTargetDamageMultiplier = 0.5;
 			config.speedAmplifier = 4;
 			config.strengthAmplifier = 2;
 			config.regenerationAmplifier = 0;
 			config.boundaryHeatGainPercent = 5.0;
 			config.boundaryTriggerCooldownTicks = 2 * 20;
 			config.persistentFireUntilExtinguished = true;
+			config.waterHeatPerSecond = -0.5;
 			config.extraStepHeightBlocks = 1.0;
 			return config;
 		}
@@ -640,6 +644,7 @@ public final class MagicConfig {
 		private static BurningPassionStageConfig defaultStageThree() {
 			BurningPassionStageConfig config = new BurningPassionStageConfig();
 			config.auraEnabled = false;
+			config.fireDamageIgnoresFireResistance = true;
 			config.speedAmplifier = 9;
 			config.strengthAmplifier = 2;
 			config.regenerationAmplifier = 1;
@@ -746,6 +751,8 @@ public final class MagicConfig {
 		public int selfFireDurationTicks = 40;
 		public int selfFireDamageIntervalTicks = 10;
 		public float selfFireDamagePerTick = 0.25F;
+		public double selfFireResistantDamageMultiplier = 1.0;
+		public boolean selfFireIgnoresFireResistance = true;
 		public boolean selfFireExtinguishesWhenWetBeforeStageThree = true;
 		public double minimumRemainingHealthHearts = 1.0;
 		public double ignitionHealthCostHearts = 0.0;
@@ -761,6 +768,7 @@ public final class MagicConfig {
 			selfFireDurationTicks = Math.max(1, selfFireDurationTicks);
 			selfFireDamageIntervalTicks = Math.max(1, selfFireDamageIntervalTicks);
 			selfFireDamagePerTick = Math.max(0.0F, selfFireDamagePerTick);
+			selfFireResistantDamageMultiplier = Math.max(0.0, selfFireResistantDamageMultiplier);
 			minimumRemainingHealthHearts = Math.max(0.5, minimumRemainingHealthHearts);
 			ignitionHealthCostHearts = Math.max(0.0, ignitionHealthCostHearts);
 			phoenixsCageHealthCostHearts = Math.max(0.0, phoenixsCageHealthCostHearts);
@@ -799,6 +807,8 @@ public final class MagicConfig {
 		public int fireRefreshTicks = 40;
 		public int fireDamageIntervalTicks = 10;
 		public float fireDamagePerTick = 0.0F;
+		public double fireResistantTargetDamageMultiplier = 1.0;
+		public boolean fireDamageIgnoresFireResistance = false;
 		public boolean persistentFireUntilExtinguished = false;
 		public boolean extinguishWhenWet = true;
 		public int speedAmplifier = -1;
@@ -817,12 +827,13 @@ public final class MagicConfig {
 			fireRefreshTicks = Math.max(1, fireRefreshTicks);
 			fireDamageIntervalTicks = Math.max(1, fireDamageIntervalTicks);
 			fireDamagePerTick = Math.max(0.0F, fireDamagePerTick);
+			fireResistantTargetDamageMultiplier = Math.max(0.0, fireResistantTargetDamageMultiplier);
 			speedAmplifier = Math.max(-1, speedAmplifier);
 			strengthAmplifier = Math.max(-1, strengthAmplifier);
 			regenerationAmplifier = Math.max(-1, regenerationAmplifier);
 			boundaryHeatGainPercent = Math.max(0.0, boundaryHeatGainPercent);
 			boundaryTriggerCooldownTicks = Math.max(0, boundaryTriggerCooldownTicks);
-			passiveHeatPerSecond = Math.max(0.0, passiveHeatPerSecond);
+			passiveHeatPerSecond = MathHelper.clamp(passiveHeatPerSecond, -100.0, 100.0);
 			auraFlameParticleCount = Math.max(0, auraFlameParticleCount);
 			auraSmokeParticleCount = Math.max(0, auraSmokeParticleCount);
 			waterHeatPerSecond = MathHelper.clamp(waterHeatPerSecond, -100.0, 100.0);
@@ -915,6 +926,8 @@ public final class MagicConfig {
 		public int deathfireDurationTicks = 0;
 		public int deathfireDamageIntervalTicks = 10;
 		public float deathfireDamagePerTick = 4.0F;
+		public double deathfireResistantDamageMultiplier = 1.0;
+		public boolean deathfireIgnoresFireResistance = true;
 		public int trailFlameParticleCount = 12;
 		public int emberParticleCount = 8;
 		public int primedBurstParticleCount = 18;
@@ -935,6 +948,7 @@ public final class MagicConfig {
 			deathfireDurationTicks = Math.max(0, deathfireDurationTicks);
 			deathfireDamageIntervalTicks = Math.max(1, deathfireDamageIntervalTicks);
 			deathfireDamagePerTick = Math.max(0.0F, deathfireDamagePerTick);
+			deathfireResistantDamageMultiplier = Math.max(0.0, deathfireResistantDamageMultiplier);
 			trailFlameParticleCount = Math.max(0, trailFlameParticleCount);
 			emberParticleCount = Math.max(0, emberParticleCount);
 			primedBurstParticleCount = Math.max(0, primedBurstParticleCount);
@@ -4021,7 +4035,7 @@ public final class MagicConfig {
 		public double postClashDomainCooldownMultiplier = 0.5;
 		public int particlesPerTick = 120;
 		public int splitPatternModulo = 2;
-		public boolean disableDomainEffectsDuringClash = false;
+		public boolean disableDomainEffectsDuringClash = true;
 		public boolean forceLookAtOpponent = true;
 		public boolean participantsInvincible = false;
 		public boolean pauseTimedDomainCollapseTimers = true;
