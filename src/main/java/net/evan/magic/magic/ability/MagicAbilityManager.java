@@ -32,6 +32,7 @@ import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -59,6 +60,7 @@ import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.decoration.BlockAttachedEntity;
 import net.minecraft.entity.decoration.DisplayEntity;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.effect.StatusEffect;
@@ -133,6 +135,14 @@ public final class MagicAbilityManager {
 	private static final int TICKS_PER_SECOND = 20;
 	private static final int COOLDOWN_MESSAGE_DEBOUNCE_TICKS = 20;
 	private static final float DEFAULT_PLAYER_FLY_SPEED = 0.05F;
+	private static final RegistryKey<DamageType> TRUE_MAGIC_DAMAGE_TYPE = RegistryKey.of(
+		RegistryKeys.DAMAGE_TYPE,
+		Identifier.of(Magic.MOD_ID, "true_magic")
+	);
+	private static final RegistryKey<DamageType> SAGITTARIUS_ASTRAL_ARROW_DAMAGE_TYPE = RegistryKey.of(
+		RegistryKeys.DAMAGE_TYPE,
+		Identifier.of(Magic.MOD_ID, "sagittarius_astral_arrow")
+	);
 	private static MagicConfig.FrostConfig FROST_CONFIG = new MagicConfig.FrostConfig();
 	private static MagicConfig.BurningPassionConfig BURNING_PASSION_CONFIG = new MagicConfig.BurningPassionConfig();
 	private static int BELOW_FREEZING_COOLDOWN_TICKS = 30 * TICKS_PER_SECOND;
@@ -144,7 +154,7 @@ public final class MagicAbilityManager {
 	private static double MARTYRS_FLAME_DRAIN_PERCENT_PER_SECOND = 1.0;
 	private static double TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = 3.0;
 	private static int MANIPULATION_ACTIVATION_MANA_COST = 0;
-	private static int MANIPULATION_MANA_DRAIN_PER_SECOND = 0;
+	private static double MANIPULATION_MANA_DRAIN_PER_SECOND = 2.5;
 	private static int PASSIVE_MANA_REGEN_PER_SECOND = 2;
 	private static int DEPLETED_RECOVERY_REGEN_PER_SECOND = 1;
 	private static int EFFECT_REFRESH_TICKS = 40;
@@ -351,7 +361,7 @@ public final class MagicAbilityManager {
 		0.95F
 	);
 	private static double PLUS_ULTRA_ACTIVATION_COST_PERCENT = 80.0;
-	private static int PLUS_ULTRA_DURATION_TICKS = 30 * TICKS_PER_SECOND;
+	private static int PLUS_ULTRA_DURATION_TICKS = 90 * TICKS_PER_SECOND;
 	private static double PLUS_ULTRA_OUTLINE_RADIUS = 150.0;
 	private static int PLUS_ULTRA_OUTLINE_REFRESH_TICKS = 10;
 	private static double PLUS_ULTRA_INCOMING_DAMAGE_MULTIPLIER = 0.1;
@@ -362,7 +372,8 @@ public final class MagicAbilityManager {
 	private static int PLUS_ULTRA_OVERHEAD_TEXT_REFRESH_TICKS = 2;
 	private static int PLUS_ULTRA_OVERHEAD_TEXT_DURATION_TICKS = 3 * TICKS_PER_SECOND;
 	private static double PLUS_ULTRA_OVERHEAD_TEXT_VERTICAL_OFFSET = 2.85;
-	private static float PLUS_ULTRA_FLIGHT_FLY_SPEED = 0.12F;
+	private static float PLUS_ULTRA_FLIGHT_FLY_SPEED = 0.16F;
+	private static double PLUS_ULTRA_FLIGHT_SPRINT_SPEED_MULTIPLIER = 1.75;
 	private static double PLUS_ULTRA_FLIGHT_ACCELERATION = 0.28;
 	private static double PLUS_ULTRA_FLIGHT_MAX_SPEED = 3.75;
 	private static double PLUS_ULTRA_FLIGHT_VERTICAL_ACCELERATION = 0.16;
@@ -408,7 +419,7 @@ public final class MagicAbilityManager {
 	private static int HERCULES_WARNING_STAY_TICKS = 50;
 	private static int HERCULES_WARNING_FADE_OUT_TICKS = 5;
 	private static float HERCULES_WARNING_SCALE = 0.9F;
-	private static double HERCULES_ACTIVATION_COST_PERCENT = 40.0;
+	private static double HERCULES_ACTIVATION_COST_PERCENT = 30.0;
 	private static int HERCULES_COOLDOWN_TICKS = 45 * TICKS_PER_SECOND;
 	private static float HERCULES_TRUE_DAMAGE = 5.0F;
 	private static int HERCULES_SLOWNESS_AMPLIFIER = 255;
@@ -428,8 +439,8 @@ public final class MagicAbilityManager {
 	private static double SAGITTARIUS_WINDUP_MOVEMENT_SPEED_MULTIPLIER = 0.5;
 	private static int SAGITTARIUS_CHARGE_GLOW_PARTICLE_COUNT = 1;
 	private static int SAGITTARIUS_CHARGE_BEAM_PARTICLE_COUNT = 0;
-	private static double SAGITTARIUS_ACTIVATION_COST_PERCENT = 70.0;
-	private static int SAGITTARIUS_COOLDOWN_TICKS = 2 * 60 * TICKS_PER_SECOND;
+	private static double SAGITTARIUS_ACTIVATION_COST_PERCENT = 35.0;
+	private static int SAGITTARIUS_COOLDOWN_TICKS = 90 * TICKS_PER_SECOND;
 	private static double SAGITTARIUS_CLOSE_RANGE_THRESHOLD = 5.0;
 	private static double SAGITTARIUS_MID_RANGE_THRESHOLD = 10.0;
 	private static float SAGITTARIUS_CLOSE_RANGE_TRUE_DAMAGE = 10.0F;
@@ -776,6 +787,7 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, Integer> TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK = new HashMap<>();
 	private static final Map<UUID, Double> TILL_DEATH_DO_US_PART_DRAIN_BUFFER = new HashMap<>();
 	private static final Map<UUID, Integer> TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK = new HashMap<>();
+	private static final Map<UUID, Double> MANIPULATION_DRAIN_BUFFER = new HashMap<>();
 	private static final Map<UUID, HerculesBurdenState> HERCULES_STATES = new HashMap<>();
 	private static final Map<UUID, AstralBurdenTargetState> HERCULES_TARGETS = new HashMap<>();
 	private static final Map<UUID, Integer> HERCULES_COOLDOWN_END_TICK = new HashMap<>();
@@ -836,6 +848,7 @@ public final class MagicAbilityManager {
 		reloadConfigValues();
 		ServerLifecycleEvents.SERVER_STARTED.register(MagicAbilityManager::onServerStarted);
 		ServerLifecycleEvents.SERVER_STOPPING.register(MagicAbilityManager::onServerStopping);
+		ServerChunkEvents.CHUNK_LOAD.register(GreedDomainRuntime::onChunkLoad);
 		ServerTickEvents.END_SERVER_TICK.register(MagicAbilityManager::onEndServerTick);
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register(MagicAbilityManager::onAllowLivingEntityDamage);
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
@@ -872,7 +885,7 @@ public final class MagicAbilityManager {
 		MARTYRS_FLAME_DRAIN_PERCENT_PER_SECOND = MathHelper.clamp(config.mana.martyrsFlameDrainPercentPerSecond, 0.0, 100.0);
 		TILL_DEATH_DO_US_PART_DRAIN_PERCENT_PER_SECOND = MathHelper.clamp(config.mana.tillDeathDoUsPartDrainPercentPerSecond, 0.0, 100.0);
 		MANIPULATION_ACTIVATION_MANA_COST = Math.max(0, config.mana.emptyEmbraceActivationCost);
-		MANIPULATION_MANA_DRAIN_PER_SECOND = Math.max(0, config.mana.emptyEmbraceDrainPerSecond);
+		MANIPULATION_MANA_DRAIN_PER_SECOND = Math.max(0.0, config.mana.emptyEmbraceDrainPerSecond);
 		DOMAIN_EXPANSION_ACTIVATION_MANA_COST = config.mana.domainExpansionActivationCost;
 		PASSIVE_MANA_REGEN_PER_SECOND = MathHelper.clamp(config.mana.passiveRegenPerSecond, 0, 100);
 		DEPLETED_RECOVERY_REGEN_PER_SECOND = MathHelper.clamp(config.mana.depletedRecoveryRegenPerSecond, 0, 100);
@@ -1045,6 +1058,7 @@ public final class MagicAbilityManager {
 		PLUS_ULTRA_OVERHEAD_TEXT_DURATION_TICKS = Math.max(0, config.jesterPlusUltra.overheadTextDurationTicks);
 		PLUS_ULTRA_OVERHEAD_TEXT_VERTICAL_OFFSET = Math.max(0.0, config.jesterPlusUltra.overheadTextVerticalOffset);
 		PLUS_ULTRA_FLIGHT_FLY_SPEED = Math.max(0.0F, config.jesterPlusUltra.flightFlySpeed);
+		PLUS_ULTRA_FLIGHT_SPRINT_SPEED_MULTIPLIER = Math.max(1.0, config.jesterPlusUltra.flightSprintSpeedMultiplier);
 		PLUS_ULTRA_FLIGHT_ACCELERATION = Math.max(0.0, config.jesterPlusUltra.flightAcceleration);
 		PLUS_ULTRA_FLIGHT_MAX_SPEED = Math.max(0.0, config.jesterPlusUltra.flightMaxSpeed);
 		PLUS_ULTRA_FLIGHT_VERTICAL_ACCELERATION = Math.max(0.0, config.jesterPlusUltra.flightVerticalAcceleration);
@@ -1750,6 +1764,7 @@ public final class MagicAbilityManager {
 		UUID playerId = player.getUuid();
 		BURNING_PASSION_IGNITION_STATES.remove(playerId);
 		clearPhoenixsCageLinesByCaster(playerId, player.getEntityWorld().getServer());
+		clearBurningPassionAuraFireByCaster(playerId);
 		clearBurningPassionFastestState(playerId);
 		if (BURNING_PASSION_SELF_FIRE_TARGETS.remove(playerId) != null) {
 			player.extinguish();
@@ -2203,14 +2218,12 @@ public final class MagicAbilityManager {
 				iterator.remove();
 				continue;
 			}
-			if (!state.persistent && currentTick > state.expiresTick) {
+			if (currentTick > state.expiresTick) {
 				iterator.remove();
 				continue;
 			}
 
-			int fireTicks = state.persistent
-				? Math.max(target.getFireTicks(), Math.max(TICKS_PER_SECOND, state.refreshTicks))
-				: Math.max(target.getFireTicks(), Math.max(1, state.expiresTick - currentTick + 1));
+			int fireTicks = Math.max(target.getFireTicks(), Math.max(1, state.expiresTick - currentTick + 1));
 			target.setFireTicks(fireTicks);
 			if (state.damagePerTick > 0.0F && currentTick >= state.nextDamageTick) {
 				dealBurningPassionFireDamage(
@@ -2224,6 +2237,13 @@ public final class MagicAbilityManager {
 				state.nextDamageTick = currentTick + state.damageIntervalTicks;
 			}
 		}
+	}
+
+	private static void clearBurningPassionAuraFireByCaster(UUID casterId) {
+		if (casterId == null) {
+			return;
+		}
+		BURNING_PASSION_AURA_FIRE_TARGETS.entrySet().removeIf(entry -> casterId.equals(entry.getValue().casterId));
 	}
 
 	private static void dealBurningPassionFireDamage(
@@ -2282,6 +2302,7 @@ public final class MagicAbilityManager {
 
 		boolean momentumMaintained = aboveThreshold && burningPassionFastestMomentumMaintained(state, currentMomentum);
 		if (momentumMaintained) {
+			state.referenceMomentum = currentMomentum;
 			state.outOfToleranceTicks = 0;
 			if (state.phase == BurningPassionFastestPhase.BUILD_UP) {
 				state.stableTicks++;
@@ -2736,7 +2757,7 @@ public final class MagicAbilityManager {
 				}
 
 				state.nextHitTickByTarget.put(target.getUuid(), currentTick + BURNING_PASSION_CONFIG.phoenixsCage.hitCooldownTicks);
-				dealTrackedMagicDamage(target, state.casterId, world.getDamageSources().magic(), BURNING_PASSION_CONFIG.phoenixsCage.collisionTrueDamage);
+				dealTrackedMagicDamage(target, state.casterId, createTrueMagicDamageSource(world, caster), BURNING_PASSION_CONFIG.phoenixsCage.collisionTrueDamage);
 				target.setOnFireForTicks(BURNING_PASSION_CONFIG.phoenixsCage.fireDurationTicks);
 				world.spawnParticles(
 					ParticleTypes.FLAME,
@@ -3588,13 +3609,14 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		float targetFlySpeed = plusUltraCurrentFlySpeed(player);
 		boolean changed = false;
 		if (!player.getAbilities().allowFlying) {
 			player.getAbilities().allowFlying = true;
 			changed = true;
 		}
-		if (Math.abs(player.getAbilities().getFlySpeed() - PLUS_ULTRA_FLIGHT_FLY_SPEED) > 1.0E-4F) {
-			player.getAbilities().setFlySpeed(PLUS_ULTRA_FLIGHT_FLY_SPEED);
+		if (Math.abs(player.getAbilities().getFlySpeed() - targetFlySpeed) > 1.0E-4F) {
+			player.getAbilities().setFlySpeed(targetFlySpeed);
 			changed = true;
 		}
 		if (changed) {
@@ -3620,12 +3642,13 @@ public final class MagicAbilityManager {
 		Vec3d sideways = new Vec3d(-normalizedHorizontalLook.z, 0.0, normalizedHorizontalLook.x);
 		double forwardInput = MathHelper.clamp(player.forwardSpeed, -1.0F, 1.0F);
 		double sidewaysInput = MathHelper.clamp(player.sidewaysSpeed, -1.0F, 1.0F);
+		double sprintMultiplier = plusUltraSprintFlightMultiplier(player);
 		Vec3d acceleration = Vec3d.ZERO;
 		if (Math.abs(forwardInput) > 0.01) {
-			acceleration = acceleration.add(normalizedLook.multiply(forwardInput * PLUS_ULTRA_FLIGHT_ACCELERATION));
+			acceleration = acceleration.add(normalizedLook.multiply(forwardInput * PLUS_ULTRA_FLIGHT_ACCELERATION * sprintMultiplier));
 		}
 		if (Math.abs(sidewaysInput) > 0.01) {
-			acceleration = acceleration.add(sideways.multiply(sidewaysInput * PLUS_ULTRA_FLIGHT_ACCELERATION * 0.75));
+			acceleration = acceleration.add(sideways.multiply(sidewaysInput * PLUS_ULTRA_FLIGHT_ACCELERATION * 0.75 * sprintMultiplier));
 		}
 		if (player.isJumping()) {
 			acceleration = acceleration.add(0.0, PLUS_ULTRA_FLIGHT_VERTICAL_ACCELERATION, 0.0);
@@ -3635,15 +3658,26 @@ public final class MagicAbilityManager {
 		}
 
 		Vec3d nextVelocity = player.getVelocity().multiply(PLUS_ULTRA_FLIGHT_DRAG).add(acceleration);
-		player.setVelocity(clampPlusUltraFlightVelocity(nextVelocity));
+		player.setVelocity(clampPlusUltraFlightVelocity(nextVelocity, sprintMultiplier));
 	}
 
-	private static Vec3d clampPlusUltraFlightVelocity(Vec3d velocity) {
+	private static float plusUltraCurrentFlySpeed(ServerPlayerEntity player) {
+		return (float) (PLUS_ULTRA_FLIGHT_FLY_SPEED * plusUltraSprintFlightMultiplier(player));
+	}
+
+	private static double plusUltraSprintFlightMultiplier(ServerPlayerEntity player) {
+		return player.getAbilities().flying && !player.isOnGround() && player.isSprinting()
+			? PLUS_ULTRA_FLIGHT_SPRINT_SPEED_MULTIPLIER
+			: 1.0;
+	}
+
+	private static Vec3d clampPlusUltraFlightVelocity(Vec3d velocity, double sprintMultiplier) {
 		double horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
 		double clampedX = velocity.x;
 		double clampedZ = velocity.z;
-		if (PLUS_ULTRA_FLIGHT_MAX_SPEED > 0.0 && horizontalSpeed > PLUS_ULTRA_FLIGHT_MAX_SPEED) {
-			double scale = PLUS_ULTRA_FLIGHT_MAX_SPEED / horizontalSpeed;
+		double horizontalMaxSpeed = PLUS_ULTRA_FLIGHT_MAX_SPEED * sprintMultiplier;
+		if (horizontalMaxSpeed > 0.0 && horizontalSpeed > horizontalMaxSpeed) {
+			double scale = horizontalMaxSpeed / horizontalSpeed;
 			clampedX *= scale;
 			clampedZ *= scale;
 		}
@@ -4185,7 +4219,13 @@ public final class MagicAbilityManager {
 			state.progressTicks = 0;
 			state.stageThreeHoldTicks = 0;
 			state.dimension = player.getEntityWorld().getRegistryKey();
-			if (FROST_CONFIG.progression.clearUnlocksOnEnd || reason == FrostStageEndReason.FORCED_THRESHOLD || reason == FrostStageEndReason.OVERCAST) {
+			if (
+				FROST_CONFIG.progression.clearUnlocksOnEnd
+					|| reason == FrostStageEndReason.FORCED_THRESHOLD
+					|| reason == FrostStageEndReason.OVERCAST
+					|| reason == FrostStageEndReason.INVALID
+					|| reason == FrostStageEndReason.LOCKED
+			) {
 				FROST_STAGE_STATES.remove(playerId);
 			}
 		}
@@ -4300,7 +4340,7 @@ public final class MagicAbilityManager {
 			if (target == player || !target.isAlive()) {
 				continue;
 			}
-			applyFrostActionDamage(player, target, slamDamage, false, FrostKillProgressType.SLAM);
+			applyFrostActionDamage(player, target, slamDamage, true, false, FrostKillProgressType.SLAM);
 			applyFrostStageHitEffects(player, target, currentTick);
 			applyFrostFreeze(target, player.getUuid(), currentTick + slamConfig.freezeDurationTicks);
 		}
@@ -4511,6 +4551,18 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static void progressSuspendedFrostStageDuringDomainClash(ServerPlayerEntity player) {
+		if (player == null || MagicPlayerData.getSchool(player) != MagicSchool.FROST || activeAbility(player) == MagicAbility.BELOW_FREEZING) {
+			return;
+		}
+		FrostStageState state = FROST_STAGE_STATES.get(player.getUuid());
+		if (state == null || state.dimension != player.getEntityWorld().getRegistryKey() || !MagicPlayerData.isDomainClashActive(player)) {
+			return;
+		}
+		progressFrostStageUnlocks(player, state);
+		progressFrostMaximumUnlock(state);
+	}
+
 	private static void applyFrostStageOneAura(ServerPlayerEntity player, int currentTick) {
 		spawnCasterAuraParticles(player);
 		double auraRadius = Math.max(0.0, FROST_CONFIG.stageOne.auraRadius);
@@ -4631,6 +4683,7 @@ public final class MagicAbilityManager {
 		ServerPlayerEntity caster,
 		LivingEntity target,
 		float damage,
+		boolean trueDamage,
 		boolean overcast,
 		FrostKillProgressType progressType
 	) {
@@ -4640,7 +4693,12 @@ public final class MagicAbilityManager {
 		if (overcast && FROST_CONFIG.rangedAttack.instantKillEnabled) {
 			dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().freeze(), Float.MAX_VALUE);
 		} else if (damage > 0.0F) {
-			dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().magic(), damage);
+			dealTrackedMagicDamage(
+				target,
+				caster.getUuid(),
+				trueDamage ? createTrueMagicDamageSource(world, caster) : world.getDamageSources().magic(),
+				damage
+			);
 		}
 		if (target.isAlive()) {
 			return;
@@ -4768,7 +4826,7 @@ public final class MagicAbilityManager {
 					if (!state.hitTargets.add(target.getUuid())) {
 						continue;
 					}
-					applyFrostActionDamage(caster, target, state.damage, state.overcast, FrostKillProgressType.RANGED);
+					applyFrostActionDamage(caster, target, state.damage, false, state.overcast, FrostKillProgressType.RANGED);
 					if (!state.overcast) {
 						applyFrostStageHitEffects(caster, target, currentTick);
 					}
@@ -5217,6 +5275,51 @@ public final class MagicAbilityManager {
 		state.stageThreeHoldTicks = Math.max(0, state.stageThreeHoldTicks);
 		removeFrostStageCasterBuffs(player);
 		setActiveAbility(player, MagicAbility.BELOW_FREEZING);
+		MagicPlayerData.setDepletedRecoveryMode(player, false);
+		return state;
+	}
+
+	private static BurningPassionIgnitionState ensureAdminBurningPassionIgnitionState(ServerPlayerEntity player, int currentTick) {
+		if (
+			player == null
+			|| MagicPlayerData.getSchool(player) != MagicSchool.BURNING_PASSION
+			|| player.getEntityWorld().getServer() == null
+		) {
+			return null;
+		}
+
+		UUID playerId = player.getUuid();
+		MinecraftServer server = player.getEntityWorld().getServer();
+		BurningPassionIgnitionState state = BURNING_PASSION_IGNITION_STATES.get(playerId);
+		if (state == null || state.dimension != player.getEntityWorld().getRegistryKey()) {
+			double heatPercent = state == null
+				? 0.0
+				: MathHelper.clamp(state.heatPercent, 0.0, BURNING_PASSION_CONFIG.heat.overheatThresholdPercent);
+			endIgnition(player, currentTick, BurningPassionIgnitionEndReason.CLEAR_ALL, false, false);
+			state = new BurningPassionIgnitionState(player.getEntityWorld().getRegistryKey(), 1, currentTick, heatPercent);
+			BURNING_PASSION_IGNITION_STATES.put(playerId, state);
+		} else {
+			clearPhoenixsCageLinesByCaster(playerId, server);
+			clearBurningPassionAuraFireByCaster(playerId);
+			clearBurningPassionFastestState(playerId);
+			if (BURNING_PASSION_SELF_FIRE_TARGETS.remove(playerId) != null) {
+				player.extinguish();
+			}
+			removeBurningPassionStageBuffs(player);
+			state.currentStage = MathHelper.clamp(state.currentStage, 1, 3);
+			state.stageStartTick = Math.min(state.stageStartTick, currentTick);
+			state.heatPercent = MathHelper.clamp(state.heatPercent, 0.0, BURNING_PASSION_CONFIG.heat.overheatThresholdPercent);
+			state.auraPlayersInside.clear();
+			state.boundaryCooldownEndTickByTarget.clear();
+		}
+
+		clearOverrideMeteorState(playerId, server);
+		IGNITION_COOLDOWN_END_TICK.remove(playerId);
+		PHOENIXS_CAGE_COOLDOWN_END_TICK.remove(playerId);
+		PYROTECHNICS_LAW_COOLDOWN_END_TICK.remove(playerId);
+		IM_THE_FASTEST_THERE_IS_COOLDOWN_END_TICK.remove(playerId);
+		OVERRIDE_COOLDOWN_END_TICK.remove(playerId);
+		setActiveAbility(player, MagicAbility.IGNITION);
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
 		return state;
 	}
@@ -6022,8 +6125,14 @@ public final class MagicAbilityManager {
 				return;
 			}
 
-			prepareForDomainActivation(player, activeAbility);
+			boolean preserveFrostStageDuringClash = activeAbility == MagicAbility.BELOW_FREEZING && FROST_STAGE_STATES.containsKey(player.getUuid());
+			if (!preserveFrostStageDuringClash) {
+				prepareForDomainActivation(player, activeAbility);
+			}
 			if (startDomainClash(player, requestedAbility, containingDomain.ownerId, containingDomain.state, currentTick)) {
+				if (preserveFrostStageDuringClash) {
+					suspendFrostStagedModeForDomainClash(player);
+				}
 				spendAbilityCost(player, DOMAIN_EXPANSION_ACTIVATION_MANA_COST);
 				setActiveAbility(player, requestedAbility);
 				if (requestedAbility == MagicAbility.GREED_DOMAIN_EXPANSION) {
@@ -6086,6 +6195,15 @@ public final class MagicAbilityManager {
 		if (activeAbility == MagicAbility.ORIONS_GAMBIT) {
 			endOrionsGambit(player, OrionGambitEndReason.MANUAL_CANCEL, player.getEntityWorld().getServer().getTicks(), false);
 		}
+	}
+
+	private static void suspendFrostStagedModeForDomainClash(ServerPlayerEntity player) {
+		if (!FROST_STAGE_STATES.containsKey(player.getUuid())) {
+			return;
+		}
+		clearFrostEffectsByCaster(player.getUuid(), false, player.getEntityWorld().getServer());
+		removeFrostStageCasterBuffs(player);
+		MagicPlayerData.clearFrostStageHud(player);
 	}
 
 	private static DomainOwnerState findContainingForeignDomain(ServerPlayerEntity player) {
@@ -6362,7 +6480,7 @@ public final class MagicAbilityManager {
 			);
 		}
 		restoreDomainExpansion(server, state);
-		applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier);
+		applyDomainCasterShutdown(ownerId, state.ability, server, currentTick, state.cooldownMultiplier);
 	}
 
 	private static void restoreDomainExpansion(MinecraftServer server, DomainExpansionState state) {
@@ -6422,6 +6540,9 @@ public final class MagicAbilityManager {
 			boolean expired = !clashActive && currentTick >= state.expiresTick;
 
 			if (!expired) {
+				if (state.ability == MagicAbility.FROST_DOMAIN_EXPANSION && caster != null && caster.isAlive()) {
+					refreshFrostDomainCasterEffects(caster);
+				}
 				if (!(clashActive && DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS) && state.ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
 					changed |= updateFrostDomain(world, ownerId, state, currentTick);
 				}
@@ -6463,7 +6584,7 @@ public final class MagicAbilityManager {
 			}
 			cancelDomainClash(ownerId, server);
 			restoreDomainExpansion(server, state);
-			applyDomainEndCooldowns(ownerId, state.ability, currentTick, state.cooldownMultiplier);
+			applyDomainCasterShutdown(ownerId, state.ability, server, currentTick, state.cooldownMultiplier);
 			ASTRAL_CATACLYSM_DOMAIN_STATES.remove(ownerId);
 			iterator.remove();
 			changed = true;
@@ -6531,6 +6652,19 @@ public final class MagicAbilityManager {
 			}
 			world.spawnParticles(ParticleTypes.SNOWFLAKE, target.getX(), target.getBodyY(0.5), target.getZ(), 10, 0.3, 0.6, 0.3, 0.03);
 			world.spawnParticles(ParticleTypes.WHITE_ASH, target.getX(), target.getBodyY(0.5), target.getZ(), 6, 0.25, 0.5, 0.25, 0.02);
+		}
+	}
+
+	private static void refreshFrostDomainCasterEffects(ServerPlayerEntity caster) {
+		if (caster == null || !caster.isAlive()) {
+			return;
+		}
+
+		if (FROST_CONFIG.domain.casterResistanceAmplifier >= 0) {
+			refreshStatusEffect(caster, StatusEffects.RESISTANCE, EFFECT_REFRESH_TICKS, FROST_CONFIG.domain.casterResistanceAmplifier, true, false, true);
+		}
+		if (FROST_CONFIG.domain.casterSlownessAmplifier >= 0) {
+			refreshStatusEffect(caster, StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, FROST_CONFIG.domain.casterSlownessAmplifier, true, false, true);
 		}
 	}
 
@@ -6665,7 +6799,7 @@ public final class MagicAbilityManager {
 		DOMAIN_EXPANSIONS.remove(ownerId);
 		cancelDomainClash(ownerId, server);
 		restoreDomainExpansion(server, ownerState);
-		applyDomainEndCooldowns(ownerId, ownerState.ability, currentTick, 1.0);
+		applyDomainCasterShutdown(ownerId, ownerState.ability, server, currentTick, 1.0);
 
 		ServerPlayerEntity ownerPlayer = server.getPlayerManager().getPlayer(ownerId);
 		if (ownerPlayer != null && activeAbility(ownerPlayer) == ownerState.ability) {
@@ -6707,13 +6841,21 @@ public final class MagicAbilityManager {
 		int clashSafetyTick = currentTick + domainClashIntroLockTicks() + TICKS_PER_SECOND;
 		state.expiresTick = Math.max(state.expiresTick, clashSafetyTick);
 		state.effectEndTick = Math.max(state.effectEndTick, clashSafetyTick);
+		applySplitDomainInteriorVisuals(world, state, state.ability, challengerAbility);
+		Vec3d ownerLockedPos = new Vec3d(owner.getX(), owner.getY(), owner.getZ());
+		Vec3d challengerLockedPos = new Vec3d(challenger.getX(), challenger.getY(), challenger.getZ());
+		if (state.ability == MagicAbility.GREED_DOMAIN_EXPANSION || challengerAbility == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			ownerLockedPos = resolveGreedDomainClashLockedPosition(world, state, owner, ownerLockedPos);
+			challengerLockedPos = resolveGreedDomainClashLockedPosition(world, state, challenger, challengerLockedPos);
+		}
+
 		DomainClashState clashState = new DomainClashState(
 			ownerId,
 			state.ability,
 			challenger.getUuid(),
 			challengerAbility,
-			new Vec3d(owner.getX(), owner.getY(), owner.getZ()),
-			new Vec3d(challenger.getX(), challenger.getY(), challenger.getZ()),
+			ownerLockedPos,
+			challengerLockedPos,
 			currentTick,
 			titleEndTick,
 			instructionsFadeStartTick,
@@ -6735,11 +6877,12 @@ public final class MagicAbilityManager {
 
 		showDomainClashTitle(owner);
 		showDomainClashTitle(challenger);
-		applySplitDomainInteriorVisuals(world, state, state.ability, challengerAbility);
+		if (state.ability == MagicAbility.GREED_DOMAIN_EXPANSION || challengerAbility == MagicAbility.GREED_DOMAIN_EXPANSION) {
+			lockDomainClashParticipant(owner, clashState.ownerLockedPos, challenger.getEyePos());
+			lockDomainClashParticipant(challenger, clashState.challengerLockedPos, owner.getEyePos());
+		}
 		applyDomainClashStartEffects(owner);
 		applyDomainClashStartEffects(challenger);
-		owner.sendMessage(Text.translatable("message.magic.domain.clash.started"), true);
-		challenger.sendMessage(Text.translatable("message.magic.domain.clash.started"), true);
 		persistDomainRuntimeState(server);
 		return true;
 	}
@@ -6790,6 +6933,14 @@ public final class MagicAbilityManager {
 				lockDomainClashParticipant(owner, clash.ownerLockedPos, challenger.getEyePos());
 				lockDomainClashParticipant(challenger, clash.challengerLockedPos, owner.getEyePos());
 			}
+			if (clash.ownerAbility == MagicAbility.FROST_DOMAIN_EXPANSION) {
+				refreshFrostDomainCasterEffects(owner);
+			}
+			if (clash.challengerAbility == MagicAbility.FROST_DOMAIN_EXPANSION) {
+				refreshFrostDomainCasterEffects(challenger);
+			}
+			progressSuspendedFrostStageDuringDomainClash(owner);
+			progressSuspendedFrostStageDuringDomainClash(challenger);
 			applyDomainClashCombatEffects(owner);
 			applyDomainClashCombatEffects(challenger);
 			spawnDomainClashParticles(world, domain, DOMAIN_CLASH_PARTICLES_PER_TICK);
@@ -6877,7 +7028,13 @@ public final class MagicAbilityManager {
 			} else {
 				ASTRAL_CATACLYSM_DOMAIN_STATES.remove(clash.challengerId);
 			}
-			applyDomainEndCooldowns(clash.ownerId, clash.ownerAbility, currentTick, DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER);
+			applyDomainCasterShutdown(
+				clash.ownerId,
+				clash.ownerAbility,
+				server,
+				currentTick,
+				DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER
+			);
 			if (owner != null) {
 				setActiveAbility(owner, MagicAbility.NONE);
 				applyDomainClashLoserManaPenalty(owner);
@@ -6890,7 +7047,13 @@ public final class MagicAbilityManager {
 		} else {
 			applyDomainVisualForAbility(world, domain, clash.ownerAbility);
 			domain.cooldownMultiplier = DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER;
-			startDomainCooldown(clash.challengerId, clash.challengerAbility, currentTick, DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER);
+			applyDomainCasterShutdown(
+				clash.challengerId,
+				clash.challengerAbility,
+				server,
+				currentTick,
+				DOMAIN_CLASH_POST_CLASH_COOLDOWN_MULTIPLIER
+			);
 			if (challenger != null) {
 				setActiveAbility(challenger, MagicAbility.NONE);
 				applyDomainClashLoserManaPenalty(challenger);
@@ -7166,6 +7329,49 @@ public final class MagicAbilityManager {
 		}
 
 		teleportDomainEntity(player, lockedPos.x, lockedPos.y, lockedPos.z, yaw, pitch);
+	}
+
+	private static Vec3d resolveGreedDomainClashLockedPosition(
+		ServerWorld world,
+		DomainExpansionState state,
+		LivingEntity participant,
+		Vec3d preferredPos
+	) {
+		double horizontalDistanceSq = squaredHorizontalDistance(preferredPos.x, preferredPos.z, state.centerX, state.centerZ);
+		if (
+			isInsideDomainInterior(horizontalDistanceSq, preferredPos.y - state.baseY, state.innerRadius, state.innerHeight)
+				&& isSafeDomainTeleportPosition(world, participant, preferredPos.x, preferredPos.y, preferredPos.z)
+		) {
+			return preferredPos;
+		}
+
+		Vec3d safePos = findNearestSafeDomainOccupantPosition(
+			world,
+			participant,
+			state.centerX,
+			state.centerZ,
+			state.baseY,
+			state.innerRadius,
+			state.innerHeight,
+			preferredPos.x,
+			preferredPos.z
+		);
+		if (safePos != null) {
+			return safePos;
+		}
+
+		safePos = findNearestSafeDomainOccupantPosition(
+			world,
+			participant,
+			state.centerX,
+			state.centerZ,
+			state.baseY,
+			state.innerRadius,
+			state.innerHeight,
+			state.centerX,
+			state.centerZ
+		);
+		return safePos == null ? preferredPos : safePos;
 	}
 
 	private static void spawnDomainClashParticles(ServerWorld world, DomainExpansionState state, int particlesPerTick) {
@@ -7832,6 +8038,7 @@ public final class MagicAbilityManager {
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
 		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.clear();
 		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.clear();
+		MANIPULATION_DRAIN_BUFFER.clear();
 		GreedDomainRuntime.onServerStarted(server);
 		loadPersistedDomainRuntimeState(server);
 	}
@@ -7872,6 +8079,7 @@ public final class MagicAbilityManager {
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
 		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.clear();
 		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.clear();
+		MANIPULATION_DRAIN_BUFFER.clear();
 		GREED_DOMAIN_COOLDOWN_END_TICK.clear();
 		GreedDomainRuntime.onServerStopping(server);
 		DOMAIN_PENDING_RETURNS.clear();
@@ -8635,6 +8843,20 @@ public final class MagicAbilityManager {
 			MARTYRS_FLAME_DRAIN_BUFFER.remove(playerId);
 		}
 
+		int manipulationManaDrain = 0;
+		if (activeAbility == MagicAbility.MANIPULATION && MANIPULATION_MANA_DRAIN_PER_SECOND > 0.0) {
+			double bufferedDrain = MANIPULATION_DRAIN_BUFFER.getOrDefault(playerId, 0.0) + MANIPULATION_MANA_DRAIN_PER_SECOND;
+			manipulationManaDrain = Math.max(0, (int) Math.floor(bufferedDrain + 1.0E-7));
+			double remainingDrain = Math.max(0.0, bufferedDrain - manipulationManaDrain);
+			if (remainingDrain > 1.0E-7) {
+				MANIPULATION_DRAIN_BUFFER.put(playerId, remainingDrain);
+			} else {
+				MANIPULATION_DRAIN_BUFFER.remove(playerId);
+			}
+		} else {
+			MANIPULATION_DRAIN_BUFFER.remove(playerId);
+		}
+
 		int activeAbilityDrain = switch (activeAbility) {
 				case ABSOLUTE_ZERO -> 0;
 				case BELOW_FREEZING -> 0;
@@ -8642,7 +8864,7 @@ public final class MagicAbilityManager {
 				case LOVE_AT_FIRST_SIGHT -> isLovePowerActiveThisSecond(player)
 					? LOVE_AT_FIRST_SIGHT_ACTIVE_DRAIN_PER_SECOND
 					: LOVE_AT_FIRST_SIGHT_IDLE_DRAIN_PER_SECOND;
-				case MANIPULATION -> MANIPULATION_MANA_DRAIN_PER_SECOND;
+				case MANIPULATION -> manipulationManaDrain;
 				case ORIONS_GAMBIT -> 0;
 				case FROST_DOMAIN_EXPANSION, LOVE_DOMAIN_EXPANSION -> 0;
 				default -> 0;
@@ -8720,6 +8942,7 @@ public final class MagicAbilityManager {
 					deactivateLoveAtFirstSight(player);
 				}
 				if (activeAbility == MagicAbility.MANIPULATION) {
+					MANIPULATION_DRAIN_BUFFER.remove(playerId);
 					deactivateManipulation(player, true, "mana depleted");
 				}
 				if (activeAbility == MagicAbility.HERCULES_BURDEN_OF_THE_SKY) {
@@ -8843,11 +9066,27 @@ public final class MagicAbilityManager {
 		}
 
 		if (activeAbility == MagicAbility.BELOW_FREEZING) {
+			if (isMagicSuppressed(player)) {
+				endFrostStagedMode(player, currentTick, FrostStageEndReason.LOCKED, true, false);
+				return;
+			}
+			if (isLockedByForeignLoveDomain(player)) {
+				endFrostStagedMode(player, currentTick, FrostStageEndReason.LOCKED, false, false);
+				return;
+			}
 			applyBelowFreezing(player, currentTick);
 			return;
 		}
 
 		if (activeAbility == MagicAbility.IGNITION) {
+			if (isMagicSuppressed(player)) {
+				endIgnition(player, currentTick, BurningPassionIgnitionEndReason.LOCKED, true, false);
+				return;
+			}
+			if (isLockedByForeignLoveDomain(player)) {
+				endIgnition(player, currentTick, BurningPassionIgnitionEndReason.LOCKED, false, false);
+				return;
+			}
 			applyIgnition(player, currentTick);
 			return;
 		}
@@ -12317,6 +12556,64 @@ public final class MagicAbilityManager {
 		return true;
 	}
 
+	public static int setBurningPassionStage(ServerPlayerEntity player, int stage) {
+		if (player == null || player.getEntityWorld().getServer() == null) {
+			return 0;
+		}
+
+		int currentTick = player.getEntityWorld().getServer().getTicks();
+		BurningPassionIgnitionState state = ensureAdminBurningPassionIgnitionState(player, currentTick);
+		if (state == null) {
+			return 0;
+		}
+
+		state.currentStage = MathHelper.clamp(stage, 1, 3);
+		state.stageStartTick = currentTick;
+		state.auraPlayersInside.clear();
+		state.boundaryCooldownEndTickByTarget.clear();
+		syncBurningPassionHud(player);
+		return 1;
+	}
+
+	public static int advanceBurningPassionStageForTesting(ServerPlayerEntity player) {
+		if (player == null || player.getEntityWorld().getServer() == null) {
+			return 0;
+		}
+
+		int currentTick = player.getEntityWorld().getServer().getTicks();
+		BurningPassionIgnitionState state = ensureAdminBurningPassionIgnitionState(player, currentTick);
+		if (state == null || state.currentStage >= 3) {
+			return 0;
+		}
+
+		state.currentStage = Math.min(3, state.currentStage + 1);
+		state.stageStartTick = currentTick;
+		state.auraPlayersInside.clear();
+		state.boundaryCooldownEndTickByTarget.clear();
+		syncBurningPassionHud(player);
+		return 1;
+	}
+
+	public static int setBurningPassionStageProgressSeconds(ServerPlayerEntity player, int seconds) {
+		if (player == null || player.getEntityWorld().getServer() == null) {
+			return 0;
+		}
+
+		int currentTick = player.getEntityWorld().getServer().getTicks();
+		BurningPassionIgnitionState state = ensureAdminBurningPassionIgnitionState(player, currentTick);
+		if (state == null) {
+			return 0;
+		}
+
+		int stageDuration = burningPassionStageDurationTicks(state.currentStage);
+		int progressTicks = MathHelper.clamp(Math.max(0, seconds) * TICKS_PER_SECOND, 0, stageDuration);
+		state.stageStartTick = currentTick - progressTicks;
+		state.auraPlayersInside.clear();
+		state.boundaryCooldownEndTickByTarget.clear();
+		applyIgnition(player, currentTick);
+		return 1;
+	}
+
 	public static int forceBurningPassionOverride(ServerPlayerEntity player) {
 		if (player == null) {
 			return 0;
@@ -12436,6 +12733,21 @@ public final class MagicAbilityManager {
 		} else {
 			state.highestUnlockedStage = state.currentStage;
 		}
+		syncFrostStageHud(player);
+		return 1;
+	}
+
+	public static int setFrostStageThreeProgressSeconds(ServerPlayerEntity player, int seconds) {
+		FrostStageState state = ensureAdminFrostStageState(player);
+		if (state == null) {
+			return 0;
+		}
+
+		int requirement = Math.max(0, FROST_CONFIG.progression.maximumUnlockTicks);
+		state.currentStage = 3;
+		state.highestUnlockedStage = 3;
+		state.progressTicks = 0;
+		state.stageThreeHoldTicks = MathHelper.clamp(Math.max(0, seconds) * TICKS_PER_SECOND, 0, requirement);
 		syncFrostStageHud(player);
 		return 1;
 	}
@@ -12726,7 +13038,7 @@ public final class MagicAbilityManager {
 		spawnHerculesImpactBurst(target);
 		spawnHerculesBurdenParticles(target);
 		if (HERCULES_TRUE_DAMAGE > 0.0F && target.getEntityWorld() instanceof ServerWorld world) {
-			dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().genericKill(), HERCULES_TRUE_DAMAGE);
+			dealTrackedMagicDamage(target, caster.getUuid(), createTrueMagicDamageSource(world, caster), HERCULES_TRUE_DAMAGE);
 		}
 		if (target instanceof ServerPlayerEntity targetPlayer) {
 			sendHerculesWarning(targetPlayer);
@@ -12923,7 +13235,7 @@ public final class MagicAbilityManager {
 		for (LivingEntity target : collectLivingEntitiesAlongBeam(caster, start, end, SAGITTARIUS_BEAM_RADIUS)) {
 			float damage = sagittariusDamageForDistance(Math.sqrt(caster.squaredDistanceTo(target)));
 			if (damage > 0.0F && caster.getEntityWorld() instanceof ServerWorld world) {
-				dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().genericKill(), damage);
+				dealTrackedMagicDamage(target, caster.getUuid(), createSagittariusAstralArrowDamageSource(world, caster), damage);
 			}
 		}
 
@@ -12972,6 +13284,19 @@ public final class MagicAbilityManager {
 			return SAGITTARIUS_MID_RANGE_TRUE_DAMAGE;
 		}
 		return SAGITTARIUS_FAR_RANGE_TRUE_DAMAGE;
+	}
+
+	private static DamageSource createTrueMagicDamageSource(ServerWorld world, Entity attacker) {
+		return createConfiguredMagicDamageSource(world, attacker, TRUE_MAGIC_DAMAGE_TYPE);
+	}
+
+	private static DamageSource createSagittariusAstralArrowDamageSource(ServerWorld world, ServerPlayerEntity caster) {
+		return createConfiguredMagicDamageSource(world, caster, SAGITTARIUS_ASTRAL_ARROW_DAMAGE_TYPE);
+	}
+
+	private static DamageSource createConfiguredMagicDamageSource(ServerWorld world, Entity attacker, RegistryKey<DamageType> damageTypeKey) {
+		var damageTypeRegistry = world.getRegistryManager().getOrThrow(RegistryKeys.DAMAGE_TYPE);
+		return new DamageSource(damageTypeRegistry.getEntry(damageTypeRegistry.getValueOrThrow(damageTypeKey)), attacker);
 	}
 
 	private static void spawnParticleBeam(ServerWorld world, Vec3d start, Vec3d end, ParticleEffect particle, double spacing) {
@@ -15214,6 +15539,55 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	private static void applyDomainCasterShutdown(
+		UUID playerId,
+		MagicAbility domainAbility,
+		MinecraftServer server,
+		int currentTick,
+		double domainCooldownMultiplier
+	) {
+		disableSchoolPassivesAfterDomain(playerId, domainAbility.school(), server.getPlayerManager().getPlayer(playerId));
+		applyDomainEndCooldowns(playerId, domainAbility, currentTick, domainCooldownMultiplier);
+	}
+
+	private static void disableSchoolPassivesAfterDomain(UUID playerId, MagicSchool school, ServerPlayerEntity player) {
+		switch (school) {
+			case BURNING_PASSION -> {
+				MARTYRS_FLAME_PASSIVE_ENABLED.remove(playerId);
+				MARTYRS_FLAME_DRAIN_BUFFER.remove(playerId);
+				if (player != null) {
+					player.removeStatusEffect(StatusEffects.GLOWING);
+				}
+			}
+			case LOVE -> {
+				TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.remove(playerId);
+				TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
+			}
+			case JESTER -> {
+				if (player != null) {
+					deactivateSpotlight(player, true);
+				} else {
+					SPOTLIGHT_PASSIVE_ENABLED.remove(playerId);
+					SPOTLIGHT_STATES.remove(playerId);
+				}
+				COMEDIC_REWRITE_PASSIVE_ENABLED.remove(playerId);
+				COMEDIC_REWRITE_PENDING_STATES.remove(playerId);
+				COMEDIC_REWRITE_IMMUNITY_END_TICK.remove(playerId);
+				COMEDIC_REWRITE_FALL_PROTECTION_END_TICK.remove(playerId);
+			}
+			case CONSTELLATION -> {
+				if (player != null) {
+					deactivateCassiopeia(player, true);
+				} else {
+					CASSIOPEIA_PASSIVE_ENABLED.remove(playerId);
+					CASSIOPEIA_LAST_OUTLINED_PLAYERS.remove(playerId);
+				}
+			}
+			default -> {
+			}
+		}
+	}
+
 	private static int domainCooldownTicks(MagicAbility ability) {
 		if (ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
 			return Math.max(0, FROST_DOMAIN_COOLDOWN_TICKS);
@@ -16490,13 +16864,12 @@ public final class MagicAbilityManager {
 		}
 
 		ManipulationState state = MANIPULATION_STATES.get(caster.getUuid());
-		boolean cancel = state != null && entity.getUuid().equals(state.targetId);
-		if (cancel) {
-			debugManipulation("{} manipulation entity attack canceled: attempted to attack controlled target {}", debugName(caster), state.targetId);
+		if (state != null && entity.getUuid().equals(state.targetId)) {
+			debugManipulation("{} manipulation entity attack allowed: controlled target {}", debugName(caster), state.targetId);
 		} else {
 			debugManipulation("{} manipulation entity attack allowed: targetEntity={}", debugName(caster), entity.getUuid());
 		}
-		return cancel;
+		return false;
 	}
 
 	public static int resetCooldown(ServerPlayerEntity player, MagicAbility ability) {
@@ -16628,6 +17001,7 @@ public final class MagicAbilityManager {
 
 		if (ability == MagicAbility.MANIPULATION) {
 			boolean removed = MANIPULATION_COOLDOWN_END_TICK.remove(playerId) != null;
+			MANIPULATION_DRAIN_BUFFER.remove(playerId);
 			MANIPULATION_NEXT_REQUEST_TICK.remove(playerId);
 			MANIPULATION_LAST_CLAMP_LOG_TICK.remove(playerId);
 			MANIPULATION_INTERACTION_PROXY.remove(playerId);
@@ -16835,6 +17209,7 @@ public final class MagicAbilityManager {
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.remove(playerId);
 		TILL_DEATH_DO_US_PART_DRAIN_BUFFER.remove(playerId);
 		TILL_DEATH_DO_US_PART_LAST_COOLDOWN_MESSAGE_TICK.remove(playerId);
+		MANIPULATION_DRAIN_BUFFER.remove(playerId);
 		MANIPULATION_COOLDOWN_END_TICK.remove(playerId);
 		MANIPULATION_NEXT_REQUEST_TICK.remove(playerId);
 		MANIPULATION_LAST_CLAMP_LOG_TICK.remove(playerId);
@@ -16853,6 +17228,7 @@ public final class MagicAbilityManager {
 		PLANCK_HEAT_STATES.remove(playerId);
 		PLANCK_HEAT_FROST_NEXT_DAMAGE_TICK.remove(playerId);
 		BURNING_PASSION_IGNITION_STATES.remove(playerId);
+		clearBurningPassionAuraFireByCaster(playerId);
 		BURNING_PASSION_AURA_FIRE_TARGETS.remove(playerId);
 		BURNING_PASSION_SELF_FIRE_TARGETS.remove(playerId);
 		BURNING_PASSION_DEATHFIRE_TARGETS.remove(playerId);
@@ -17061,6 +17437,7 @@ public final class MagicAbilityManager {
 	private static void deactivateManipulation(ServerPlayerEntity caster, boolean startCooldown, String reason) {
 		UUID casterId = caster.getUuid();
 		ManipulationState state = MANIPULATION_STATES.remove(casterId);
+		MANIPULATION_DRAIN_BUFFER.remove(casterId);
 		MANIPULATION_LAST_CLAMP_LOG_TICK.remove(casterId);
 		MANIPULATION_INTERACTION_PROXY.remove(casterId);
 		MANIPULATION_INPUT_BY_CASTER.remove(casterId);

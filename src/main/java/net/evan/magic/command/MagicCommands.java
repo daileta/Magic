@@ -180,11 +180,102 @@ public final class MagicCommands {
 															)
 													)
 											)
+											.then(
+												CommandManager.literal("maximum")
+													.then(
+														CommandManager.literal("set")
+															.then(
+																CommandManager.argument("seconds", IntegerArgumentType.integer(0))
+																	.executes(context ->
+																		setFrostStageThreeProgressForSelf(
+																			context.getSource(),
+																			IntegerArgumentType.getInteger(context, "seconds")
+																		)
+																	)
+																	.then(
+																		CommandManager.argument("targets", EntityArgumentType.players())
+																			.executes(context ->
+																				setFrostStageThreeProgress(
+																					context.getSource(),
+																					EntityArgumentType.getPlayers(context, "targets"),
+																					IntegerArgumentType.getInteger(context, "seconds")
+																				)
+																			)
+																	)
+															)
+													)
+											)
 									)
 							)
 					)
 					.then(
 						CommandManager.literal("burning_passion")
+							.then(
+								CommandManager.literal("ignition")
+									.then(
+										CommandManager.literal("stage")
+											.then(
+												CommandManager.literal("set")
+													.then(
+														CommandManager.argument("stage", IntegerArgumentType.integer(1, 3))
+															.executes(context ->
+																setBurningPassionStageForSelf(
+																	context.getSource(),
+																	IntegerArgumentType.getInteger(context, "stage")
+																)
+															)
+															.then(
+																CommandManager.argument("targets", EntityArgumentType.players())
+																	.executes(context ->
+																		setBurningPassionStage(
+																			context.getSource(),
+																			EntityArgumentType.getPlayers(context, "targets"),
+																			IntegerArgumentType.getInteger(context, "stage")
+																		)
+																	)
+															)
+													)
+											)
+											.then(
+												CommandManager.literal("next")
+													.executes(context -> advanceBurningPassionStageForSelf(context.getSource()))
+													.then(
+														CommandManager.argument("targets", EntityArgumentType.players())
+															.executes(context ->
+																advanceBurningPassionStage(
+																	context.getSource(),
+																	EntityArgumentType.getPlayers(context, "targets")
+																)
+															)
+													)
+											)
+											.then(
+												CommandManager.literal("progress")
+													.then(
+														CommandManager.literal("set")
+															.then(
+																CommandManager.argument("seconds", IntegerArgumentType.integer(0))
+																	.executes(context ->
+																		setBurningPassionStageProgressForSelf(
+																			context.getSource(),
+																			IntegerArgumentType.getInteger(context, "seconds")
+																		)
+																	)
+																	.then(
+																		CommandManager.argument("targets", EntityArgumentType.players())
+																			.executes(context ->
+																				setBurningPassionStageProgress(
+																					context.getSource(),
+																					EntityArgumentType.getPlayers(context, "targets"),
+																					IntegerArgumentType.getInteger(context, "seconds")
+																				)
+																			)
+																	)
+															)
+													)
+											)
+									)
+							)
 							.then(
 								CommandManager.literal("override")
 									.then(
@@ -415,6 +506,22 @@ public final class MagicCommands {
 		return setFrostStageProgress(source, List.of(source.getPlayerOrThrow()), seconds);
 	}
 
+	private static int setFrostStageThreeProgressForSelf(ServerCommandSource source, int seconds) throws CommandSyntaxException {
+		return setFrostStageThreeProgress(source, List.of(source.getPlayerOrThrow()), seconds);
+	}
+
+	private static int setBurningPassionStageForSelf(ServerCommandSource source, int stage) throws CommandSyntaxException {
+		return setBurningPassionStage(source, List.of(source.getPlayerOrThrow()), stage);
+	}
+
+	private static int advanceBurningPassionStageForSelf(ServerCommandSource source) throws CommandSyntaxException {
+		return advanceBurningPassionStage(source, List.of(source.getPlayerOrThrow()));
+	}
+
+	private static int setBurningPassionStageProgressForSelf(ServerCommandSource source, int seconds) throws CommandSyntaxException {
+		return setBurningPassionStageProgress(source, List.of(source.getPlayerOrThrow()), seconds);
+	}
+
 	private static int forceBurningPassionOverrideForSelf(ServerCommandSource source) throws CommandSyntaxException {
 		return forceBurningPassionOverride(source, List.of(source.getPlayerOrThrow()));
 	}
@@ -619,6 +726,86 @@ public final class MagicCommands {
 		}
 
 		sendFrostStageProgressFeedback(source, updatedTargets, seconds);
+		return updatedTargets.size();
+	}
+
+	private static int setFrostStageThreeProgress(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int seconds
+	) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setFrostStageThreeProgressSeconds(target, seconds) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.frost.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendFrostStageThreeProgressFeedback(source, updatedTargets, seconds);
+		return updatedTargets.size();
+	}
+
+	private static int setBurningPassionStage(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int stage
+	) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setBurningPassionStage(target, stage) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.burning_passion.ignition.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendBurningPassionStageSetFeedback(source, updatedTargets, stage);
+		return updatedTargets.size();
+	}
+
+	private static int advanceBurningPassionStage(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.advanceBurningPassionStageForTesting(target) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.burning_passion.ignition.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendBurningPassionStageNextFeedback(source, updatedTargets);
+		return updatedTargets.size();
+	}
+
+	private static int setBurningPassionStageProgress(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int seconds
+	) {
+		List<ServerPlayerEntity> updatedTargets = new ArrayList<>();
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setBurningPassionStageProgressSeconds(target, seconds) > 0) {
+				updatedTargets.add(target);
+			}
+		}
+
+		if (updatedTargets.isEmpty()) {
+			source.sendError(Text.translatable("command.magic.burning_passion.ignition.stage.failure.no_updates"));
+			return 0;
+		}
+
+		sendBurningPassionStageProgressFeedback(source, updatedTargets, seconds);
 		return updatedTargets.size();
 	}
 
@@ -841,6 +1028,82 @@ public final class MagicCommands {
 
 		source.sendFeedback(
 			() -> Text.translatable("command.magic.frost.stage.progress.set.multiple", seconds, targets.size()),
+			true
+		);
+	}
+
+	private static void sendFrostStageThreeProgressFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int seconds
+	) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.frost.stage.progress.maximum.set.single", seconds, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.frost.stage.progress.maximum.set.multiple", seconds, targets.size()),
+			true
+		);
+	}
+
+	private static void sendBurningPassionStageSetFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int stage
+	) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.burning_passion.ignition.stage.set.single", stage, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.burning_passion.ignition.stage.set.multiple", stage, targets.size()),
+			true
+		);
+	}
+
+	private static void sendBurningPassionStageNextFeedback(ServerCommandSource source, Collection<ServerPlayerEntity> targets) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.burning_passion.ignition.stage.next.single", target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.burning_passion.ignition.stage.next.multiple", targets.size()),
+			true
+		);
+	}
+
+	private static void sendBurningPassionStageProgressFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		int seconds
+	) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.burning_passion.ignition.stage.progress.set.single", seconds, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.burning_passion.ignition.stage.progress.set.multiple", seconds, targets.size()),
 			true
 		);
 	}

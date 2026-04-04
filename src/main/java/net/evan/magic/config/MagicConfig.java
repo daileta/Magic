@@ -424,7 +424,7 @@ public final class MagicConfig {
 		@SerializedName(value = "emptyEmbraceActivationCost", alternate = { "manipulationActivationCost" })
 		public int emptyEmbraceActivationCost = 0;
 		@SerializedName(value = "emptyEmbraceDrainPerSecond", alternate = { "manipulationDrainPerSecond" })
-		public int emptyEmbraceDrainPerSecond = 0;
+		public double emptyEmbraceDrainPerSecond = 2.5;
 		public int domainExpansionActivationCost = 0;
 		public int passiveRegenPerSecond = 2;
 		public int depletedRecoveryRegenPerSecond = 1;
@@ -438,7 +438,7 @@ public final class MagicConfig {
 			martyrsFlameDrainPercentPerSecond = MathHelper.clamp(martyrsFlameDrainPercentPerSecond, 0.0, 100.0);
 			tillDeathDoUsPartDrainPercentPerSecond = MathHelper.clamp(tillDeathDoUsPartDrainPercentPerSecond, 0.0, 100.0);
 			emptyEmbraceActivationCost = Math.max(0, emptyEmbraceActivationCost);
-			emptyEmbraceDrainPerSecond = Math.max(0, emptyEmbraceDrainPerSecond);
+			emptyEmbraceDrainPerSecond = Math.max(0.0, emptyEmbraceDrainPerSecond);
 			domainExpansionActivationCost = Math.max(0, domainExpansionActivationCost);
 			passiveRegenPerSecond = MathHelper.clamp(passiveRegenPerSecond, 0, 100);
 			depletedRecoveryRegenPerSecond = MathHelper.clamp(depletedRecoveryRegenPerSecond, 0, 100);
@@ -613,13 +613,13 @@ public final class MagicConfig {
 		private static BurningPassionStageConfig defaultStageOne() {
 			BurningPassionStageConfig config = new BurningPassionStageConfig();
 			config.auraEnabled = true;
-			config.auraRadius = 15.0;
+			config.auraRadius = 7.5;
 			config.fireDamagePerTick = 0.25F;
 			config.fireResistantTargetDamageMultiplier = 0.0;
 			config.speedAmplifier = 1;
 			config.boundaryHeatGainPercent = 1.5;
 			config.boundaryTriggerCooldownTicks = 2 * 20;
-			config.passiveHeatPerSecond = -1.5;
+			config.passiveHeatPerSecond = -0.5;
 			config.waterHeatPerSecond = -0.5;
 			return config;
 		}
@@ -627,7 +627,7 @@ public final class MagicConfig {
 		private static BurningPassionStageConfig defaultStageTwo() {
 			BurningPassionStageConfig config = new BurningPassionStageConfig();
 			config.auraEnabled = true;
-			config.auraRadius = 5.0;
+			config.auraRadius = 2.5;
 			config.fireDamagePerTick = 0.5F;
 			config.fireResistantTargetDamageMultiplier = 0.5;
 			config.speedAmplifier = 4;
@@ -635,17 +635,19 @@ public final class MagicConfig {
 			config.regenerationAmplifier = 0;
 			config.boundaryHeatGainPercent = 5.0;
 			config.boundaryTriggerCooldownTicks = 2 * 20;
-			config.persistentFireUntilExtinguished = true;
-			config.waterHeatPerSecond = -0.5;
+			config.persistentFireUntilExtinguished = false;
+			config.waterHeatPerSecond = -1.5;
 			config.extraStepHeightBlocks = 1.0;
 			return config;
 		}
 
 		private static BurningPassionStageConfig defaultStageThree() {
 			BurningPassionStageConfig config = new BurningPassionStageConfig();
-			config.auraEnabled = false;
+			config.auraEnabled = true;
+			config.auraRadius = 2.5;
+			config.fireDamagePerTick = 0.5F;
 			config.fireDamageIgnoresFireResistance = true;
-			config.speedAmplifier = 9;
+			config.speedAmplifier = 14;
 			config.strengthAmplifier = 2;
 			config.regenerationAmplifier = 1;
 			config.passiveHeatPerSecond = 0.5;
@@ -712,12 +714,12 @@ public final class MagicConfig {
 	}
 
 	public static final class BurningPassionIgnitionConfig {
-		public int cooldownTicks = 0;
+		public int cooldownTicks = 30 * 20;
 		public boolean allowManualCancel = true;
-		public boolean manualCancelStartsCooldown = false;
+		public boolean manualCancelStartsCooldown = true;
 		public boolean naturalEndStartsCooldown = false;
-		public int stageOneDurationTicks = 2 * 60 * 20;
-		public int stageTwoDurationTicks = 3 * 60 * 20;
+		public int stageOneDurationTicks = 90 * 20;
+		public int stageTwoDurationTicks = 2 * 60 * 20;
 		public int stageThreeDurationTicks = 5 * 60 * 20;
 		public int effectRefreshTicks = 40;
 		public int activationFlameParticleCount = 28;
@@ -844,7 +846,7 @@ public final class MagicConfig {
 	}
 
 	public static final class PhoenixsCageConfig {
-		public double manaCostPercent = 0.0;
+		public double manaCostPercent = 7.5;
 		public int cooldownTicks = 0;
 		public double lengthBlocks = 40.0;
 		public int durationTicks = 5 * 20;
@@ -923,7 +925,7 @@ public final class MagicConfig {
 		public double movementThresholdBlocksPerTick = 0.05;
 		public double momentumToleranceBlocksPerTick = 0.03;
 		public int graceTicks = 0;
-		public int buildUpTicks = 30 * 20;
+		public int buildUpTicks = 15 * 20;
 		public int primedDurationTicks = 0;
 		public int deathfireDurationTicks = 0;
 		public int deathfireDamageIntervalTicks = 10;
@@ -1902,7 +1904,7 @@ public final class MagicConfig {
 
 	public static final class JesterPlusUltraConfig {
 		public double activationCostPercent = 80.0;
-		public int durationTicks = 3 * 60 * 20;
+		public int durationTicks = 90 * 20;
 		public double outlineRadius = 150.0;
 		public int outlineRefreshTicks = 10;
 		public double incomingDamageMultiplier = 0.1;
@@ -1913,7 +1915,8 @@ public final class MagicConfig {
 		public int overheadTextRefreshTicks = 2;
 		public int overheadTextDurationTicks = 3 * 20;
 		public double overheadTextVerticalOffset = 2.85;
-		public float flightFlySpeed = 0.12F;
+		public float flightFlySpeed = 0.16F;
+		public double flightSprintSpeedMultiplier = 1.75;
 		public double flightAcceleration = 0.28;
 		public double flightMaxSpeed = 3.75;
 		public double flightVerticalAcceleration = 0.16;
@@ -1966,6 +1969,7 @@ public final class MagicConfig {
 			overheadTextDurationTicks = Math.max(0, overheadTextDurationTicks);
 			overheadTextVerticalOffset = Math.max(0.0, overheadTextVerticalOffset);
 			flightFlySpeed = Math.max(0.0F, flightFlySpeed);
+			flightSprintSpeedMultiplier = Math.max(1.0, flightSprintSpeedMultiplier);
 			flightAcceleration = Math.max(0.0, flightAcceleration);
 			flightMaxSpeed = Math.max(0.0, flightMaxSpeed);
 			flightVerticalAcceleration = Math.max(0.0, flightVerticalAcceleration);
@@ -2021,7 +2025,7 @@ public final class MagicConfig {
 		public int warningStayTicks = 50;
 		public int warningFadeOutTicks = 5;
 		public float warningScale = 2.1F;
-		public double activationCostPercent = 40.0;
+		public double activationCostPercent = 30.0;
 		public int cooldownTicks = 45 * 20;
 		public float trueDamage = 5.0F;
 		public int slownessAmplifier = 255;
@@ -2067,8 +2071,8 @@ public final class MagicConfig {
 		public double windupMovementSpeedMultiplier = 0.5;
 		public int chargeGlowParticleCount = 1;
 		public int chargeBeamParticleCount = 0;
-		public double activationCostPercent = 70.0;
-		public int cooldownTicks = 2 * 60 * 20;
+		public double activationCostPercent = 35.0;
+		public int cooldownTicks = 90 * 20;
 		public double closeRangeThreshold = 5.0;
 		public double midRangeThreshold = 10.0;
 		public float closeRangeTrueDamage = 10.0F;
@@ -3803,8 +3807,8 @@ public final class MagicConfig {
 	}
 
 	public static final class FrostProgressConfig {
-		public int stageTwoUnlockTicks = 2 * 60 * 20;
-		public int stageThreeUnlockTicks = 3 * 60 * 20;
+		public int stageTwoUnlockTicks = 60 * 20;
+		public int stageThreeUnlockTicks = 90 * 20;
 		public int maximumUnlockTicks = 5 * 60 * 20;
 		public int rangedKillProgressTicks = 2 * 60 * 20;
 		public int slamKillProgressTicks = 60 * 20;
@@ -3991,6 +3995,8 @@ public final class MagicConfig {
 		public boolean applySlowness = true;
 		public int slownessBaseAmplifier = 0;
 		public int slownessAmplifierPerPulse = 1;
+		public int casterResistanceAmplifier = 2;
+		public int casterSlownessAmplifier = 2;
 		public boolean applyFrost = true;
 		public float frostDamagePerTick = 2.0F;
 		public boolean applyBlindness = true;
@@ -4015,6 +4021,8 @@ public final class MagicConfig {
 			finalExecutionDelayTicks = Math.max(0, finalExecutionDelayTicks);
 			slownessBaseAmplifier = Math.max(-1, slownessBaseAmplifier);
 			slownessAmplifierPerPulse = Math.max(0, slownessAmplifierPerPulse);
+			casterResistanceAmplifier = Math.max(-1, casterResistanceAmplifier);
+			casterSlownessAmplifier = Math.max(-1, casterSlownessAmplifier);
 			frostDamagePerTick = Math.max(0.0F, frostDamagePerTick);
 			executionParticleCount = Math.max(0, executionParticleCount);
 			executionSoundVolume = Math.max(0.0F, executionSoundVolume);

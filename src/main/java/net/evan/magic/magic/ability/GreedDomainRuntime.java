@@ -45,6 +45,7 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.WorldChunk;
 
 final class GreedDomainRuntime {
 	private static final int COIN_UNITS_PER_COIN = MagicPlayerData.GREED_COIN_UNITS_PER_COIN;
@@ -65,6 +66,7 @@ final class GreedDomainRuntime {
 	private static final Identifier GREED_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "greed_domain_max_health_penalty");
 	private static final Identifier GREED_KNOCKBACK_RESISTANCE_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "greed_domain_knockback_resistance_penalty");
 	private static final Identifier GREED_SCALE_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "greed_domain_scale_penalty");
+	private static final String TRIBUTE_DISPLAY_TAG = "magic_greed_tribute_display";
 	private static int DOMAIN_RADIUS = 25;
 	private static int DOMAIN_HEIGHT = 25;
 	private static int DOMAIN_SHELL_THICKNESS = 1;
@@ -344,12 +346,18 @@ final class GreedDomainRuntime {
 		if (player == null) {
 			return false;
 		}
+		if (MagicPlayerData.isDomainClashActive(player)) {
+			return false;
+		}
 		ActiveDomainState state = activeIntroStateForTarget(player.getUuid(), player.getEntityWorld().getRegistryKey(), currentTick);
 		return state != null && state.freezePlayersDuringIntro && state.introFreezeByTarget.containsKey(player.getUuid());
 	}
 
 	static boolean isPlayerInvulnerableDuringIntro(ServerPlayerEntity player, int currentTick) {
 		if (player == null) {
+			return false;
+		}
+		if (MagicPlayerData.isDomainClashActive(player)) {
 			return false;
 		}
 		ActiveDomainState state = activeIntroStateForTarget(player.getUuid(), player.getEntityWorld().getRegistryKey(), currentTick);
@@ -402,6 +410,7 @@ final class GreedDomainRuntime {
 		FROZEN_TRIBUTES.clear();
 		DEBT_PENALTIES.clear();
 		PERSISTENT_MARKS_BY_OWNER.clear();
+		cleanupOrphanTributeDisplays(server);
 	}
 
 	static void onServerStopping(MinecraftServer server) {
@@ -409,6 +418,13 @@ final class GreedDomainRuntime {
 		FROZEN_TRIBUTES.clear();
 		DEBT_PENALTIES.clear();
 		PERSISTENT_MARKS_BY_OWNER.clear();
+	}
+
+	static void onChunkLoad(ServerWorld world, WorldChunk chunk) {
+		if (world == null || chunk == null) {
+			return;
+		}
+		cleanupOrphanTributeDisplays(world, chunkBounds(world, chunk));
 	}
 
 	static void onPlayerDeath(ServerPlayerEntity player) {
@@ -1498,7 +1514,7 @@ final class GreedDomainRuntime {
 	private static int countPassiveIncomeTargets(ServerWorld world, UUID casterId, double centerX, double centerZ, int baseY, int innerRadius, int innerHeight, boolean countMobs) {
 		int count = 0;
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (player.getUuid().equals(casterId) || !player.isAlive() || player.isSpectator()) {
+			if (player.getUuid().equals(casterId) || !player.isAlive() || player.isSpectator() || MagicPlayerData.isDomainClashActive(player)) {
 				continue;
 			}
 			if (isInsideDomainInterior(player, centerX, centerZ, baseY, innerRadius, innerHeight)) {
@@ -1520,7 +1536,7 @@ final class GreedDomainRuntime {
 	private static List<LivingEntity> collectTributeTargetsInsideDomain(ServerWorld world, UUID casterId, double centerX, double centerZ, int baseY, int innerRadius, int innerHeight) {
 		ArrayList<LivingEntity> targets = new ArrayList<>();
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (player.getUuid().equals(casterId) || !player.isAlive() || player.isSpectator()) {
+			if (player.getUuid().equals(casterId) || !player.isAlive() || player.isSpectator() || MagicPlayerData.isDomainClashActive(player)) {
 				continue;
 			}
 			if (isInsideDomainInterior(player, centerX, centerZ, baseY, innerRadius, innerHeight)) {
@@ -1576,6 +1592,7 @@ final class GreedDomainRuntime {
 		if (displayEntity == null) {
 			return null;
 		}
+		displayEntity.addCommandTag(TRIBUTE_DISPLAY_TAG);
 		displayEntity.setCustomName(tributeText(prefix, tributeUnits));
 		displayEntity.setCustomNameVisible(true);
 		displayEntity.refreshPositionAndAngles(target.getX(), target.getY() + DISPLAY_VERTICAL_OFFSET, target.getZ(), 0.0F, 0.0F);
@@ -1589,6 +1606,7 @@ final class GreedDomainRuntime {
 		displayEntity.setNoGravity(true);
 		((ArmorStandEntityAccessorMixin) displayEntity).magic$setMarker(true);
 		displayEntity.setSilent(true);
+		displayEntity.addCommandTag(TRIBUTE_DISPLAY_TAG);
 		displayEntity.setCustomName(tributeText(prefix, tributeUnits));
 		displayEntity.setCustomNameVisible(true);
 		if (!world.spawnEntity(displayEntity)) {
@@ -1599,6 +1617,72 @@ final class GreedDomainRuntime {
 
 	private static Text tributeText(String prefix, int tributeUnits) {
 		return Text.literal(prefix + ": " + formatCoinUnits(tributeUnits)).formatted(Formatting.GOLD, Formatting.BOLD);
+	}
+
+	private static void cleanupOrphanTributeDisplays(MinecraftServer server) {
+		if (server == null) {
+			return;
+		}
+		String tributeNamePrefix = tributeNamePrefix(MagicConfig.get().greed.domain.tribute.displayPrefix);
+		for (ServerWorld world : server.getWorlds()) {
+			cleanupOrphanTributeDisplays(world, new Box(-3.0E7, world.getBottomY(), -3.0E7, 3.0E7, world.getTopYInclusive() + 1.0, 3.0E7), tributeNamePrefix);
+		}
+	}
+
+	private static void cleanupOrphanTributeDisplays(ServerWorld world, Box bounds) {
+		if (world == null || bounds == null) {
+			return;
+		}
+		cleanupOrphanTributeDisplays(world, bounds, tributeNamePrefix(MagicConfig.get().greed.domain.tribute.displayPrefix));
+	}
+
+	private static void cleanupOrphanTributeDisplays(ServerWorld world, Box bounds, String tributeNamePrefix) {
+		for (ArmorStandEntity armorStand : world.getEntitiesByClass(ArmorStandEntity.class, bounds, armorStand -> !isTrackedTributeDisplay(armorStand.getUuid()))) {
+			if (isGreedTributeDisplay(armorStand, tributeNamePrefix)) {
+				armorStand.discard();
+			}
+		}
+	}
+
+	private static Box chunkBounds(ServerWorld world, WorldChunk chunk) {
+		int minX = chunk.getPos().getStartX();
+		int minZ = chunk.getPos().getStartZ();
+		return new Box(minX, world.getBottomY(), minZ, minX + 16, world.getTopYInclusive() + 1.0, minZ + 16);
+	}
+
+	private static boolean isTrackedTributeDisplay(UUID entityId) {
+		for (ActiveDomainState state : ACTIVE_DOMAINS.values()) {
+			for (TributeState tributeState : state.tributeByTarget.values()) {
+				if (entityId.equals(tributeState.displayEntityId)) {
+					return true;
+				}
+			}
+		}
+		for (FrozenTributeState state : FROZEN_TRIBUTES.values()) {
+			if (entityId.equals(state.displayEntityId)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean isGreedTributeDisplay(ArmorStandEntity armorStand, String tributeNamePrefix) {
+		if (armorStand.getCommandTags().contains(TRIBUTE_DISPLAY_TAG)) {
+			return true;
+		}
+		Text customName = armorStand.getCustomName();
+		return armorStand.isMarker()
+			&& armorStand.isInvisible()
+			&& armorStand.hasNoGravity()
+			&& armorStand.isSilent()
+			&& armorStand.isCustomNameVisible()
+			&& customName != null
+			&& customName.getString().startsWith(tributeNamePrefix);
+	}
+
+	private static String tributeNamePrefix(String prefix) {
+		String normalizedPrefix = prefix == null || prefix.isBlank() ? "Tribute" : prefix.trim();
+		return normalizedPrefix + ": ";
 	}
 
 	private static void removeDisplayEntity(MinecraftServer server, net.minecraft.registry.RegistryKey<World> dimension, UUID entityId) {
