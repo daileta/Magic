@@ -2388,7 +2388,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -2535,16 +2535,12 @@ public final class MagicAbilityManager {
 	private static void tryApplyBurningPassionAttackEffects(ServerPlayerEntity attacker, LivingEntity target) {
 		if (
 			target == attacker
-			|| !target.isAlive()
+			|| !isMagicTargetableEntity(target)
 			|| MagicPlayerData.getSchool(attacker) != MagicSchool.BURNING_PASSION
 			|| !(target.getEntityWorld() instanceof ServerWorld world)
 		) {
 			return;
 		}
-		if (target instanceof ServerPlayerEntity playerTarget && playerTarget.isSpectator()) {
-			return;
-		}
-
 		BurningPassionIgnitionState ignitionState = burningPassionIgnitionState(attacker);
 		if (ignitionState == null) {
 			return;
@@ -2873,7 +2869,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(state.targetId);
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				discardBurningPassionCinderMarkDisplay(world, state);
 				iterator.remove();
 				continue;
@@ -3762,10 +3758,8 @@ public final class MagicAbilityManager {
 			state.impactCenter.z + state.impactRadius
 		);
 		Predicate<Entity> filter = entity ->
-			entity instanceof LivingEntity living
-				&& living.isAlive()
+			isMagicTargetableEntity(entity)
 				&& entity.getUuid() != state.casterId
-				&& (!(entity instanceof PlayerEntity player) || !player.isSpectator())
 				&& (
 					(entity instanceof ServerPlayerEntity && BURNING_PASSION_CONFIG.override.affectPlayers)
 					|| (!(entity instanceof PlayerEntity) && BURNING_PASSION_CONFIG.override.affectMobs)
@@ -5038,7 +5032,7 @@ public final class MagicAbilityManager {
 		spawnFrostMaximumParticles(world, player, state, currentTick);
 		double fearRadius = FROST_CONFIG.domain.radius * FROST_CONFIG.maximum.fearRadiusMultiplierFromDomainRadius;
 		Box fearBox = player.getBoundingBox().expand(fearRadius);
-		Predicate<Entity> filter = entity -> entity instanceof LivingEntity living && living.isAlive() && entity != player;
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != player;
 		for (Entity entity : player.getEntityWorld().getOtherEntities(player, fearBox, filter)) {
 			if (entity instanceof LivingEntity living && isFrostEnemy(player, living)) {
 				FROST_MAXIMUM_FEAR_TARGETS.put(
@@ -5068,12 +5062,9 @@ public final class MagicAbilityManager {
 		state.encaseEndTick = currentTick + FROST_CONFIG.maximum.packedIceDurationTicks;
 		state.pendingHelplessTargets.clear();
 		Box burstBox = player.getBoundingBox().expand(burstRadius);
-		Predicate<Entity> filter = entity -> entity instanceof LivingEntity living && living.isAlive() && entity != player;
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != player;
 		for (Entity entity : player.getEntityWorld().getOtherEntities(player, burstBox, filter)) {
 			if (entity instanceof LivingEntity livingTarget) {
-				if (livingTarget instanceof PlayerEntity spectatorCheck && spectatorCheck.isSpectator()) {
-					continue;
-				}
 				FrostPackedIceState packedIceState = new FrostPackedIceState(
 					livingTarget.getEntityWorld().getRegistryKey(),
 					player.getUuid(),
@@ -5123,7 +5114,7 @@ public final class MagicAbilityManager {
 				continue;
 			}
 			Entity entity = targetWorld.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				continue;
 			}
 			FROST_HELPLESS_TARGETS.put(
@@ -5519,7 +5510,7 @@ public final class MagicAbilityManager {
 			}
 			Entity entity = world.getEntity(entry.getKey());
 			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(state.casterId);
-			if (!(entity instanceof LivingEntity target) || !target.isAlive() || caster == null || !caster.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target) || caster == null || !caster.isAlive()) {
 				iterator.remove();
 				continue;
 			}
@@ -5543,7 +5534,7 @@ public final class MagicAbilityManager {
 				continue;
 			}
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				clearFrostPackedIceEncasement(world, state, false);
 				iterator.remove();
 				continue;
@@ -5587,7 +5578,7 @@ public final class MagicAbilityManager {
 				continue;
 			}
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -7882,7 +7873,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static void onLivingEntityAfterDamage(LivingEntity entity, DamageSource source, float damageTaken) {
-		if (entity == null || source == null || damageTaken <= 0.0F || entity.getEntityWorld().isClient()) {
+		if (entity == null || !isMagicTargetableEntity(entity) || source == null || damageTaken <= 0.0F || entity.getEntityWorld().isClient()) {
 			return;
 		}
 
@@ -9837,13 +9828,9 @@ public final class MagicAbilityManager {
 		Map<UUID, Integer> nextDamageTicksByTarget = PLANCK_HEAT_FROST_NEXT_DAMAGE_TICK.computeIfAbsent(casterId, ignored -> new HashMap<>());
 		Set<UUID> seenTargets = new HashSet<>();
 		Box area = caster.getBoundingBox().expand(PLANCK_HEAT_AURA_RADIUS);
-		Predicate<Entity> filter = entity -> entity instanceof LivingEntity living && living.isAlive() && entity != caster;
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != caster;
 
 		for (Entity entity : caster.getEntityWorld().getOtherEntities(caster, area, filter)) {
-			if (entity instanceof PlayerEntity otherPlayer && otherPlayer.isSpectator()) {
-				continue;
-			}
-
 			if (entity instanceof LivingEntity target) {
 				UUID targetId = target.getUuid();
 				seenTargets.add(targetId);
@@ -9870,13 +9857,9 @@ public final class MagicAbilityManager {
 		spawnPlanckHeatFireCasterParticles(caster);
 
 		Box area = caster.getBoundingBox().expand(PLANCK_HEAT_AURA_RADIUS);
-		Predicate<Entity> filter = entity -> entity instanceof LivingEntity living && living.isAlive() && entity != caster;
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != caster;
 
 		for (Entity entity : caster.getEntityWorld().getOtherEntities(caster, area, filter)) {
-			if (entity instanceof PlayerEntity otherPlayer && otherPlayer.isSpectator()) {
-				continue;
-			}
-
 			if (entity instanceof LivingEntity target) {
 				applyOrRefreshEnhancedFire(target, caster.getUuid(), currentTick, PLANCK_HEAT_AURA_ENHANCED_FIRE_DURATION_TICKS);
 				refreshStatusEffect(target, StatusEffects.HUNGER, EFFECT_REFRESH_TICKS, PLANCK_HEAT_FIRE_PHASE_HUNGER_AMPLIFIER, true, true, true);
@@ -11233,7 +11216,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity targetEntity = world.getEntity(state.targetEntityId());
-			if (!(targetEntity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(targetEntity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				anvil.discard();
 				iterator.remove();
 				continue;
@@ -11259,7 +11242,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				COMEDIC_ASSISTANT_CANE_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
@@ -11328,7 +11311,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				PLUS_ULTRA_IMPACT_STATES.remove(entry.getKey(), state);
 				continue;
 			}
@@ -11712,7 +11695,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -13492,9 +13475,16 @@ public final class MagicAbilityManager {
 		ServerPlayNetworking.send(player, new ConstellationOutlinePayload(List.copyOf(uuids)));
 	}
 
+	private static boolean isMagicTargetableEntity(Entity entity) {
+		if (!(entity instanceof LivingEntity living) || !living.isAlive() || living instanceof ArmorStandEntity) {
+			return false;
+		}
+		return !(living instanceof PlayerEntity player) || !player.isSpectator();
+	}
+
 	private static List<LivingEntity> findLivingTargetsAround(LivingEntity center, double radius) {
 		List<LivingEntity> targets = new ArrayList<>();
-		if (center == null || !center.isAlive()) {
+		if (!isMagicTargetableEntity(center)) {
 			return targets;
 		}
 
@@ -13504,11 +13494,7 @@ public final class MagicAbilityManager {
 		}
 
 		Box area = center.getBoundingBox().expand(radius);
-		Predicate<Entity> filter = entity ->
-			entity instanceof LivingEntity living
-				&& living.isAlive()
-				&& entity != center
-				&& (!(entity instanceof PlayerEntity player) || !player.isSpectator());
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != center;
 		for (Entity entity : center.getEntityWorld().getOtherEntities(center, area, filter)) {
 			if (entity instanceof LivingEntity livingTarget && center.squaredDistanceTo(livingTarget) <= radius * radius) {
 				targets.add(livingTarget);
@@ -13534,14 +13520,10 @@ public final class MagicAbilityManager {
 		double clampedRange = Math.max(1.0, range);
 		Vec3d end = eyePos.add(look.multiply(clampedRange));
 		Box area = caster.getBoundingBox().stretch(look.multiply(clampedRange)).expand(1.0);
-		Predicate<Entity> filter = entity ->
-			entity instanceof LivingEntity living &&
-			living.isAlive() &&
-			entity != caster &&
-			(!(entity instanceof PlayerEntity player) || !player.isSpectator());
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != caster;
 
 		EntityHitResult hitResult = ProjectileUtil.raycast(caster, eyePos, end, area, filter, clampedRange * clampedRange);
-		if (hitResult == null || !(hitResult.getEntity() instanceof LivingEntity target)) {
+		if (hitResult == null || !(hitResult.getEntity() instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 			return null;
 		}
 
@@ -13744,7 +13726,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive() || currentTick >= state.endTick) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target) || currentTick >= state.endTick) {
 				iterator.remove();
 				continue;
 			}
@@ -13901,11 +13883,7 @@ public final class MagicAbilityManager {
 		double maxZ = Math.max(start.z, end.z);
 		Box searchBox = new Box(minX, minY, minZ, maxX, maxY, maxZ).expand(radius);
 		List<LivingEntity> targets = new ArrayList<>();
-		Predicate<Entity> filter = entity ->
-			entity instanceof LivingEntity living
-				&& living.isAlive()
-				&& entity != caster
-				&& (!(entity instanceof PlayerEntity player) || !player.isSpectator());
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != caster;
 		for (Entity entity : caster.getEntityWorld().getOtherEntities(caster, searchBox, filter)) {
 			if (entity instanceof LivingEntity livingTarget && livingTarget.getBoundingBox().expand(radius).raycast(start, end).isPresent()) {
 				targets.add(livingTarget);
@@ -14440,7 +14418,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -14926,7 +14904,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity targetEntity = world.getEntity(entry.getKey());
-			if (!(targetEntity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(targetEntity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -14992,13 +14970,9 @@ public final class MagicAbilityManager {
 
 	private static void applyAuraSlowness(ServerPlayerEntity caster, int radius, int slownessAmplifier, int shardCount) {
 		Box area = caster.getBoundingBox().expand(radius);
-		Predicate<Entity> filter = entity -> entity instanceof LivingEntity living && living.isAlive() && entity != caster;
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != caster;
 
 		for (Entity entity : caster.getEntityWorld().getOtherEntities(caster, area, filter)) {
-			if (entity instanceof PlayerEntity otherPlayer && otherPlayer.isSpectator()) {
-				continue;
-			}
-
 			if (entity instanceof LivingEntity livingTarget) {
 				refreshStatusEffect(livingTarget, StatusEffects.SLOWNESS, EFFECT_REFRESH_TICKS, slownessAmplifier, true, true, true);
 				spawnHitboxShardParticles(livingTarget, shardCount);
@@ -15126,7 +15100,7 @@ public final class MagicAbilityManager {
 			return ActionResult.PASS;
 		}
 
-		if (!(entity instanceof LivingEntity target) || !target.isAlive() || target == player) {
+		if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target) || target == player) {
 			if (isProtectedDomainDecoration(entity)) {
 				sendDomainProtectedMessage(serverPlayer);
 				return ActionResult.FAIL;
@@ -15294,7 +15268,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -15332,7 +15306,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -15485,7 +15459,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -15570,7 +15544,7 @@ public final class MagicAbilityManager {
 			}
 
 			Entity entity = world.getEntity(entry.getKey());
-			if (!(entity instanceof LivingEntity target) || !target.isAlive()) {
+			if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target)) {
 				iterator.remove();
 				continue;
 			}
@@ -17565,10 +17539,7 @@ public final class MagicAbilityManager {
 		}
 
 		Entity entity = packet.getEntity(attacker.getEntityWorld());
-		if (!(entity instanceof LivingEntity target) || target == attacker || !target.isAlive()) {
-			return;
-		}
-		if (target instanceof ServerPlayerEntity playerTarget && playerTarget.isSpectator()) {
+		if (!(entity instanceof LivingEntity target) || !isMagicTargetableEntity(target) || target == attacker) {
 			return;
 		}
 
