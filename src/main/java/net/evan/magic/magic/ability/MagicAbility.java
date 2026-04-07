@@ -16,9 +16,9 @@ public enum MagicAbility {
 	LOVE_DOMAIN_EXPANSION(5, MagicSchool.LOVE, "love_domain_expansion"),
 	MARTYRS_FLAME(1, MagicSchool.BURNING_PASSION, "martyrs_flame"),
 	IGNITION(2, MagicSchool.BURNING_PASSION, "ignition"),
-	PHOENIXS_CAGE(3, MagicSchool.BURNING_PASSION, "phoenixs_cage"),
-	PYROTECHNICS_LAW(4, MagicSchool.BURNING_PASSION, "pyrotechnics_law"),
-	IM_THE_FASTEST_THERE_IS(4, MagicSchool.BURNING_PASSION, "im_the_fastest_there_is"),
+	SEARING_DASH(3, MagicSchool.BURNING_PASSION, "searing_dash"),
+	CINDER_MARK(4, MagicSchool.BURNING_PASSION, "cinder_mark"),
+	ENGINE_HEART(4, MagicSchool.BURNING_PASSION, "engine_heart"),
 	OVERRIDE(5, MagicSchool.BURNING_PASSION, "override"),
 	SPOTLIGHT(1, MagicSchool.JESTER, "spotlight"),
 	WITTY_ONE_LINER(2, MagicSchool.JESTER, "witty_one_liner"),
@@ -69,6 +69,15 @@ public enum MagicAbility {
 
 		if ("manipulation".equals(id)) {
 			return MANIPULATION;
+		}
+		if ("phoenixs_cage".equals(id)) {
+			return SEARING_DASH;
+		}
+		if ("pyrotechnics_law".equals(id)) {
+			return CINDER_MARK;
+		}
+		if ("im_the_fastest_there_is".equals(id)) {
+			return ENGINE_HEART;
 		}
 
 		for (MagicAbility ability : values()) {

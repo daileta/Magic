@@ -174,6 +174,27 @@ public final class MagicPlayerData {
 			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.targetOnly())
 	);
 
+	private static final AttachmentType<String> BURNING_PASSION_HUD_NOTIFICATION = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "burning_passion_hud_notification"),
+		builder -> builder
+			.initializer(() -> "")
+			.syncWith(PacketCodecs.STRING, AttachmentSyncPredicate.targetOnly())
+	);
+
+	private static final AttachmentType<Boolean> BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_ACTIVE = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "burning_passion_engine_heart_tier_three_afterimage_active"),
+		builder -> builder
+			.initializer(() -> false)
+			.syncWith(PacketCodecs.BOOLEAN, AttachmentSyncPredicate.all())
+	);
+
+	private static final AttachmentType<Integer> BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_TIER = AttachmentRegistry.create(
+		Identifier.of(Magic.MOD_ID, "burning_passion_engine_heart_afterimage_tier"),
+		builder -> builder
+			.initializer(() -> 0)
+			.syncWith(PacketCodecs.INTEGER, AttachmentSyncPredicate.all())
+	);
+
 	private MagicPlayerData() {
 	}
 
@@ -453,6 +474,33 @@ public final class MagicPlayerData {
 		setAttachedIfChanged(target, BURNING_PASSION_STAGE, 0, 0);
 		setAttachedIfChanged(target, BURNING_PASSION_STAGE_REMAINING_TICKS, 0, 0);
 		setAttachedIfChanged(target, BURNING_PASSION_HEAT_TENTHS, 0, 0);
+		setAttachedIfChanged(target, BURNING_PASSION_HUD_NOTIFICATION, "", "");
+		setAttachedIfChanged(target, BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_ACTIVE, false, false);
+		setAttachedIfChanged(target, BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_TIER, 0, 0);
+	}
+
+	public static String getBurningPassionHudNotification(PlayerEntity player) {
+		return target(player).getAttachedOrElse(BURNING_PASSION_HUD_NOTIFICATION, "");
+	}
+
+	public static boolean isBurningPassionEngineHeartAfterimageActive(PlayerEntity player) {
+		return target(player).getAttachedOrElse(BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_ACTIVE, false);
+	}
+
+	public static int getBurningPassionEngineHeartAfterimageTier(PlayerEntity player) {
+		return MathHelper.clamp(target(player).getAttachedOrElse(BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_TIER, 0), 0, 3);
+	}
+
+	public static void setBurningPassionHudNotification(PlayerEntity player, String text) {
+		AttachmentTarget target = target(player);
+		String resolvedText = text == null ? "" : text;
+		setAttachedIfChanged(target, BURNING_PASSION_HUD_NOTIFICATION, resolvedText, "");
+	}
+
+	public static void setBurningPassionEngineHeartAfterimageState(PlayerEntity player, boolean active, int tier) {
+		AttachmentTarget target = target(player);
+		setAttachedIfChanged(target, BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_ACTIVE, active, false);
+		setAttachedIfChanged(target, BURNING_PASSION_ENGINE_HEART_AFTERIMAGE_TIER, MathHelper.clamp(tier, 0, 3), 0);
 	}
 
 	private static AttachmentTarget target(PlayerEntity player) {

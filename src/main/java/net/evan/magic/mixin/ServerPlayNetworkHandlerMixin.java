@@ -280,6 +280,7 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			ci.cancel();
 			return;
 		}
+		MagicAbilityManager.recordBurningPassionMeleeImpact(player, packet);
 
 		MagicAbilityManager.beginManipulationInteractionProxy(player);
 		magic$packetDebug("{} packet onPlayerInteractEntity begin interaction proxy", magic$debugName());

@@ -427,6 +427,7 @@ public final class ManaHudOverlay {
 		int currentStage = MagicPlayerData.getBurningPassionStage(client.player);
 		int remainingTicks = MagicPlayerData.getBurningPassionStageRemainingTicks(client.player);
 		double heatPercent = MagicPlayerData.getBurningPassionHeatPercent(client.player);
+		String hudNotification = MagicPlayerData.getBurningPassionHudNotification(client.player);
 		if (!MagicPlayerData.isBurningPassionStageActive(client.player) && currentStage <= 0 && remainingTicks <= 0 && heatPercent <= 0.0) {
 			return;
 		}
@@ -461,16 +462,17 @@ public final class ManaHudOverlay {
 			}
 		}
 
-		if (heatLine != null && hud.heatTextEnabled) {
-			String heatText = heatLine.getString();
+		if (hud.heatTextEnabled) {
+			String heatText = hudNotification == null || hudNotification.isBlank() ? (heatLine == null ? "" : heatLine.getString()) : hudNotification;
 			if (!heatText.isBlank()) {
+				int renderedTextColor = hudNotification == null || hudNotification.isBlank() ? heatColor : textColor;
 				drawCenteredHudBoxedText(
 					drawContext,
 					client,
 					Text.literal(heatText),
 					centerX,
 					manaBarY - hud.heatTextYOffset,
-					heatColor,
+					renderedTextColor,
 					outlineColor
 				);
 			}
