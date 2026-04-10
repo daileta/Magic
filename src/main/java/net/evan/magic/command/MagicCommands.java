@@ -64,7 +64,7 @@ public final class MagicCommands {
 									.then(cooldownAbilityLiteral(MagicAbility.COMEDIC_ASSISTANT, "comedic_assistant"))
 									.then(cooldownAbilityLiteral(MagicAbility.PLUS_ULTRA, "plus_ultra"))
 									.then(cooldownAbilityLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky"))
-									.then(cooldownAbilityLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow"))
+									.then(cooldownAbilityLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "celestial_alignment"))
 									.then(cooldownAbilityLiteral(MagicAbility.ORIONS_GAMBIT, "orions_gambit"))
 									.then(cooldownAbilityLiteral(MagicAbility.ASTRAL_CATACLYSM, "astral_cataclysm"))
 									.then(cooldownAbilityLiteral(MagicAbility.APPRAISERS_MARK, "appraisers_mark"))
@@ -103,6 +103,28 @@ public final class MagicCommands {
 						CommandManager.literal("testing")
 							.then(testingModeLiteral("enable", true))
 							.then(testingModeLiteral("disable", false))
+							.then(
+								CommandManager.literal("celestial_alignment")
+									.then(
+										CommandManager.literal("rarity")
+											.then(celestialAlignmentRarityLiteral("common"))
+											.then(celestialAlignmentRarityLiteral("rare"))
+											.then(celestialAlignmentRarityLiteral("mythic"))
+											.then(
+												CommandManager.literal("reset")
+													.executes(context -> clearCelestialAlignmentRarityForSelf(context.getSource()))
+													.then(
+														CommandManager.argument("targets", EntityArgumentType.players())
+															.executes(context ->
+																clearCelestialAlignmentRarity(
+																	context.getSource(),
+																	EntityArgumentType.getPlayers(context, "targets")
+																)
+															)
+													)
+											)
+									)
+							)
 					)
 					.then(
 						CommandManager.literal("frost")
@@ -356,7 +378,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.PLUS_ULTRA, "plus_ultra", true))
 									.then(abilityAccessLiteral(MagicAbility.CASSIOPEIA, "cassiopeia", true))
 									.then(abilityAccessLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky", true))
-									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow", true))
+									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "celestial_alignment", true))
 									.then(abilityAccessLiteral(MagicAbility.ORIONS_GAMBIT, "orions_gambit", true))
 									.then(abilityAccessLiteral(MagicAbility.ASTRAL_CATACLYSM, "astral_cataclysm", true))
 									.then(abilityAccessLiteral(MagicAbility.APPRAISERS_MARK, "appraisers_mark", true))
@@ -389,7 +411,7 @@ public final class MagicCommands {
 									.then(abilityAccessLiteral(MagicAbility.PLUS_ULTRA, "plus_ultra", false))
 									.then(abilityAccessLiteral(MagicAbility.CASSIOPEIA, "cassiopeia", false))
 									.then(abilityAccessLiteral(MagicAbility.HERCULES_BURDEN_OF_THE_SKY, "hercules_burden_of_the_sky", false))
-									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "sagittarius_astral_arrow", false))
+									.then(abilityAccessLiteral(MagicAbility.SAGITTARIUS_ASTRAL_ARROW, "celestial_alignment", false))
 									.then(abilityAccessLiteral(MagicAbility.ORIONS_GAMBIT, "orions_gambit", false))
 									.then(abilityAccessLiteral(MagicAbility.ASTRAL_CATACLYSM, "astral_cataclysm", false))
 									.then(abilityAccessLiteral(MagicAbility.APPRAISERS_MARK, "appraisers_mark", false))
@@ -447,6 +469,21 @@ public final class MagicCommands {
 			);
 	}
 
+	private static LiteralArgumentBuilder<ServerCommandSource> celestialAlignmentRarityLiteral(String literal) {
+		return CommandManager.literal(literal)
+			.executes(context -> setCelestialAlignmentRarityForSelf(context.getSource(), literal))
+			.then(
+				CommandManager.argument("targets", EntityArgumentType.players())
+					.executes(context ->
+						setCelestialAlignmentRarity(
+							context.getSource(),
+							EntityArgumentType.getPlayers(context, "targets"),
+							literal
+						)
+					)
+			);
+	}
+
 	private static LiteralArgumentBuilder<ServerCommandSource> schoolLiteral(MagicSchool school, String literal) {
 		return CommandManager.literal(literal)
 			.executes(context -> setSchoolForSelf(context.getSource(), school))
@@ -480,6 +517,14 @@ public final class MagicCommands {
 
 	private static int setTestingModeForSelf(ServerCommandSource source, boolean enabled) throws CommandSyntaxException {
 		return setTestingMode(source, List.of(source.getPlayerOrThrow()), enabled);
+	}
+
+	private static int setCelestialAlignmentRarityForSelf(ServerCommandSource source, String rarityId) throws CommandSyntaxException {
+		return setCelestialAlignmentRarity(source, List.of(source.getPlayerOrThrow()), rarityId);
+	}
+
+	private static int clearCelestialAlignmentRarityForSelf(ServerCommandSource source) throws CommandSyntaxException {
+		return clearCelestialAlignmentRarity(source, List.of(source.getPlayerOrThrow()));
 	}
 
 	private static int setSchoolForSelf(ServerCommandSource source, MagicSchool school) throws CommandSyntaxException {
@@ -605,6 +650,37 @@ public final class MagicCommands {
 		}
 
 		sendTestingModeFeedback(source, targets, enabled);
+		return changedCount == 0 ? Command.SINGLE_SUCCESS : changedCount;
+	}
+
+	private static int setCelestialAlignmentRarity(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		String rarityId
+	) {
+		int changedCount = 0;
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.setCelestialAlignmentForcedRarity(target, rarityId)) {
+				changedCount++;
+			}
+		}
+
+		sendCelestialAlignmentRarityFeedback(source, targets, rarityId);
+		return changedCount == 0 ? Command.SINGLE_SUCCESS : changedCount;
+	}
+
+	private static int clearCelestialAlignmentRarity(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets
+	) {
+		int changedCount = 0;
+		for (ServerPlayerEntity target : targets) {
+			if (MagicAbilityManager.clearCelestialAlignmentForcedRarity(target)) {
+				changedCount++;
+			}
+		}
+
+		sendCelestialAlignmentRarityResetFeedback(source, targets);
 		return changedCount == 0 ? Command.SINGLE_SUCCESS : changedCount;
 	}
 
@@ -917,6 +993,55 @@ public final class MagicCommands {
 			() -> Text.translatable(keyPrefix + ".multiple", targets.size()),
 			true
 		);
+	}
+
+	private static void sendCelestialAlignmentRarityFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		String rarityId
+	) {
+		Text rarityName = Text.literal(displayCelestialAlignmentRarity(rarityId));
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.testing.celestial_alignment.rarity.single", rarityName, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.testing.celestial_alignment.rarity.multiple", rarityName, targets.size()),
+			true
+		);
+	}
+
+	private static void sendCelestialAlignmentRarityResetFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets
+	) {
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable("command.magic.testing.celestial_alignment.rarity.reset.single", target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable("command.magic.testing.celestial_alignment.rarity.reset.multiple", targets.size()),
+			true
+		);
+	}
+
+	private static String displayCelestialAlignmentRarity(String rarityId) {
+		return switch (rarityId) {
+			case "common" -> "Common";
+			case "rare" -> "Rare";
+			case "mythic" -> "Mythic";
+			default -> rarityId;
+		};
 	}
 
 	private static void sendSchoolSetFeedback(

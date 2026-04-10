@@ -1254,12 +1254,14 @@ public final class GreedRuntime {
 			return 0;
 		}
 
+		int adjustedMinimumCoins = MagicAbilityManager.adjustCelestialAlignmentGreedCoinCost(player, minimumCoins);
+		int adjustedMaximumCoins = Math.max(adjustedMinimumCoins, MagicAbilityManager.adjustCelestialAlignmentGreedCoinCost(player, maximumCoins));
 		int available = availableWholeCoins(storage);
-		if (available < minimumCoins) {
+		if (available < adjustedMinimumCoins) {
 			return 0;
 		}
 
-		return Math.min(available, maximumCoins);
+		return Math.min(available, adjustedMaximumCoins);
 	}
 
 	private static void addCoinUnits(ServerPlayerEntity caster, UUID sourcePlayerId, int coinUnits, int currentTick) {

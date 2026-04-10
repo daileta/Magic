@@ -82,6 +82,8 @@ public final class ManaHudOverlay {
 	private static int constellationWarningFadeInTicks = 0;
 	private static int constellationWarningStayTicks = 0;
 	private static int constellationWarningFadeOutTicks = 0;
+	private static int constellationWarningXOffset = Integer.MIN_VALUE;
+	private static int constellationWarningYOffset = Integer.MIN_VALUE;
 	private static int constellationWarningStartAge = Integer.MIN_VALUE;
 	private static List<Text> activeGreedDomainWarningLines = List.of();
 	private static int activeGreedDomainWarningColor = 0xFFFFFFFF;
@@ -205,15 +207,19 @@ public final class ManaHudOverlay {
 		float scale,
 		int fadeInTicks,
 		int stayTicks,
-		int fadeOutTicks
+		int fadeOutTicks,
+		int xOffset,
+		int yOffset
 	) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		activeConstellationWarning = Text.literal(message == null ? "" : message).formatted(Formatting.BOLD);
+		activeConstellationWarning = Text.literal(message == null ? "" : message);
 		activeConstellationWarningColor = 0xFF000000 | (colorRgb & 0x00FFFFFF);
-		constellationWarningScale = Math.max(JESTER_JOKE_SCALE + 0.1F, scale);
+		constellationWarningScale = Math.max(0.5F, scale);
 		constellationWarningFadeInTicks = Math.max(0, fadeInTicks);
 		constellationWarningStayTicks = Math.max(0, stayTicks);
 		constellationWarningFadeOutTicks = Math.max(0, fadeOutTicks);
+		constellationWarningXOffset = xOffset;
+		constellationWarningYOffset = yOffset;
 		constellationWarningStartAge = client.player == null ? Integer.MIN_VALUE : client.player.age;
 	}
 
@@ -857,9 +863,13 @@ public final class ManaHudOverlay {
 		matrices.pushMatrix();
 		matrices.scale(fittedScale, fittedScale);
 		int drawX = Math.round((drawContext.getScaledWindowWidth() - (warningWidth * fittedScale)) / (2.0F * fittedScale));
-		int drawY = Math.round(
-			(drawContext.getScaledWindowHeight() - (client.textRenderer.fontHeight * fittedScale)) / (2.0F * fittedScale)
-		);
+		int drawY = Math.round(JESTER_JOKE_Y / fittedScale);
+		if (constellationWarningXOffset != Integer.MIN_VALUE) {
+			drawX += Math.round(constellationWarningXOffset / fittedScale);
+		}
+		if (constellationWarningYOffset != Integer.MIN_VALUE) {
+			drawY = Math.round((JESTER_JOKE_Y + constellationWarningYOffset) / fittedScale);
+		}
 		drawContext.drawTextWithShadow(
 			client.textRenderer,
 			activeConstellationWarning,
@@ -1091,6 +1101,8 @@ public final class ManaHudOverlay {
 		constellationWarningFadeInTicks = 0;
 		constellationWarningStayTicks = 0;
 		constellationWarningFadeOutTicks = 0;
+		constellationWarningXOffset = Integer.MIN_VALUE;
+		constellationWarningYOffset = Integer.MIN_VALUE;
 		constellationWarningStartAge = Integer.MIN_VALUE;
 	}
 

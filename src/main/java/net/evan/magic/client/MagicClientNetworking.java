@@ -37,7 +37,9 @@ public final class MagicClientNetworking {
 					payload.scale(),
 					payload.fadeInTicks(),
 					payload.stayTicks(),
-					payload.fadeOutTicks()
+					payload.fadeOutTicks(),
+					payload.xOffset(),
+					payload.yOffset()
 				)
 			)
 		);

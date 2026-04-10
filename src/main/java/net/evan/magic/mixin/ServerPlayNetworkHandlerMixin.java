@@ -87,6 +87,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerMove", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerMoveHead(PlayerMoveC2SPacket packet, CallbackInfo ci) {
+		if (MagicAbilityManager.handleCelestialPlayerMovePacket(player, packet)) {
+			ci.cancel();
+			return;
+		}
 		MagicAbilityManager.onManipulationLookPacket(player, packet.getYaw(player.getYaw()), packet.getPitch(player.getPitch()));
 		if (MagicAbilityManager.isManipulationControlledTarget(player)) {
 			magic$packetDebug("{} packet onPlayerMove canceled: player is manipulation-controlled target", magic$debugName());
@@ -108,6 +112,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerInput", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerInputHead(PlayerInputC2SPacket packet, CallbackInfo ci) {
+		if (MagicAbilityManager.handleCelestialPlayerInputPacket(player, packet)) {
+			ci.cancel();
+			return;
+		}
 		MagicAbilityManager.onManipulationInputPacket(player, packet.input());
 		if (MagicAbilityManager.isManipulationControlledTarget(player)) {
 			magic$packetDebug("{} packet onPlayerInput canceled: player is manipulation-controlled target", magic$debugName());
@@ -134,6 +142,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onClientCommand", at = @At("HEAD"), cancellable = true)
 	private void magic$onClientCommandHead(ClientCommandC2SPacket packet, CallbackInfo ci) {
+		if (MagicAbilityManager.handleCelestialClientCommandPacket(player, packet)) {
+			ci.cancel();
+			return;
+		}
 		magic$packetDebug(
 			"{} packet onClientCommand HEAD: mode={}",
 			magic$debugName(),
@@ -177,6 +189,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerAction", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerActionHead(PlayerActionC2SPacket packet, CallbackInfo ci) {
+		if (MagicAbilityManager.handleCelestialPlayerActionPacket(player, packet)) {
+			ci.cancel();
+			return;
+		}
 		PlayerActionC2SPacket.Action action = packet.getAction();
 		magic$packetDebug("{} packet onPlayerAction HEAD: action={}", magic$debugName(), action);
 		if (magic$isGreedIntroFrozen()) {
@@ -213,6 +229,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerInteractBlock", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerInteractBlockHead(PlayerInteractBlockC2SPacket packet, CallbackInfo ci) {
+		if (MagicAbilityManager.handleCelestialInteractBlockPacket(player, packet)) {
+			ci.cancel();
+			return;
+		}
 		if (magic$isGreedIntroFrozen()) {
 			ci.cancel();
 			return;
@@ -240,6 +260,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerInteractItem", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerInteractItemHead(PlayerInteractItemC2SPacket packet, CallbackInfo ci) {
+		if (MagicAbilityManager.handleCelestialInteractItemPacket(player, packet)) {
+			ci.cancel();
+			return;
+		}
 		if (magic$isGreedIntroFrozen()) {
 			ci.cancel();
 			return;
@@ -262,6 +286,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 
 	@Inject(method = "onPlayerInteractEntity", at = @At("HEAD"), cancellable = true)
 	private void magic$onPlayerInteractEntityHead(PlayerInteractEntityC2SPacket packet, CallbackInfo ci) {
+		if (MagicAbilityManager.handleCelestialInteractEntityPacket(player, packet)) {
+			ci.cancel();
+			return;
+		}
 		magic$packetDebug("{} packet onPlayerInteractEntity HEAD", magic$debugName());
 		if (magic$isGreedIntroFrozen()) {
 			ci.cancel();

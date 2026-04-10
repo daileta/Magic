@@ -13,7 +13,9 @@ public record ConstellationWarningOverlayPayload(
 	float scale,
 	int fadeInTicks,
 	int stayTicks,
-	int fadeOutTicks
+	int fadeOutTicks,
+	int xOffset,
+	int yOffset
 ) implements CustomPayload {
 	public static final CustomPayload.Id<ConstellationWarningOverlayPayload> ID = new CustomPayload.Id<>(
 		Identifier.of(Magic.MOD_ID, "constellation_warning_overlay")
@@ -31,6 +33,10 @@ public record ConstellationWarningOverlayPayload(
 		ConstellationWarningOverlayPayload::stayTicks,
 		PacketCodecs.INTEGER,
 		ConstellationWarningOverlayPayload::fadeOutTicks,
+		PacketCodecs.INTEGER,
+		ConstellationWarningOverlayPayload::xOffset,
+		PacketCodecs.INTEGER,
+		ConstellationWarningOverlayPayload::yOffset,
 		ConstellationWarningOverlayPayload::new
 	);
 

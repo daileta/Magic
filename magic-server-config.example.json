@@ -769,7 +769,7 @@
     "warningStayTicks": 50,
     "warningFadeOutTicks": 5,
     "warningScale": 2.1,
-    "activationCostPercent": 30.0,
+    "activationCostPercent": 45.0,
     "cooldownTicks": 900,
     "trueDamage": 5.0,
     "slownessAmplifier": 255,
@@ -784,21 +784,165 @@
     "activationImpactSoundVolume": 1.2,
     "activationImpactSoundPitch": 0.65
   },
-  "constellationSagittarius": {
-    "beamRange": 32.0,
-    "beamRadius": 1.5,
-    "windupTicks": 60,
-    "windupMovementSpeedMultiplier": 0.5,
-    "chargeGlowParticleCount": 1,
-    "chargeBeamParticleCount": 0,
-    "activationCostPercent": 35.0,
-    "cooldownTicks": 1800,
-    "closeRangeThreshold": 5.0,
-    "midRangeThreshold": 10.0,
-    "closeRangeTrueDamage": 10.0,
-    "midRangeTrueDamage": 6.0,
-    "farRangeTrueDamage": 2.0,
-    "disableManaRegenDuringWindup": true
+  "constellationCelestialAlignment": {
+    "activationCostPercent": 45.0,
+    "cooldownTicks": 400,
+    "targetPlacementRange": 15.0,
+    "columnHeight": 10.0,
+    "visuals": {
+      "renderGroundRing": true,
+      "renderTopRing": true,
+      "renderConstellationShape": true,
+      "renderVerticalLinks": true,
+      "particleIntervalTicks": 4,
+      "groundRingParticleCount": 40,
+      "topRingParticleCount": 40,
+      "starNodeParticleCount": 4,
+      "connectionLineParticleCount": 10,
+      "verticalLinkParticleCount": 8,
+      "groundRingPrimaryColorHex": "#74FF9A",
+      "groundRingSecondaryColorHex": "#FFFFFF",
+      "topRingPrimaryColorHex": "#74FF9A",
+      "topRingSecondaryColorHex": "#FFFFFF",
+      "starNodeColorHex": "#FFFFFF",
+      "connectionLineColorHex": "#DFFFE8",
+      "verticalLinkColorHex": "#C4FFD8",
+      "ringParticleScale": 1.2,
+      "starNodeParticleScale": 1.05,
+      "connectionParticleScale": 0.85,
+      "verticalLinkParticleScale": 0.65
+    },
+    "banner": {
+      "enabled": true,
+      "scale": 1.2,
+      "fadeInTicks": 4,
+      "fadeOutTicks": 8,
+      "screenXOffset": 0,
+      "screenYOffset": 0,
+      "commonColorHex": "#FFFFFF",
+      "rareColorHex": "#4AA3FF",
+      "mythicColorHex": "#FF4A4A"
+    },
+    "rarityWeights": {
+      "common": 60.0,
+      "rare": 35.0,
+      "mythic": 5.0
+    },
+    "common": {
+      "crater": {
+        "poolWeight": 16.0,
+        "durationTicks": 200,
+        "radius": 6.0,
+        "blockNaturalHealing": true,
+        "blockPotionHealing": true,
+        "blockEffectHealing": true,
+        "blockMagicHealing": true
+      },
+      "ara": {
+        "poolWeight": 14.0,
+        "durationTicks": 240,
+        "radius": 7.0,
+        "manaCostMultiplier": 1.5,
+        "greedCoinMultiplier": 1.5
+      },
+      "horologium": {
+        "poolWeight": 12.0,
+        "durationTicks": 240,
+        "radius": 7.0,
+        "enemyPositiveEffectDrainMultiplier": 2.0,
+        "casterPositiveEffectExtensionMultiplier": 2.0
+      },
+      "sagitta": {
+        "poolWeight": 10.0,
+        "durationTicks": 140,
+        "radius": 7.0,
+        "beamStartDelayTicks": 20,
+        "beamIntervalTicks": 4,
+        "beamsPerInterval": 2,
+        "beamDamage": 2.0,
+        "beamHitRadius": 0.85
+      },
+      "gemini": {
+        "poolWeight": 8.0,
+        "durationTicks": 200,
+        "radius": 6.0,
+        "recordedHitCount": 3
+      }
+    },
+    "rare": {
+      "pyxis": {
+        "poolWeight": 9.0,
+        "durationTicks": 100,
+        "radius": 5.0,
+        "invertForwardBackward": true,
+        "invertStrafe": true,
+        "invertJumpSneak": true,
+        "mirrorVerticalDelta": true,
+        "groundedSneakJumpLift": 0.42
+      },
+      "bootes": {
+        "poolWeight": 8.0,
+        "durationTicks": 160,
+        "radius": 6.0,
+        "casterCooldownRateMultiplier": 2.0,
+        "othersMovementSpeedMultiplier": 0.5,
+        "disableSprint": true
+      },
+      "coronaBorealis": {
+        "poolWeight": 7.0,
+        "durationTicks": 160,
+        "radius": 6.0,
+        "casterImmuneToNegativeEffects": true,
+        "curseExistingCasterEffects": true,
+        "targetNegativeDurationMultiplier": 1.5,
+        "targetNegativeAmplifierBonus": 1
+      },
+      "aquila": {
+        "poolWeight": 6.0,
+        "durationTicks": 160,
+        "radius": 7.0,
+        "starSpawnIntervalTicks": 4,
+        "starsPerInterval": 1,
+        "starDamage": 5.0,
+        "starSpeed": 1.1,
+        "homingStrength": 0.3,
+        "hitRadius": 0.85,
+        "maxLifetimeTicks": 40
+      },
+      "scorpius": {
+        "poolWeight": 5.0,
+        "durationTicks": 100,
+        "radius": 5.0,
+        "incomingDamageMultiplier": 1.5
+      }
+    },
+    "mythic": {
+      "cetus": {
+        "poolWeight": 2.0,
+        "durationTicks": 100,
+        "radius": 6.0,
+        "pullStrength": 0.35,
+        "suspendProjectilesAtCenter": true,
+        "centerHoldRadius": 1.2,
+        "projectileContactDamage": 4.0,
+        "affectNonLivingEntities": true
+      },
+      "reticulum": {
+        "poolWeight": 1.5,
+        "durationTicks": 120,
+        "radius": 8.0,
+        "inputDelayTicks": 40
+      },
+      "libra": {
+        "poolWeight": 1.5,
+        "durationTicks": 120,
+        "radius": 5.5,
+        "redistributeOutgoingDamage": true,
+        "includeOriginalTarget": true,
+        "minimumEligibleTargets": 1,
+        "casterIncomingDamageMultiplier": 0.5
+      }
+    }
   },
   "constellationOrion": {
     "targetRange": 64.0,

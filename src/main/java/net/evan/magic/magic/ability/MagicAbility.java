@@ -27,7 +27,7 @@ public enum MagicAbility {
 	PLUS_ULTRA(5, MagicSchool.JESTER, "plus_ultra"),
 	CASSIOPEIA(1, MagicSchool.CONSTELLATION, "cassiopeia"),
 	HERCULES_BURDEN_OF_THE_SKY(2, MagicSchool.CONSTELLATION, "hercules_burden_of_the_sky"),
-	SAGITTARIUS_ASTRAL_ARROW(3, MagicSchool.CONSTELLATION, "sagittarius_astral_arrow"),
+	SAGITTARIUS_ASTRAL_ARROW(3, MagicSchool.CONSTELLATION, "celestial_alignment"),
 	ORIONS_GAMBIT(4, MagicSchool.CONSTELLATION, "orions_gambit"),
 	ASTRAL_CATACLYSM(5, MagicSchool.CONSTELLATION, "astral_cataclysm"),
 	APPRAISERS_MARK(1, MagicSchool.GREED, "appraisers_mark"),
@@ -69,6 +69,9 @@ public enum MagicAbility {
 
 		if ("manipulation".equals(id)) {
 			return MANIPULATION;
+		}
+		if ("sagittarius_astral_arrow".equals(id)) {
+			return SAGITTARIUS_ASTRAL_ARROW;
 		}
 		if ("phoenixs_cage".equals(id)) {
 			return SEARING_DASH;

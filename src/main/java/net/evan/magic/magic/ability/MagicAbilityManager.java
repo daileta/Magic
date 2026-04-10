@@ -76,10 +76,17 @@ import net.minecraft.entity.passive.PandaEntity;
 import net.minecraft.entity.passive.ParrotEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
+import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.s2c.play.EntitiesDestroyS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntityPositionSyncS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
@@ -93,6 +100,7 @@ import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtHelper;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.particle.BlockStateParticleEffect;
+import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.particle.ItemStackParticleEffect;
 import net.minecraft.particle.ParticleEffect;
 import net.minecraft.particle.ParticleTypes;
@@ -139,12 +147,9 @@ public final class MagicAbilityManager {
 		RegistryKeys.DAMAGE_TYPE,
 		Identifier.of(Magic.MOD_ID, "true_magic")
 	);
-	private static final RegistryKey<DamageType> SAGITTARIUS_ASTRAL_ARROW_DAMAGE_TYPE = RegistryKey.of(
-		RegistryKeys.DAMAGE_TYPE,
-		Identifier.of(Magic.MOD_ID, "sagittarius_astral_arrow")
-	);
 	private static MagicConfig.FrostConfig FROST_CONFIG = new MagicConfig.FrostConfig();
 	private static MagicConfig.BurningPassionConfig BURNING_PASSION_CONFIG = new MagicConfig.BurningPassionConfig();
+	private static MagicConfig.ConstellationCelestialAlignmentConfig CELESTIAL_ALIGNMENT_CONFIG = new MagicConfig.ConstellationCelestialAlignmentConfig();
 	private static int BELOW_FREEZING_COOLDOWN_TICKS = 30 * TICKS_PER_SECOND;
 	private static int FROST_ASCENT_COOLDOWN_TICKS = 0;
 	private static int BELOW_FREEZING_MANA_DRAIN_PER_SECOND = 5;
@@ -433,20 +438,6 @@ public final class MagicAbilityManager {
 	private static double HERCULES_ACTIVATION_IMPACT_DIRT_PARTICLE_SPEED = 0.08;
 	private static float HERCULES_ACTIVATION_IMPACT_SOUND_VOLUME = 1.2F;
 	private static float HERCULES_ACTIVATION_IMPACT_SOUND_PITCH = 0.65F;
-	private static double SAGITTARIUS_BEAM_RANGE = 32.0;
-	private static double SAGITTARIUS_BEAM_RADIUS = 1.5;
-	private static int SAGITTARIUS_WINDUP_TICKS = 3 * TICKS_PER_SECOND;
-	private static double SAGITTARIUS_WINDUP_MOVEMENT_SPEED_MULTIPLIER = 0.5;
-	private static int SAGITTARIUS_CHARGE_GLOW_PARTICLE_COUNT = 1;
-	private static int SAGITTARIUS_CHARGE_BEAM_PARTICLE_COUNT = 0;
-	private static double SAGITTARIUS_ACTIVATION_COST_PERCENT = 35.0;
-	private static int SAGITTARIUS_COOLDOWN_TICKS = 90 * TICKS_PER_SECOND;
-	private static double SAGITTARIUS_CLOSE_RANGE_THRESHOLD = 5.0;
-	private static double SAGITTARIUS_MID_RANGE_THRESHOLD = 10.0;
-	private static float SAGITTARIUS_CLOSE_RANGE_TRUE_DAMAGE = 10.0F;
-	private static float SAGITTARIUS_MID_RANGE_TRUE_DAMAGE = 6.0F;
-	private static float SAGITTARIUS_FAR_RANGE_TRUE_DAMAGE = 2.0F;
-	private static boolean SAGITTARIUS_DISABLE_MANA_REGEN_DURING_WINDUP = true;
 	private static double ORIONS_GAMBIT_TARGET_RANGE = 64.0;
 	private static int ORIONS_GAMBIT_WAIT_CANCEL_COOLDOWN_TICKS = 3 * TICKS_PER_SECOND;
 	private static int ORIONS_GAMBIT_LINK_DURATION_TICKS = 40 * TICKS_PER_SECOND;
@@ -695,12 +686,11 @@ public final class MagicAbilityManager {
 	private static final Identifier SPOTLIGHT_MOVEMENT_SPEED_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "spotlight_movement_speed");
 	private static final Identifier SPOTLIGHT_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "spotlight_max_health");
 	private static final Identifier SPOTLIGHT_SCALE_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "spotlight_scale");
-	private static final Identifier SAGITTARIUS_WINDUP_SPEED_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "sagittarius_windup_speed");
+	private static final Identifier CELESTIAL_ALIGNMENT_BOOTES_SPEED_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "celestial_alignment_bootes_speed");
 	private static final Identifier ORIONS_GAMBIT_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "orions_gambit_max_health");
 	private static final Identifier FROST_STAGE_MAX_HEALTH_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "frost_stage_max_health");
 	private static final Identifier BURNING_PASSION_STEP_HEIGHT_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "burning_passion_step_height");
 	private static final Identifier BURNING_PASSION_ENGINE_HEART_ATTACK_DAMAGE_MODIFIER_ID = Identifier.of(Magic.MOD_ID, "burning_passion_engine_heart_attack_damage");
-	private static final ParticleEffect SAGITTARIUS_BEAM_PARTICLE = ParticleTypes.END_ROD;
 	private static final ParticleEffect FROST_SHARD_PARTICLE = new ItemStackParticleEffect(ParticleTypes.ITEM, new ItemStack(ModItems.FROST_SHARD));
 	private static final double DOMAIN_TELEPORT_POSITION_EPSILON_SQUARED = 4.0E-4;
 	private static final float DOMAIN_TELEPORT_ROTATION_EPSILON_DEGREES = 0.5F;
@@ -796,8 +786,15 @@ public final class MagicAbilityManager {
 	private static final Map<UUID, HerculesBurdenState> HERCULES_STATES = new HashMap<>();
 	private static final Map<UUID, AstralBurdenTargetState> HERCULES_TARGETS = new HashMap<>();
 	private static final Map<UUID, Integer> HERCULES_COOLDOWN_END_TICK = new HashMap<>();
-	private static final Map<UUID, SagittariusWindupState> SAGITTARIUS_STATES = new HashMap<>();
+	private static final Map<UUID, CelestialAlignmentState> SAGITTARIUS_STATES = new HashMap<>();
 	private static final Map<UUID, Integer> SAGITTARIUS_COOLDOWN_END_TICK = new HashMap<>();
+	private static final Map<UUID, List<DelayedCelestialAction>> CELESTIAL_DELAYED_ACTIONS = new HashMap<>();
+	private static final Map<UUID, CelestialAlignmentRarity> CELESTIAL_ALIGNMENT_FORCED_RARITIES = new HashMap<>();
+	private static final Map<String, Double> CELESTIAL_HOROLOGIUM_EFFECT_BUDGET = new HashMap<>();
+	private static final Set<UUID> CELESTIAL_DAMAGE_REDIRECT_GUARD = new HashSet<>();
+	private static final Set<UUID> CELESTIAL_DAMAGE_SCALE_GUARD = new HashSet<>();
+	private static final ThreadLocal<Integer> CELESTIAL_DELAY_BYPASS_DEPTH = ThreadLocal.withInitial(() -> 0);
+	private static final ThreadLocal<Integer> CELESTIAL_TRANSFORM_BYPASS_DEPTH = ThreadLocal.withInitial(() -> 0);
 	private static final Map<UUID, OrionGambitState> ORIONS_GAMBIT_STATES = new HashMap<>();
 	private static final Map<UUID, OrionPenaltyState> ORIONS_GAMBIT_PENALTIES = new HashMap<>();
 	private static final Map<UUID, UUID> ORIONS_GAMBIT_CASTER_BY_TARGET = new HashMap<>();
@@ -1123,20 +1120,7 @@ public final class MagicAbilityManager {
 		HERCULES_ACTIVATION_IMPACT_DIRT_PARTICLE_SPEED = Math.max(0.0, config.constellationHercules.activationImpactDirtParticleSpeed);
 		HERCULES_ACTIVATION_IMPACT_SOUND_VOLUME = Math.max(0.0F, config.constellationHercules.activationImpactSoundVolume);
 		HERCULES_ACTIVATION_IMPACT_SOUND_PITCH = Math.max(0.0F, config.constellationHercules.activationImpactSoundPitch);
-		SAGITTARIUS_BEAM_RANGE = Math.max(1.0, config.constellationSagittarius.beamRange);
-		SAGITTARIUS_BEAM_RADIUS = Math.max(0.1, config.constellationSagittarius.beamRadius);
-		SAGITTARIUS_WINDUP_TICKS = Math.max(1, config.constellationSagittarius.windupTicks);
-		SAGITTARIUS_WINDUP_MOVEMENT_SPEED_MULTIPLIER = MathHelper.clamp(config.constellationSagittarius.windupMovementSpeedMultiplier, 0.0, 1.0);
-		SAGITTARIUS_CHARGE_GLOW_PARTICLE_COUNT = Math.max(0, config.constellationSagittarius.chargeGlowParticleCount);
-		SAGITTARIUS_CHARGE_BEAM_PARTICLE_COUNT = Math.max(0, config.constellationSagittarius.chargeBeamParticleCount);
-		SAGITTARIUS_ACTIVATION_COST_PERCENT = MathHelper.clamp(config.constellationSagittarius.activationCostPercent, 0.0, 100.0);
-		SAGITTARIUS_COOLDOWN_TICKS = Math.max(0, config.constellationSagittarius.cooldownTicks);
-		SAGITTARIUS_CLOSE_RANGE_THRESHOLD = Math.max(0.0, config.constellationSagittarius.closeRangeThreshold);
-		SAGITTARIUS_MID_RANGE_THRESHOLD = Math.max(SAGITTARIUS_CLOSE_RANGE_THRESHOLD, config.constellationSagittarius.midRangeThreshold);
-		SAGITTARIUS_CLOSE_RANGE_TRUE_DAMAGE = Math.max(0.0F, config.constellationSagittarius.closeRangeTrueDamage);
-		SAGITTARIUS_MID_RANGE_TRUE_DAMAGE = Math.max(0.0F, config.constellationSagittarius.midRangeTrueDamage);
-		SAGITTARIUS_FAR_RANGE_TRUE_DAMAGE = Math.max(0.0F, config.constellationSagittarius.farRangeTrueDamage);
-		SAGITTARIUS_DISABLE_MANA_REGEN_DURING_WINDUP = config.constellationSagittarius.disableManaRegenDuringWindup;
+		CELESTIAL_ALIGNMENT_CONFIG = config.constellationCelestialAlignment;
 		ORIONS_GAMBIT_TARGET_RANGE = Math.max(1.0, config.constellationOrion.targetRange);
 		ORIONS_GAMBIT_WAIT_CANCEL_COOLDOWN_TICKS = Math.max(0, config.constellationOrion.waitCancelCooldownTicks);
 		ORIONS_GAMBIT_LINK_DURATION_TICKS = Math.max(1, config.constellationOrion.linkDurationTicks);
@@ -1281,6 +1265,9 @@ public final class MagicAbilityManager {
 			player.sendMessage(Text.translatable("message.magic.ability.not_implemented", abilitySlot), true);
 			return;
 		}
+		if (queueCelestialAbilityRequest(player, abilitySlot)) {
+			return;
+		}
 
 		UUID playerId = player.getUuid();
 		int currentTick = player.getEntityWorld().getServer().getTicks();
@@ -1321,7 +1308,7 @@ public final class MagicAbilityManager {
 		}
 
 		if (currentActiveAbility == MagicAbility.SAGITTARIUS_ASTRAL_ARROW && requestedAbility != MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
-			player.sendMessage(Text.translatable("message.magic.constellation.still_charging", MagicAbility.SAGITTARIUS_ASTRAL_ARROW.displayName()), true);
+			player.sendMessage(Text.translatable("message.magic.constellation.celestial_alignment.active"), true);
 			return;
 		}
 
@@ -4564,8 +4551,8 @@ public final class MagicAbilityManager {
 
 	private static void handleSagittariusAstralArrowRequest(ServerPlayerEntity player) {
 		int currentTick = player.getEntityWorld().getServer().getTicks();
-		if (activeAbility(player) == MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
-			player.sendMessage(Text.translatable("message.magic.constellation.still_charging", MagicAbility.SAGITTARIUS_ASTRAL_ARROW.displayName()), true);
+		if (activeAbility(player) == MagicAbility.SAGITTARIUS_ASTRAL_ARROW && SAGITTARIUS_STATES.containsKey(player.getUuid())) {
+			player.sendMessage(Text.translatable("message.magic.constellation.celestial_alignment.active"), true);
 			return;
 		}
 
@@ -4575,17 +4562,47 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		int manaCost = (int) Math.ceil(manaFromPercentExact(SAGITTARIUS_ACTIVATION_COST_PERCENT));
+		BlockHitResult placement = findTargetedBlock(player, CELESTIAL_ALIGNMENT_CONFIG.targetPlacementRange);
+		if (placement == null || placement.getType() != HitResult.Type.BLOCK) {
+			player.sendMessage(Text.translatable("message.magic.constellation.celestial_alignment.no_ground"), true);
+			return;
+		}
+
+		int manaCost = (int) Math.ceil(manaFromPercentExact(CELESTIAL_ALIGNMENT_CONFIG.activationCostPercent));
 		if (!canSpendAbilityCost(player, manaCost)) {
 			player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
 			return;
 		}
 
+		CelestialAlignmentRoll selectedConstellation = rollCelestialAlignment(player);
+		if (selectedConstellation == null) {
+			player.sendMessage(Text.translatable("message.magic.ability.not_implemented", MagicAbility.SAGITTARIUS_ASTRAL_ARROW.displayName()), true);
+			return;
+		}
+
+		Vec3d blockCenter = placement.getBlockPos().toCenterPos();
+		Vec3d center = new Vec3d(blockCenter.x, placement.getBlockPos().getY() + 1.05, blockCenter.z);
+		int durationTicks = selectedConstellation.durationTicks();
 		spendAbilityCost(player, manaCost);
 		setActiveAbility(player, MagicAbility.SAGITTARIUS_ASTRAL_ARROW);
 		MagicPlayerData.setDepletedRecoveryMode(player, false);
-		SAGITTARIUS_STATES.put(player.getUuid(), new SagittariusWindupState(currentTick + SAGITTARIUS_WINDUP_TICKS));
-		applySagittariusWindupModifier(player);
+		SAGITTARIUS_STATES.put(
+			player.getUuid(),
+			new CelestialAlignmentState(
+				player.getUuid(),
+				player.getEntityWorld().getRegistryKey(),
+				center,
+				selectedConstellation.radius(),
+				center.y,
+				center.y + CELESTIAL_ALIGNMENT_CONFIG.columnHeight,
+				selectedConstellation.rarity(),
+				selectedConstellation.constellation(),
+				currentTick,
+				currentTick + durationTicks
+			)
+		);
+		startAbilityCooldownFromNow(player.getUuid(), MagicAbility.SAGITTARIUS_ASTRAL_ARROW, currentTick);
+		sendCelestialAlignmentBanner(player, selectedConstellation, durationTicks);
 		player.sendMessage(Text.translatable("message.magic.ability.activated", MagicAbility.SAGITTARIUS_ASTRAL_ARROW.displayName()), true);
 		recordOrionsGambitAbilityUse(player, MagicAbility.SAGITTARIUS_ASTRAL_ARROW);
 	}
@@ -7877,6 +7894,11 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		ServerPlayerEntity anyAttacker = attackingPlayerFrom(source);
+		if (anyAttacker != null && anyAttacker != entity && anyAttacker.isAlive() && !anyAttacker.isSpectator()) {
+			recordCelestialGeminiHit(anyAttacker, entity, damageTaken);
+		}
+
 		ServerPlayerEntity attacker = directMeleePlayerAttackerFrom(source);
 		if (attacker == null || attacker == entity || !attacker.isAlive() || attacker.isSpectator()) {
 			return;
@@ -8482,6 +8504,10 @@ public final class MagicAbilityManager {
 		return Math.abs(MathHelper.wrapDegrees(target - current));
 	}
 
+	private static int currentTick(ServerPlayerEntity player) {
+		return player == null || player.getEntityWorld().getServer() == null ? Integer.MIN_VALUE : player.getEntityWorld().getServer().getTicks();
+	}
+
 	private static void runWithDomainTeleportBypass(Runnable action) {
 		int depth = DOMAIN_TELEPORT_BYPASS_DEPTH.get();
 		DOMAIN_TELEPORT_BYPASS_DEPTH.set(depth + 1);
@@ -8656,6 +8682,7 @@ public final class MagicAbilityManager {
 		ENGINE_HEART_COOLDOWN_END_TICK.clear();
 		OVERRIDE_COOLDOWN_END_TICK.clear();
 		TEST_MODE_PLAYERS.clear();
+		CELESTIAL_ALIGNMENT_FORCED_RARITIES.clear();
 		TILL_DEATH_DO_US_PART_PASSIVE_ENABLED.clear();
 		TILL_DEATH_DO_US_PART_STATES.clear();
 		TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK.clear();
@@ -8681,6 +8708,7 @@ public final class MagicAbilityManager {
 		cachedBeaconCoreAnchor = null;
 		cachedBeaconCoreAnchorTick = Integer.MIN_VALUE;
 		TEST_MODE_PLAYERS.clear();
+		CELESTIAL_ALIGNMENT_FORCED_RARITIES.clear();
 		MARTYRS_FLAME_PASSIVE_ENABLED.clear();
 		MARTYRS_FLAME_COOLDOWN_END_TICK.clear();
 		MARTYRS_FLAME_DRAIN_BUFFER.clear();
@@ -9106,6 +9134,7 @@ public final class MagicAbilityManager {
 		updateHerculesBurdenStates(server, currentTick);
 		updateHerculesBurdenTargets(server, currentTick);
 		updateSagittariusWindups(server, currentTick);
+		updateCelestialDelayedActions(server, currentTick);
 		updateOrionsGambitStates(server, currentTick);
 		updateOrionsGambitPenalties(server, currentTick);
 		updateAstralCataclysmDomainStates(server, currentTick);
@@ -9936,6 +9965,25 @@ public final class MagicAbilityManager {
 		if (directAttacker != null && isDirectCasterDamageBlocked(directAttacker, entity, currentTick)) {
 			DOMAIN_CLASH_PENDING_DAMAGE.remove(entity.getUuid());
 			return false;
+		}
+
+		if (!CELESTIAL_DAMAGE_REDIRECT_GUARD.contains(entity.getUuid()) && tryApplyCelestialAlignmentDamageRedirect(entity, source, amount)) {
+			DOMAIN_CLASH_PENDING_DAMAGE.remove(entity.getUuid());
+			return false;
+		}
+
+		if (!CELESTIAL_DAMAGE_SCALE_GUARD.contains(entity.getUuid())) {
+			float scaledAmount = celestialScaledIncomingDamage(entity, source, amount);
+			if (Math.abs(scaledAmount - amount) > 1.0E-6F && entity.getEntityWorld() instanceof ServerWorld world) {
+				CELESTIAL_DAMAGE_SCALE_GUARD.add(entity.getUuid());
+				try {
+					entity.damage(world, source, scaledAmount);
+				} finally {
+					CELESTIAL_DAMAGE_SCALE_GUARD.remove(entity.getUuid());
+				}
+				DOMAIN_CLASH_PENDING_DAMAGE.remove(entity.getUuid());
+				return false;
+			}
 		}
 
 		if (!(entity instanceof ServerPlayerEntity player)) {
@@ -13111,7 +13159,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean canSpendAbilityCost(ServerPlayerEntity player, int manaCost) {
-		int adjustedManaCost = GreedDomainRuntime.adjustManaCost(player, manaCost);
+		int adjustedManaCost = adjustCelestialAlignmentManaCost(player, GreedDomainRuntime.adjustManaCost(player, manaCost));
 		return isTestingMode(player) || isOrionsGambitManaCostSuppressed(player) || MagicPlayerData.getMana(player) >= Math.max(0, adjustedManaCost);
 	}
 
@@ -13122,7 +13170,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static void spendAbilityCost(ServerPlayerEntity player, int manaCost) {
-		int adjustedManaCost = GreedDomainRuntime.adjustManaCost(player, manaCost);
+		int adjustedManaCost = adjustCelestialAlignmentManaCost(player, GreedDomainRuntime.adjustManaCost(player, manaCost));
 		if (isTestingMode(player)) {
 			MagicPlayerData.setMana(player, MagicPlayerData.MAX_MANA);
 			MagicPlayerData.setDepletedRecoveryMode(player, false);
@@ -13157,12 +13205,50 @@ public final class MagicAbilityManager {
 		}
 
 		boolean changed = enabled ? TEST_MODE_PLAYERS.add(player.getUuid()) : TEST_MODE_PLAYERS.remove(player.getUuid());
+		if (!enabled && CELESTIAL_ALIGNMENT_FORCED_RARITIES.remove(player.getUuid()) != null) {
+			changed = true;
+		}
 		if (enabled) {
 			MagicPlayerData.setMana(player, MagicPlayerData.MAX_MANA);
 			MagicPlayerData.setDepletedRecoveryMode(player, false);
 		}
 		resetAllCooldowns(player);
 		return changed;
+	}
+
+	public static boolean setCelestialAlignmentForcedRarity(ServerPlayerEntity player, String rarityId) {
+		if (player == null) {
+			return false;
+		}
+
+		CelestialAlignmentRarity rarity = parseCelestialAlignmentRarity(rarityId);
+		if (rarity == null) {
+			return false;
+		}
+
+		CelestialAlignmentRarity previous = CELESTIAL_ALIGNMENT_FORCED_RARITIES.put(player.getUuid(), rarity);
+		return previous != rarity;
+	}
+
+	public static boolean clearCelestialAlignmentForcedRarity(ServerPlayerEntity player) {
+		if (player == null) {
+			return false;
+		}
+
+		return CELESTIAL_ALIGNMENT_FORCED_RARITIES.remove(player.getUuid()) != null;
+	}
+
+	private static CelestialAlignmentRarity parseCelestialAlignmentRarity(String rarityId) {
+		if (rarityId == null) {
+			return null;
+		}
+
+		return switch (rarityId.trim().toLowerCase()) {
+			case "common" -> CelestialAlignmentRarity.COMMON;
+			case "rare" -> CelestialAlignmentRarity.RARE;
+			case "mythic" -> CelestialAlignmentRarity.MYTHIC;
+			default -> null;
+		};
 	}
 
 	public static boolean setMagicSchool(ServerPlayerEntity player, MagicSchool school) {
@@ -13274,7 +13360,7 @@ public final class MagicAbilityManager {
 			return 0;
 		}
 		if (currentActiveAbility == MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
-			player.sendMessage(Text.translatable("message.magic.constellation.still_charging", MagicAbility.SAGITTARIUS_ASTRAL_ARROW.displayName()), true);
+			player.sendMessage(Text.translatable("message.magic.constellation.celestial_alignment.active"), true);
 			return 0;
 		}
 		if (currentActiveAbility == MagicAbility.PLUS_ULTRA) {
@@ -13379,7 +13465,7 @@ public final class MagicAbilityManager {
 			case BELOW_FREEZING -> false;
 			case IGNITION -> false;
 			case HERCULES_BURDEN_OF_THE_SKY -> HERCULES_DISABLE_MANA_REGEN_WHILE_ACTIVE;
-			case SAGITTARIUS_ASTRAL_ARROW -> SAGITTARIUS_DISABLE_MANA_REGEN_DURING_WINDUP;
+			case SAGITTARIUS_ASTRAL_ARROW -> false;
 			case ASTRAL_CATACLYSM -> ASTRAL_CATACLYSM_DISABLE_MANA_REGEN_WHILE_ACTIVE;
 			default -> true;
 		};
@@ -13552,6 +13638,39 @@ public final class MagicAbilityManager {
 		return target;
 	}
 
+	private static BlockHitResult findTargetedBlock(ServerPlayerEntity caster, double range) {
+		Vec3d eyePos = caster.getEyePos();
+		Vec3d look = caster.getRotationVec(1.0F);
+		Vec3d end = eyePos.add(look.multiply(Math.max(1.0, range)));
+		BlockHitResult hitResult = caster.getEntityWorld().raycast(
+			new RaycastContext(eyePos, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, caster)
+		);
+		return hitResult.getType() == HitResult.Type.BLOCK ? hitResult : null;
+	}
+
+	private static List<LivingEntity> collectLivingEntitiesAlongBeam(
+		ServerPlayerEntity caster,
+		Vec3d start,
+		Vec3d end,
+		double radius
+	) {
+		double minX = Math.min(start.x, end.x);
+		double minY = Math.min(start.y, end.y);
+		double minZ = Math.min(start.z, end.z);
+		double maxX = Math.max(start.x, end.x);
+		double maxY = Math.max(start.y, end.y);
+		double maxZ = Math.max(start.z, end.z);
+		Box searchBox = new Box(minX, minY, minZ, maxX, maxY, maxZ).expand(radius);
+		List<LivingEntity> targets = new ArrayList<>();
+		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != caster;
+		for (Entity entity : caster.getEntityWorld().getOtherEntities(caster, searchBox, filter)) {
+			if (entity instanceof LivingEntity livingTarget && livingTarget.getBoundingBox().expand(radius).raycast(start, end).isPresent()) {
+				targets.add(livingTarget);
+			}
+		}
+		return targets;
+	}
+
 	private static ServerPlayerEntity findPlayerTargetInLineOfSight(ServerPlayerEntity caster) {
 		return findPlayerTargetInLineOfSight(caster, LOVE_GAZE_RANGE);
 	}
@@ -13672,7 +13791,9 @@ public final class MagicAbilityManager {
 			HERCULES_WARNING_SCALE,
 			HERCULES_WARNING_FADE_IN_TICKS,
 			HERCULES_WARNING_STAY_TICKS,
-			HERCULES_WARNING_FADE_OUT_TICKS
+			HERCULES_WARNING_FADE_OUT_TICKS,
+			Integer.MIN_VALUE,
+			Integer.MIN_VALUE
 		);
 		ServerPlayNetworking.send(target, payload);
 	}
@@ -13772,134 +13893,53 @@ public final class MagicAbilityManager {
 		HERCULES_TARGETS.entrySet().removeIf(entry -> entry.getValue().casterId.equals(casterId));
 	}
 
-	private static void applySagittariusWindupModifier(ServerPlayerEntity caster) {
-		setSignedAttributeModifier(
-			caster.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED),
-			SAGITTARIUS_WINDUP_SPEED_MODIFIER_ID,
-			SAGITTARIUS_WINDUP_MOVEMENT_SPEED_MULTIPLIER - 1.0,
-			EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
-		);
-	}
-
 	private static void clearSagittariusWindup(ServerPlayerEntity caster) {
-		SAGITTARIUS_STATES.remove(caster.getUuid());
-		removeAttributeModifier(caster.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED), SAGITTARIUS_WINDUP_SPEED_MODIFIER_ID);
+		CelestialAlignmentState state = SAGITTARIUS_STATES.remove(caster.getUuid());
+		if (state != null) {
+			releaseCelestialAlignmentState(caster.getEntityWorld().getServer(), state, false);
+		}
 		if (activeAbility(caster) == MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
 			setActiveAbility(caster, MagicAbility.NONE);
 		}
 	}
 
 	private static void applySagittariusAstralArrow(ServerPlayerEntity caster, int currentTick) {
-		SagittariusWindupState state = SAGITTARIUS_STATES.get(caster.getUuid());
+		CelestialAlignmentState state = SAGITTARIUS_STATES.get(caster.getUuid());
 		if (state == null) {
 			clearSagittariusWindup(caster);
 			return;
 		}
-
-		applySagittariusWindupModifier(caster);
-		if (currentTick >= state.fireTick) {
-			fireSagittariusAstralArrow(caster, currentTick);
+		if (currentTick >= state.endTick) {
+			releaseCelestialAlignmentState(caster.getEntityWorld().getServer(), state, true);
+			SAGITTARIUS_STATES.remove(caster.getUuid());
+			setActiveAbility(caster, MagicAbility.NONE);
 		}
 	}
 
 	private static void updateSagittariusWindups(MinecraftServer server, int currentTick) {
-		List<UUID> readyToFire = new ArrayList<>();
-		List<UUID> staleWindups = new ArrayList<>();
-		Iterator<Map.Entry<UUID, SagittariusWindupState>> iterator = SAGITTARIUS_STATES.entrySet().iterator();
+		Iterator<Map.Entry<UUID, CelestialAlignmentState>> iterator = SAGITTARIUS_STATES.entrySet().iterator();
 		while (iterator.hasNext()) {
-			Map.Entry<UUID, SagittariusWindupState> entry = iterator.next();
+			Map.Entry<UUID, CelestialAlignmentState> entry = iterator.next();
 			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(entry.getKey());
-			if (caster == null || !caster.isAlive() || activeAbility(caster) != MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
-				staleWindups.add(entry.getKey());
+			CelestialAlignmentState state = entry.getValue();
+			if (
+				caster == null
+				|| !caster.isAlive()
+				|| activeAbility(caster) != MagicAbility.SAGITTARIUS_ASTRAL_ARROW
+				|| caster.getEntityWorld().getRegistryKey() != state.dimension
+			) {
+				releaseCelestialAlignmentState(server, state, false);
+				iterator.remove();
 				continue;
 			}
-
-			if (currentTick >= entry.getValue().fireTick) {
-				readyToFire.add(entry.getKey());
-			} else {
-				spawnSagittariusChargeParticles(caster);
-			}
-		}
-
-		for (UUID casterId : readyToFire) {
-			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(casterId);
-			if (caster != null && caster.isAlive()) {
-				fireSagittariusAstralArrow(caster, currentTick);
-			}
-		}
-
-		for (UUID casterId : staleWindups) {
-			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(casterId);
-			if (caster != null) {
-				clearSagittariusWindup(caster);
+			if (currentTick >= state.endTick) {
+				releaseCelestialAlignmentState(server, state, true);
+				setActiveAbility(caster, MagicAbility.NONE);
+				iterator.remove();
 				continue;
 			}
-
-			SAGITTARIUS_STATES.remove(casterId);
+			updateCelestialAlignmentState(server, caster, state, currentTick);
 		}
-	}
-
-	private static void fireSagittariusAstralArrow(ServerPlayerEntity caster, int currentTick) {
-		SAGITTARIUS_STATES.remove(caster.getUuid());
-		removeAttributeModifier(caster.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED), SAGITTARIUS_WINDUP_SPEED_MODIFIER_ID);
-		Vec3d start = caster.getEyePos();
-		Vec3d direction = caster.getRotationVec(1.0F);
-		Vec3d end = start.add(direction.multiply(SAGITTARIUS_BEAM_RANGE));
-		BlockHitResult blockHit = caster.getEntityWorld().raycast(
-			new RaycastContext(start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, caster)
-		);
-		if (blockHit.getType() == HitResult.Type.BLOCK) {
-			end = blockHit.getPos();
-		}
-
-		for (LivingEntity target : collectLivingEntitiesAlongBeam(caster, start, end, SAGITTARIUS_BEAM_RADIUS)) {
-			float damage = sagittariusDamageForDistance(Math.sqrt(caster.squaredDistanceTo(target)));
-			if (damage > 0.0F && caster.getEntityWorld() instanceof ServerWorld world) {
-				dealTrackedMagicDamage(target, caster.getUuid(), createSagittariusAstralArrowDamageSource(world, caster), damage);
-			}
-		}
-
-		if (caster.getEntityWorld() instanceof ServerWorld world) {
-			spawnParticleBeam(world, start, end, SAGITTARIUS_BEAM_PARTICLE, 0.6);
-			world.playSound(null, caster.getX(), caster.getY(), caster.getZ(), SoundEvents.BLOCK_BEACON_POWER_SELECT, SoundCategory.PLAYERS, 1.2F, 1.7F);
-			world.playSound(null, caster.getX(), caster.getY(), caster.getZ(), SoundEvents.ENTITY_GUARDIAN_ATTACK, SoundCategory.PLAYERS, 0.8F, 1.15F);
-		}
-
-		setActiveAbility(caster, MagicAbility.NONE);
-		startAbilityCooldownFromNow(caster.getUuid(), MagicAbility.SAGITTARIUS_ASTRAL_ARROW, currentTick);
-	}
-
-	private static List<LivingEntity> collectLivingEntitiesAlongBeam(
-		ServerPlayerEntity caster,
-		Vec3d start,
-		Vec3d end,
-		double radius
-	) {
-		double minX = Math.min(start.x, end.x);
-		double minY = Math.min(start.y, end.y);
-		double minZ = Math.min(start.z, end.z);
-		double maxX = Math.max(start.x, end.x);
-		double maxY = Math.max(start.y, end.y);
-		double maxZ = Math.max(start.z, end.z);
-		Box searchBox = new Box(minX, minY, minZ, maxX, maxY, maxZ).expand(radius);
-		List<LivingEntity> targets = new ArrayList<>();
-		Predicate<Entity> filter = entity -> isMagicTargetableEntity(entity) && entity != caster;
-		for (Entity entity : caster.getEntityWorld().getOtherEntities(caster, searchBox, filter)) {
-			if (entity instanceof LivingEntity livingTarget && livingTarget.getBoundingBox().expand(radius).raycast(start, end).isPresent()) {
-				targets.add(livingTarget);
-			}
-		}
-		return targets;
-	}
-
-	private static float sagittariusDamageForDistance(double distance) {
-		if (distance <= SAGITTARIUS_CLOSE_RANGE_THRESHOLD) {
-			return SAGITTARIUS_CLOSE_RANGE_TRUE_DAMAGE;
-		}
-		if (distance <= SAGITTARIUS_MID_RANGE_THRESHOLD) {
-			return SAGITTARIUS_MID_RANGE_TRUE_DAMAGE;
-		}
-		return SAGITTARIUS_FAR_RANGE_TRUE_DAMAGE;
 	}
 
 	private static DamageSource createTrueMagicDamageSource(ServerWorld world, Entity attacker) {
@@ -13913,10 +13953,6 @@ public final class MagicAbilityManager {
 	private static DamageSource createTrueMagicDamageSource(MinecraftServer server, ServerWorld world, UUID casterId) {
 		ServerPlayerEntity caster = server.getPlayerManager().getPlayer(casterId);
 		return caster == null ? createTrueMagicDamageSource(world) : createTrueMagicDamageSource(world, caster);
-	}
-
-	private static DamageSource createSagittariusAstralArrowDamageSource(ServerWorld world, ServerPlayerEntity caster) {
-		return createConfiguredMagicDamageSource(world, caster, SAGITTARIUS_ASTRAL_ARROW_DAMAGE_TYPE);
 	}
 
 	private static DamageSource createConfiguredMagicDamageSource(ServerWorld world, Entity attacker, RegistryKey<DamageType> damageTypeKey) {
@@ -13939,6 +13975,1057 @@ public final class MagicAbilityManager {
 			world.spawnParticles(particle, current.x, current.y, current.z, 2, 0.08, 0.08, 0.08, 0.0);
 			current = current.add(step);
 		}
+	}
+
+	private static void sendCelestialAlignmentBanner(ServerPlayerEntity caster, CelestialAlignmentRoll roll, int durationTicks) {
+		if (!CELESTIAL_ALIGNMENT_CONFIG.banner.enabled) {
+			return;
+		}
+
+		MagicConfig.BannerConfig banner = CELESTIAL_ALIGNMENT_CONFIG.banner;
+		ServerPlayNetworking.send(
+			caster,
+			new ConstellationWarningOverlayPayload(
+				celestialAlignmentDisplayName(roll.constellation()),
+				celestialAlignmentRarityColor(roll.rarity()),
+				banner.scale,
+				banner.fadeInTicks,
+				durationTicks,
+				banner.fadeOutTicks,
+				banner.screenXOffset,
+				banner.screenYOffset
+			)
+		);
+	}
+
+	private static void clearCelestialAlignmentBanner(ServerPlayerEntity caster) {
+		if (caster == null) {
+			return;
+		}
+
+		ServerPlayNetworking.send(
+			caster,
+			new ConstellationWarningOverlayPayload(
+				"",
+				0xFFFFFF,
+				CELESTIAL_ALIGNMENT_CONFIG.banner.scale,
+				0,
+				0,
+				0,
+				CELESTIAL_ALIGNMENT_CONFIG.banner.screenXOffset,
+				CELESTIAL_ALIGNMENT_CONFIG.banner.screenYOffset
+			)
+		);
+	}
+
+	private static CelestialAlignmentRoll rollCelestialAlignment(ServerPlayerEntity caster) {
+		CelestialAlignmentRarity forcedRarity = CELESTIAL_ALIGNMENT_FORCED_RARITIES.get(caster.getUuid());
+		if (forcedRarity != null) {
+			List<CelestialAlignmentConstellation> forcedPool = celestialAlignmentPool(forcedRarity);
+			double forcedPoolWeight = 0.0;
+			for (CelestialAlignmentConstellation constellation : forcedPool) {
+				forcedPoolWeight += celestialAlignmentPoolWeight(constellation);
+			}
+			if (forcedPoolWeight <= 1.0E-6) {
+				return null;
+			}
+
+			double forcedRoll = caster.getRandom().nextDouble() * forcedPoolWeight;
+			double forcedRunningWeight = 0.0;
+			for (CelestialAlignmentConstellation constellation : forcedPool) {
+				forcedRunningWeight += celestialAlignmentPoolWeight(constellation);
+				if (forcedRoll <= forcedRunningWeight) {
+					return new CelestialAlignmentRoll(
+						forcedRarity,
+						constellation,
+						celestialAlignmentDurationTicks(constellation),
+						celestialAlignmentRadius(constellation)
+					);
+				}
+			}
+		}
+
+		double totalRarityWeight = Math.max(0.0, CELESTIAL_ALIGNMENT_CONFIG.rarityWeights.common)
+			+ Math.max(0.0, CELESTIAL_ALIGNMENT_CONFIG.rarityWeights.rare)
+			+ Math.max(0.0, CELESTIAL_ALIGNMENT_CONFIG.rarityWeights.mythic);
+		if (totalRarityWeight <= 1.0E-6) {
+			return null;
+		}
+
+		double rarityRoll = caster.getRandom().nextDouble() * totalRarityWeight;
+		CelestialAlignmentRarity rarity;
+		if (rarityRoll < CELESTIAL_ALIGNMENT_CONFIG.rarityWeights.common) {
+			rarity = CelestialAlignmentRarity.COMMON;
+		} else if (rarityRoll < CELESTIAL_ALIGNMENT_CONFIG.rarityWeights.common + CELESTIAL_ALIGNMENT_CONFIG.rarityWeights.rare) {
+			rarity = CelestialAlignmentRarity.RARE;
+		} else {
+			rarity = CelestialAlignmentRarity.MYTHIC;
+		}
+
+		List<CelestialAlignmentConstellation> pool = celestialAlignmentPool(rarity);
+		double totalPoolWeight = 0.0;
+		for (CelestialAlignmentConstellation constellation : pool) {
+			totalPoolWeight += celestialAlignmentPoolWeight(constellation);
+		}
+		if (totalPoolWeight <= 1.0E-6) {
+			return null;
+		}
+
+		double constellationRoll = caster.getRandom().nextDouble() * totalPoolWeight;
+		double runningWeight = 0.0;
+		for (CelestialAlignmentConstellation constellation : pool) {
+			runningWeight += celestialAlignmentPoolWeight(constellation);
+			if (constellationRoll <= runningWeight) {
+				return new CelestialAlignmentRoll(
+					rarity,
+					constellation,
+					celestialAlignmentDurationTicks(constellation),
+					celestialAlignmentRadius(constellation)
+				);
+			}
+		}
+
+		CelestialAlignmentConstellation fallback = pool.get(pool.size() - 1);
+		return new CelestialAlignmentRoll(rarity, fallback, celestialAlignmentDurationTicks(fallback), celestialAlignmentRadius(fallback));
+	}
+
+	private static List<CelestialAlignmentConstellation> celestialAlignmentPool(CelestialAlignmentRarity rarity) {
+		return switch (rarity) {
+			case COMMON -> List.of(
+				CelestialAlignmentConstellation.CRATER,
+				CelestialAlignmentConstellation.ARA,
+				CelestialAlignmentConstellation.HOROLOGIUM,
+				CelestialAlignmentConstellation.SAGITTA,
+				CelestialAlignmentConstellation.GEMINI
+			);
+			case RARE -> List.of(
+				CelestialAlignmentConstellation.PYXIS,
+				CelestialAlignmentConstellation.BOOTES,
+				CelestialAlignmentConstellation.CORONA_BOREALIS,
+				CelestialAlignmentConstellation.AQUILA,
+				CelestialAlignmentConstellation.SCORPIUS
+			);
+			case MYTHIC -> List.of(
+				CelestialAlignmentConstellation.CETUS,
+				CelestialAlignmentConstellation.RETICULUM,
+				CelestialAlignmentConstellation.LIBRA
+			);
+		};
+	}
+
+	private static String celestialAlignmentDisplayName(CelestialAlignmentConstellation constellation) {
+		return Text.translatable(constellation.translationKey).getString();
+	}
+
+	private static int celestialAlignmentRarityColor(CelestialAlignmentRarity rarity) {
+		return switch (rarity) {
+			case COMMON -> parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.banner.commonColorHex, 0xFFFFFF);
+			case RARE -> parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.banner.rareColorHex, 0x4AA3FF);
+			case MYTHIC -> parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.banner.mythicColorHex, 0xFF4A4A);
+		};
+	}
+
+	private static int parseHexColor(String rawColor, int fallbackColor) {
+		if (rawColor == null || rawColor.isBlank()) {
+			return fallbackColor;
+		}
+
+		String normalized = rawColor.trim();
+		if (normalized.startsWith("#")) {
+			normalized = normalized.substring(1);
+		}
+		try {
+			return Integer.parseInt(normalized, 16);
+		} catch (NumberFormatException exception) {
+			return fallbackColor;
+		}
+	}
+
+	private static DustParticleEffect celestialDust(String colorHex, float scale) {
+		return new DustParticleEffect(parseHexColor(colorHex, 0xFFFFFF), Math.max(0.1F, scale));
+	}
+
+	private static void updateCelestialAlignmentState(
+		MinecraftServer server,
+		ServerPlayerEntity caster,
+		CelestialAlignmentState state,
+		int currentTick
+	) {
+		ServerWorld world = server.getWorld(state.dimension);
+		if (world == null) {
+			return;
+		}
+
+		if (currentTick >= state.nextVisualTick) {
+			spawnCelestialAlignmentVisuals(world, state);
+			state.nextVisualTick = currentTick + Math.max(1, CELESTIAL_ALIGNMENT_CONFIG.visuals.particleIntervalTicks);
+		}
+
+		List<LivingEntity> livingInside = collectLivingEntitiesInCelestialAlignment(world, state, caster);
+		HashSet<UUID> currentLivingIds = new HashSet<>();
+		for (LivingEntity living : livingInside) {
+			currentLivingIds.add(living.getUuid());
+		}
+
+		for (UUID previousId : new HashSet<>(state.trackedLivingIds)) {
+			if (!currentLivingIds.contains(previousId)) {
+				onCelestialAlignmentEntityLeft(server, state, previousId);
+			}
+		}
+		state.trackedLivingIds.clear();
+		state.trackedLivingIds.addAll(currentLivingIds);
+
+		for (LivingEntity living : livingInside) {
+			refreshCelestialMovementSpeedModifier(living);
+			if (state.constellation == CelestialAlignmentConstellation.BOOTES && living != caster) {
+				living.setSprinting(false);
+				if (living instanceof MobEntity mob) {
+					mob.getNavigation().stop();
+				}
+			}
+			if (state.constellation == CelestialAlignmentConstellation.HOROLOGIUM) {
+				applyHorologiumEffects(caster, state, living);
+			}
+			if (state.constellation == CelestialAlignmentConstellation.CORONA_BOREALIS) {
+				applyCoronaBorealisEffects(caster, state, living);
+			}
+		}
+
+		if (state.constellation == CelestialAlignmentConstellation.BOOTES && isInsideCelestialAlignmentArea(state, caster)) {
+			accelerateCelestialCooldowns(caster, celestialBootesExtraCooldownTicksPerTick());
+		}
+		if (state.constellation == CelestialAlignmentConstellation.SAGITTA) {
+			updateSagittaConstellation(world, caster, state, currentTick);
+		}
+		if (state.constellation == CelestialAlignmentConstellation.AQUILA) {
+			updateAquilaConstellation(world, caster, state, currentTick);
+		}
+		if (state.constellation == CelestialAlignmentConstellation.CETUS) {
+			updateCetusConstellation(world, caster, state);
+		}
+	}
+
+	private static void releaseCelestialAlignmentState(MinecraftServer server, CelestialAlignmentState state, boolean expired) {
+		if (server == null || state == null) {
+			return;
+		}
+
+		ServerWorld world = server.getWorld(state.dimension);
+		if (world != null) {
+			if (expired && state.constellation == CelestialAlignmentConstellation.GEMINI) {
+				releaseGeminiRecordedDamage(server, world, state);
+			}
+			if (state.constellation == CelestialAlignmentConstellation.CETUS) {
+				releaseCetusProjectiles(world, state);
+			}
+		}
+
+		for (UUID trackedId : new HashSet<>(state.trackedLivingIds)) {
+			onCelestialAlignmentEntityLeft(server, state, trackedId);
+		}
+		state.trackedLivingIds.clear();
+		state.geminiRecordedDamage.clear();
+		state.aquilaStars.clear();
+		state.suspendedProjectileIds.clear();
+		state.observedNegativeEffectsByEntity.clear();
+
+		ServerPlayerEntity caster = server.getPlayerManager().getPlayer(state.ownerId);
+		if (caster != null) {
+			clearCelestialAlignmentBanner(caster);
+		}
+	}
+
+	private static void onCelestialAlignmentEntityLeft(MinecraftServer server, CelestialAlignmentState state, UUID entityId) {
+		state.geminiRecordedDamage.remove(entityId);
+		state.observedNegativeEffectsByEntity.remove(entityId);
+		clearCelestialDelayQueueIfUnaffected(server, entityId, state);
+
+		ServerWorld world = server.getWorld(state.dimension);
+		if (world == null) {
+			return;
+		}
+		Entity entity = world.getEntity(entityId);
+		if (entity instanceof LivingEntity living) {
+			refreshCelestialMovementSpeedModifier(living);
+		}
+	}
+
+	private static List<LivingEntity> collectLivingEntitiesInCelestialAlignment(
+		ServerWorld world,
+		CelestialAlignmentState state,
+		ServerPlayerEntity caster
+	) {
+		Box searchBox = new Box(
+			state.center.x - state.radius,
+			state.minY,
+			state.center.z - state.radius,
+			state.center.x + state.radius,
+			state.maxY,
+			state.center.z + state.radius
+		);
+		ArrayList<LivingEntity> livingEntities = new ArrayList<>();
+		if (isInsideCelestialAlignmentArea(state, caster)) {
+			livingEntities.add(caster);
+		}
+		for (Entity entity : world.getOtherEntities(caster, searchBox, candidate -> candidate instanceof LivingEntity living && isMagicTargetableEntity(living))) {
+			if (entity instanceof LivingEntity living && isInsideCelestialAlignmentArea(state, living)) {
+				livingEntities.add(living);
+			}
+		}
+		return livingEntities;
+	}
+
+	private static boolean isInsideCelestialAlignmentArea(CelestialAlignmentState state, Entity entity) {
+		return entity != null
+			&& entity.getEntityWorld().getRegistryKey() == state.dimension
+			&& isInsideCelestialAlignmentArea(state, entity.getX(), entity.getBodyY(0.5), entity.getZ());
+	}
+
+	private static boolean isInsideCelestialAlignmentArea(CelestialAlignmentState state, double x, double y, double z) {
+		if (y < state.minY - 1.0E-6 || y > state.maxY + 1.0E-6) {
+			return false;
+		}
+		double dx = x - state.center.x;
+		double dz = z - state.center.z;
+		return dx * dx + dz * dz <= state.radius * state.radius + 1.0E-6;
+	}
+
+	private static void spawnCelestialAlignmentVisuals(ServerWorld world, CelestialAlignmentState state) {
+		CelestialPattern pattern = celestialPattern(state.constellation);
+		if (CELESTIAL_ALIGNMENT_CONFIG.visuals.renderGroundRing) {
+			spawnCelestialAlignmentRing(world, state, state.minY, false);
+			if (CELESTIAL_ALIGNMENT_CONFIG.visuals.renderTopRing) {
+				spawnCelestialAlignmentRing(world, state, state.maxY, true);
+			}
+		}
+		if (CELESTIAL_ALIGNMENT_CONFIG.visuals.renderConstellationShape) {
+			spawnCelestialAlignmentPattern(world, state, pattern, state.minY);
+			spawnCelestialAlignmentPattern(world, state, pattern, state.maxY);
+			if (CELESTIAL_ALIGNMENT_CONFIG.visuals.renderVerticalLinks) {
+				spawnCelestialAlignmentVerticalLinks(world, state, pattern);
+			}
+		}
+	}
+
+	private static void spawnCelestialAlignmentRing(ServerWorld world, CelestialAlignmentState state, double y, boolean top) {
+		int count = top ? CELESTIAL_ALIGNMENT_CONFIG.visuals.topRingParticleCount : CELESTIAL_ALIGNMENT_CONFIG.visuals.groundRingParticleCount;
+		if (count <= 0) {
+			return;
+		}
+
+		DustParticleEffect primary = celestialDust(
+			top ? CELESTIAL_ALIGNMENT_CONFIG.visuals.topRingPrimaryColorHex : CELESTIAL_ALIGNMENT_CONFIG.visuals.groundRingPrimaryColorHex,
+			CELESTIAL_ALIGNMENT_CONFIG.visuals.ringParticleScale
+		);
+		DustParticleEffect secondary = celestialDust(
+			top ? CELESTIAL_ALIGNMENT_CONFIG.visuals.topRingSecondaryColorHex : CELESTIAL_ALIGNMENT_CONFIG.visuals.groundRingSecondaryColorHex,
+			CELESTIAL_ALIGNMENT_CONFIG.visuals.ringParticleScale
+		);
+		for (int index = 0; index < count; index++) {
+			double angle = (Math.PI * 2.0 * index) / count;
+			double x = state.center.x + Math.cos(angle) * state.radius;
+			double z = state.center.z + Math.sin(angle) * state.radius;
+			world.spawnParticles(index % 2 == 0 ? primary : secondary, x, y, z, 1, 0.02, 0.02, 0.02, 0.0);
+		}
+	}
+
+	private static void spawnCelestialAlignmentPattern(ServerWorld world, CelestialAlignmentState state, CelestialPattern pattern, double y) {
+		DustParticleEffect nodeParticle = celestialDust(CELESTIAL_ALIGNMENT_CONFIG.visuals.starNodeColorHex, CELESTIAL_ALIGNMENT_CONFIG.visuals.starNodeParticleScale);
+		DustParticleEffect lineParticle = celestialDust(CELESTIAL_ALIGNMENT_CONFIG.visuals.connectionLineColorHex, CELESTIAL_ALIGNMENT_CONFIG.visuals.connectionParticleScale);
+		for (Vec3d node : pattern.nodes) {
+			Vec3d point = celestialPatternPoint(state, node, y);
+			world.spawnParticles(nodeParticle, point.x, point.y, point.z, Math.max(1, CELESTIAL_ALIGNMENT_CONFIG.visuals.starNodeParticleCount), 0.03, 0.03, 0.03, 0.0);
+		}
+		for (CelestialPatternEdge edge : pattern.edges) {
+			Vec3d start = celestialPatternPoint(state, pattern.nodes.get(edge.startIndex), y);
+			Vec3d end = celestialPatternPoint(state, pattern.nodes.get(edge.endIndex), y);
+			spawnCelestialAlignmentLine(world, start, end, lineParticle, CELESTIAL_ALIGNMENT_CONFIG.visuals.connectionLineParticleCount);
+		}
+	}
+
+	private static void spawnCelestialAlignmentVerticalLinks(ServerWorld world, CelestialAlignmentState state, CelestialPattern pattern) {
+		DustParticleEffect particle = celestialDust(CELESTIAL_ALIGNMENT_CONFIG.visuals.verticalLinkColorHex, CELESTIAL_ALIGNMENT_CONFIG.visuals.verticalLinkParticleScale);
+		for (Vec3d node : pattern.nodes) {
+			spawnCelestialAlignmentLine(
+				world,
+				celestialPatternPoint(state, node, state.minY),
+				celestialPatternPoint(state, node, state.maxY),
+				particle,
+				CELESTIAL_ALIGNMENT_CONFIG.visuals.verticalLinkParticleCount
+			);
+		}
+	}
+
+	private static void spawnCelestialAlignmentLine(ServerWorld world, Vec3d start, Vec3d end, ParticleEffect particle, int count) {
+		if (count <= 0) {
+			return;
+		}
+
+		Vec3d delta = end.subtract(start);
+		for (int index = 0; index <= count; index++) {
+			double progress = index / (double) Math.max(1, count);
+			Vec3d point = start.add(delta.multiply(progress));
+			world.spawnParticles(particle, point.x, point.y, point.z, 1, 0.01, 0.01, 0.01, 0.0);
+		}
+	}
+
+	private static Vec3d celestialPatternPoint(CelestialAlignmentState state, Vec3d normalizedPoint, double y) {
+		return new Vec3d(state.center.x + normalizedPoint.x * state.radius, y, state.center.z + normalizedPoint.z * state.radius);
+	}
+
+	private static void applyHorologiumEffects(ServerPlayerEntity caster, CelestialAlignmentState state, LivingEntity living) {
+		boolean casterAffected = living.getUuid().equals(state.ownerId) && isInsideCelestialAlignmentArea(state, living);
+		for (StatusEffectInstance effect : List.copyOf(living.getStatusEffects())) {
+			if (effect.getEffectType().value().getCategory() != StatusEffectCategory.BENEFICIAL) {
+				continue;
+			}
+			double extraPerTick = casterAffected
+				? Math.max(0.0, CELESTIAL_ALIGNMENT_CONFIG.common.horologium.casterPositiveEffectExtensionMultiplier - 1.0)
+				: Math.max(0.0, CELESTIAL_ALIGNMENT_CONFIG.common.horologium.enemyPositiveEffectDrainMultiplier - 1.0);
+			int deltaTicks = celestialConsumeStatusBudget(living.getUuid(), effect, casterAffected ? "extend" : "drain", extraPerTick);
+			if (deltaTicks <= 0) {
+				continue;
+			}
+			int nextDuration = casterAffected ? effect.getDuration() + deltaTicks : Math.max(1, effect.getDuration() - deltaTicks);
+			living.addStatusEffect(new StatusEffectInstance(effect.getEffectType(), nextDuration, effect.getAmplifier(), effect.isAmbient(), effect.shouldShowParticles(), effect.shouldShowIcon()));
+		}
+	}
+
+	private static int celestialConsumeStatusBudget(UUID entityId, StatusEffectInstance effect, String mode, double amountPerTick) {
+		if (amountPerTick <= 1.0E-6) {
+			return 0;
+		}
+		String key = entityId + "|" + Registries.STATUS_EFFECT.getId(effect.getEffectType().value()) + "|" + mode;
+		double nextBudget = CELESTIAL_HOROLOGIUM_EFFECT_BUDGET.getOrDefault(key, 0.0) + amountPerTick;
+		int wholeTicks = (int) Math.floor(nextBudget + 1.0E-6);
+		if (wholeTicks <= 0) {
+			CELESTIAL_HOROLOGIUM_EFFECT_BUDGET.put(key, nextBudget);
+			return 0;
+		}
+		CELESTIAL_HOROLOGIUM_EFFECT_BUDGET.put(key, nextBudget - wholeTicks);
+		return wholeTicks;
+	}
+
+	private static void applyCoronaBorealisEffects(ServerPlayerEntity caster, CelestialAlignmentState state, LivingEntity living) {
+		if (living.getUuid().equals(state.ownerId)) {
+			for (RegistryEntry<StatusEffect> effect : COMMON_NEGATIVE_EFFECTS) {
+				if (living.hasStatusEffect(effect)) {
+					living.removeStatusEffect(effect);
+				}
+			}
+			return;
+		}
+
+		Map<RegistryEntry<StatusEffect>, ObservedStatusEffectState> observed = state.observedNegativeEffectsByEntity.computeIfAbsent(living.getUuid(), ignored -> new HashMap<>());
+		for (StatusEffectInstance effect : List.copyOf(living.getStatusEffects())) {
+			if (effect.getEffectType().value().getCategory() != StatusEffectCategory.HARMFUL) {
+				continue;
+			}
+			ObservedStatusEffectState previous = observed.get(effect.getEffectType());
+			if (previous != null && effect.getAmplifier() == previous.amplifier && effect.getDuration() <= previous.durationTicks) {
+				continue;
+			}
+			int nextDuration = Math.max(1, (int) Math.ceil(effect.getDuration() * CELESTIAL_ALIGNMENT_CONFIG.rare.coronaBorealis.targetNegativeDurationMultiplier));
+			int nextAmplifier = effect.getAmplifier() + CELESTIAL_ALIGNMENT_CONFIG.rare.coronaBorealis.targetNegativeAmplifierBonus;
+			living.addStatusEffect(new StatusEffectInstance(effect.getEffectType(), nextDuration, nextAmplifier, effect.isAmbient(), effect.shouldShowParticles(), effect.shouldShowIcon()));
+			observed.put(effect.getEffectType(), new ObservedStatusEffectState(nextDuration, nextAmplifier));
+		}
+	}
+
+	private static void updateSagittaConstellation(ServerWorld world, ServerPlayerEntity caster, CelestialAlignmentState state, int currentTick) {
+		if (currentTick < state.startTick + CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.beamStartDelayTicks) {
+			return;
+		}
+		if (currentTick < state.nextEffectTick) {
+			return;
+		}
+		state.nextEffectTick = currentTick + Math.max(1, CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.beamIntervalTicks);
+		for (int index = 0; index < CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.beamsPerInterval; index++) {
+			double angle = caster.getRandom().nextDouble() * Math.PI * 2.0;
+			double distance = Math.sqrt(caster.getRandom().nextDouble()) * state.radius;
+			double x = state.center.x + Math.cos(angle) * distance;
+			double z = state.center.z + Math.sin(angle) * distance;
+			Vec3d start = new Vec3d(x, state.maxY, z);
+			Vec3d end = new Vec3d(x, state.minY, z);
+			spawnParticleBeam(world, start, end, ParticleTypes.END_ROD, 0.4);
+			for (LivingEntity living : collectLivingEntitiesInCelestialAlignment(world, state, caster)) {
+				if (living == caster) {
+					continue;
+				}
+				double dx = living.getX() - x;
+				double dz = living.getZ() - z;
+				if (dx * dx + dz * dz <= CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.beamHitRadius * CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.beamHitRadius) {
+					dealTrackedMagicDamage(living, caster.getUuid(), createTrueMagicDamageSource(world, caster), CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.beamDamage);
+				}
+			}
+		}
+	}
+
+	private static void updateAquilaConstellation(ServerWorld world, ServerPlayerEntity caster, CelestialAlignmentState state, int currentTick) {
+		if (currentTick >= state.nextEffectTick) {
+			state.nextEffectTick = currentTick + Math.max(1, CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.starSpawnIntervalTicks);
+			List<LivingEntity> targets = collectLivingEntitiesInCelestialAlignment(world, state, caster).stream().filter(living -> living != caster).toList();
+			for (int index = 0; index < CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.starsPerInterval && !targets.isEmpty(); index++) {
+				LivingEntity target = targets.get(caster.getRandom().nextInt(targets.size()));
+				double angle = caster.getRandom().nextDouble() * Math.PI * 2.0;
+				double distance = Math.sqrt(caster.getRandom().nextDouble()) * state.radius;
+				Vec3d position = new Vec3d(
+					state.center.x + Math.cos(angle) * distance,
+					state.maxY + 2.0,
+					state.center.z + Math.sin(angle) * distance
+				);
+				state.aquilaStars.add(new AquilaStarState(position, Vec3d.ZERO, target.getUuid(), currentTick + CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.maxLifetimeTicks));
+			}
+		}
+
+		Iterator<AquilaStarState> starIterator = state.aquilaStars.iterator();
+		while (starIterator.hasNext()) {
+			AquilaStarState star = starIterator.next();
+			if (currentTick >= star.expireTick) {
+				starIterator.remove();
+				continue;
+			}
+			Entity entity = world.getEntity(star.targetId);
+			if (!(entity instanceof LivingEntity target) || !isInsideCelestialAlignmentArea(state, target) || target == caster) {
+				starIterator.remove();
+				continue;
+			}
+			Vec3d targetPos = new Vec3d(target.getX(), target.getY() + target.getHeight() * 0.5, target.getZ());
+			Vec3d desired = targetPos.subtract(star.position);
+			Vec3d nextVelocity = star.velocity.add(desired.normalize().multiply(CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.homingStrength));
+			if (nextVelocity.lengthSquared() > 1.0E-6) {
+				nextVelocity = nextVelocity.normalize().multiply(CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.starSpeed);
+			}
+			star.velocity = nextVelocity;
+			star.position = star.position.add(star.velocity);
+			world.spawnParticles(ParticleTypes.END_ROD, star.position.x, star.position.y, star.position.z, 2, 0.08, 0.08, 0.08, 0.0);
+			if (star.position.squaredDistanceTo(targetPos) <= CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.hitRadius * CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.hitRadius) {
+				dealTrackedMagicDamage(target, caster.getUuid(), createTrueMagicDamageSource(world, caster), CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.starDamage);
+				starIterator.remove();
+			}
+		}
+	}
+
+	private static void updateCetusConstellation(ServerWorld world, ServerPlayerEntity caster, CelestialAlignmentState state) {
+		Box searchBox = new Box(
+			state.center.x - state.radius,
+			state.minY,
+			state.center.z - state.radius,
+			state.center.x + state.radius,
+			state.maxY,
+			state.center.z + state.radius
+		);
+		for (
+			Entity entity : world.getOtherEntities(
+				caster,
+				searchBox,
+				candidate ->
+					candidate != caster
+						&& isInsideCelestialAlignmentArea(state, candidate)
+						&& (
+							CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.affectNonLivingEntities
+								|| candidate instanceof LivingEntity
+								|| candidate instanceof ProjectileEntity
+						)
+			)
+		) {
+			double targetY = MathHelper.clamp(entity.getY(), state.minY, state.maxY);
+			Vec3d centerTarget = new Vec3d(state.center.x, targetY, state.center.z);
+			Vec3d towardCenter = centerTarget.subtract(new Vec3d(entity.getX(), entity.getY(), entity.getZ()));
+			double distance = towardCenter.length();
+			if (distance <= 1.0E-6) {
+				if (entity instanceof ProjectileEntity projectile && CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.suspendProjectilesAtCenter) {
+					state.suspendedProjectileIds.add(projectile.getUuid());
+					projectile.setNoGravity(true);
+					projectile.setVelocity(Vec3d.ZERO);
+				}
+				continue;
+			}
+
+			double holdRadius = Math.max(0.1, CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.centerHoldRadius);
+			double pullSpeed = Math.max(CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.pullStrength, Math.min(state.radius, distance) * 0.18);
+			Vec3d nextVelocity = towardCenter.normalize().multiply(pullSpeed);
+
+			if (distance <= holdRadius) {
+				if (entity instanceof ServerPlayerEntity player) {
+					player.networkHandler.requestTeleport(state.center.x, targetY, state.center.z, player.getYaw(), player.getPitch());
+				} else {
+					entity.requestTeleport(state.center.x, targetY, state.center.z);
+				}
+				nextVelocity = Vec3d.ZERO;
+			} else if (distance <= holdRadius * 2.0) {
+				double snapProgress = MathHelper.clamp((holdRadius * 2.0 - distance) / holdRadius, 0.0, 1.0) * 0.45;
+				double snappedX = MathHelper.lerp(snapProgress, entity.getX(), state.center.x);
+				double snappedZ = MathHelper.lerp(snapProgress, entity.getZ(), state.center.z);
+				if (entity instanceof ServerPlayerEntity player) {
+					player.networkHandler.requestTeleport(snappedX, targetY, snappedZ, player.getYaw(), player.getPitch());
+				} else {
+					entity.requestTeleport(snappedX, targetY, snappedZ);
+				}
+			}
+
+			if (entity instanceof ProjectileEntity projectile && CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.suspendProjectilesAtCenter) {
+				state.suspendedProjectileIds.add(projectile.getUuid());
+				projectile.setNoGravity(true);
+				projectile.setVelocity(nextVelocity);
+				continue;
+			}
+
+			entity.setVelocity(nextVelocity);
+		}
+	}
+
+	private static void releaseCetusProjectiles(ServerWorld world, CelestialAlignmentState state) {
+		for (UUID projectileId : new HashSet<>(state.suspendedProjectileIds)) {
+			Entity entity = world.getEntity(projectileId);
+			if (entity != null) {
+				entity.setNoGravity(false);
+			}
+		}
+	}
+
+	private static void releaseGeminiRecordedDamage(MinecraftServer server, ServerWorld world, CelestialAlignmentState state) {
+		ServerPlayerEntity caster = server.getPlayerManager().getPlayer(state.ownerId);
+		if (caster == null) {
+			return;
+		}
+		for (Map.Entry<UUID, List<Float>> entry : state.geminiRecordedDamage.entrySet()) {
+			Entity entity = world.getEntity(entry.getKey());
+			if (!(entity instanceof LivingEntity living) || !isMagicTargetableEntity(living)) {
+				continue;
+			}
+			float totalDamage = 0.0F;
+			for (float recordedDamage : entry.getValue()) {
+				totalDamage += recordedDamage;
+			}
+			if (totalDamage > 0.0F) {
+				dealTrackedMagicDamage(living, caster.getUuid(), createTrueMagicDamageSource(world, caster), totalDamage);
+			}
+		}
+	}
+
+	private static void accelerateCelestialCooldowns(ServerPlayerEntity player, int extraTicks) {
+		if (extraTicks <= 0) {
+			return;
+		}
+		shiftCooldownEndTick(MARTYRS_FLAME_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(IGNITION_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(SEARING_DASH_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(CINDER_MARK_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(ENGINE_HEART_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(OVERRIDE_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(BELOW_FREEZING_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(FROST_ASCENT_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(ABSOLUTE_ZERO_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(PLANCK_HEAT_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(WITTY_ONE_LINER_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(COMEDIC_REWRITE_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(COMEDIC_ASSISTANT_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(PLUS_ULTRA_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(HERCULES_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(SAGITTARIUS_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(ORIONS_GAMBIT_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(ASTRAL_CATACLYSM_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(TILL_DEATH_DO_US_PART_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(MANIPULATION_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(FROST_DOMAIN_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(LOVE_DOMAIN_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+		shiftCooldownEndTick(GREED_DOMAIN_COOLDOWN_END_TICK, player.getUuid(), -extraTicks);
+	}
+
+	private static void shiftCooldownEndTick(Map<UUID, Integer> cooldownMap, UUID playerId, int deltaTicks) {
+		Integer endTick = cooldownMap.get(playerId);
+		if (endTick != null) {
+			cooldownMap.put(playerId, Math.max(0, endTick + deltaTicks));
+		}
+	}
+
+	private static int celestialBootesExtraCooldownTicksPerTick() {
+		return Math.max(0, (int) Math.floor(Math.max(0.0, CELESTIAL_ALIGNMENT_CONFIG.rare.bootes.casterCooldownRateMultiplier - 1.0)));
+	}
+
+	private static void refreshCelestialMovementSpeedModifier(LivingEntity entity) {
+		EntityAttributeInstance movementSpeed = entity.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED);
+		if (movementSpeed == null) {
+			return;
+		}
+
+		double multiplier = celestialMovementSpeedMultiplier(entity);
+		if (Math.abs(multiplier - 1.0) <= 1.0E-6) {
+			removeAttributeModifier(movementSpeed, CELESTIAL_ALIGNMENT_BOOTES_SPEED_MODIFIER_ID);
+			return;
+		}
+		setSignedAttributeModifier(
+			movementSpeed,
+			CELESTIAL_ALIGNMENT_BOOTES_SPEED_MODIFIER_ID,
+			multiplier - 1.0,
+			EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+		);
+	}
+
+	private static double celestialMovementSpeedMultiplier(LivingEntity entity) {
+		double multiplier = 1.0;
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (
+				state.constellation == CelestialAlignmentConstellation.BOOTES
+				&& entity.getUuid() != state.ownerId
+				&& isInsideCelestialAlignmentArea(state, entity)
+			) {
+				multiplier *= CELESTIAL_ALIGNMENT_CONFIG.rare.bootes.othersMovementSpeedMultiplier;
+			}
+		}
+		return MathHelper.clamp(multiplier, 0.0, 1.0);
+	}
+
+	private static int adjustCelestialAlignmentManaCost(ServerPlayerEntity player, int manaCost) {
+		double multiplier = 1.0;
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (
+				state.constellation == CelestialAlignmentConstellation.ARA
+				&& player.getUuid() != state.ownerId
+				&& isInsideCelestialAlignmentArea(state, player)
+			) {
+				multiplier *= CELESTIAL_ALIGNMENT_CONFIG.common.ara.manaCostMultiplier;
+			}
+		}
+		return Math.max(0, (int) Math.ceil(Math.max(0, manaCost) * multiplier - 1.0E-6));
+	}
+
+	public static int adjustCelestialAlignmentGreedCoinCost(ServerPlayerEntity player, int coinCost) {
+		double multiplier = 1.0;
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (
+				state.constellation == CelestialAlignmentConstellation.ARA
+				&& player.getUuid() != state.ownerId
+				&& isInsideCelestialAlignmentArea(state, player)
+			) {
+				multiplier *= CELESTIAL_ALIGNMENT_CONFIG.common.ara.greedCoinMultiplier;
+			}
+		}
+		return Math.max(0, (int) Math.ceil(Math.max(0, coinCost) * multiplier - 1.0E-6));
+	}
+
+	private static boolean isCelestialHealingBlocked(LivingEntity entity) {
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (
+				state.constellation == CelestialAlignmentConstellation.CRATER
+				&& entity.getUuid() != state.ownerId
+				&& isInsideCelestialAlignmentArea(state, entity)
+			) {
+				return CELESTIAL_ALIGNMENT_CONFIG.common.crater.blockNaturalHealing
+					|| CELESTIAL_ALIGNMENT_CONFIG.common.crater.blockPotionHealing
+					|| CELESTIAL_ALIGNMENT_CONFIG.common.crater.blockEffectHealing
+					|| CELESTIAL_ALIGNMENT_CONFIG.common.crater.blockMagicHealing;
+			}
+		}
+		return false;
+	}
+
+	private static boolean isConstellationTeleportItemBlocked(ServerPlayerEntity player, ItemStack stack) {
+		if (player == null || stack == null || (!stack.isOf(Items.ENDER_PEARL) && !stack.isOf(Items.CHORUS_FRUIT))) {
+			return false;
+		}
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (player.getUuid() != state.ownerId && isInsideCelestialAlignmentArea(state, player)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static float celestialScaledIncomingDamage(LivingEntity entity, DamageSource source, float amount) {
+		float scaledAmount = amount;
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (entity.getUuid() == state.ownerId || !isInsideCelestialAlignmentArea(state, entity)) {
+				continue;
+			}
+			if (state.constellation == CelestialAlignmentConstellation.SCORPIUS) {
+				scaledAmount *= (float) CELESTIAL_ALIGNMENT_CONFIG.rare.scorpius.incomingDamageMultiplier;
+			}
+		}
+		if (entity instanceof ServerPlayerEntity player) {
+			for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+				if (
+					state.constellation == CelestialAlignmentConstellation.LIBRA
+					&& player.getUuid() == state.ownerId
+					&& isInsideCelestialAlignmentArea(state, player)
+				) {
+					scaledAmount *= (float) CELESTIAL_ALIGNMENT_CONFIG.mythic.libra.casterIncomingDamageMultiplier;
+				}
+			}
+		}
+		return scaledAmount;
+	}
+
+	private static boolean tryApplyCelestialAlignmentDamageRedirect(LivingEntity entity, DamageSource source, float amount) {
+		ServerPlayerEntity attacker = attackingPlayerFrom(source);
+		if (attacker == null) {
+			return false;
+		}
+
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (
+				state.constellation != CelestialAlignmentConstellation.LIBRA
+				|| !attacker.getUuid().equals(state.ownerId)
+				|| !isInsideCelestialAlignmentArea(state, attacker)
+			) {
+				continue;
+			}
+
+			if (!(attacker.getEntityWorld() instanceof ServerWorld world)) {
+				continue;
+			}
+			List<LivingEntity> eligibleTargets = collectLivingEntitiesInCelestialAlignment(world, state, attacker)
+				.stream()
+				.filter(living -> living != attacker && (CELESTIAL_ALIGNMENT_CONFIG.mythic.libra.includeOriginalTarget || !living.getUuid().equals(entity.getUuid())))
+				.toList();
+			if (eligibleTargets.size() < CELESTIAL_ALIGNMENT_CONFIG.mythic.libra.minimumEligibleTargets) {
+				continue;
+			}
+
+			float sharedDamage = amount / Math.max(1, eligibleTargets.size());
+			for (LivingEntity living : eligibleTargets) {
+				CELESTIAL_DAMAGE_REDIRECT_GUARD.add(living.getUuid());
+				try {
+					living.damage(world, source, sharedDamage);
+				} finally {
+					CELESTIAL_DAMAGE_REDIRECT_GUARD.remove(living.getUuid());
+				}
+			}
+			return true;
+		}
+
+		return false;
+	}
+
+	private static void recordCelestialGeminiHit(ServerPlayerEntity attacker, LivingEntity target, float damageTaken) {
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (
+				state.constellation != CelestialAlignmentConstellation.GEMINI
+				|| !attacker.getUuid().equals(state.ownerId)
+				|| !isInsideCelestialAlignmentArea(state, target)
+			) {
+				continue;
+			}
+			List<Float> recordedDamage = state.geminiRecordedDamage.computeIfAbsent(target.getUuid(), ignored -> new ArrayList<>());
+			if (recordedDamage.size() < CELESTIAL_ALIGNMENT_CONFIG.common.gemini.recordedHitCount) {
+				recordedDamage.add(damageTaken);
+			}
+		}
+	}
+
+	private static double celestialAlignmentPoolWeight(CelestialAlignmentConstellation constellation) {
+		return switch (constellation) {
+			case CRATER -> CELESTIAL_ALIGNMENT_CONFIG.common.crater.poolWeight;
+			case ARA -> CELESTIAL_ALIGNMENT_CONFIG.common.ara.poolWeight;
+			case HOROLOGIUM -> CELESTIAL_ALIGNMENT_CONFIG.common.horologium.poolWeight;
+			case SAGITTA -> CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.poolWeight;
+			case GEMINI -> CELESTIAL_ALIGNMENT_CONFIG.common.gemini.poolWeight;
+			case PYXIS -> CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.poolWeight;
+			case BOOTES -> CELESTIAL_ALIGNMENT_CONFIG.rare.bootes.poolWeight;
+			case CORONA_BOREALIS -> CELESTIAL_ALIGNMENT_CONFIG.rare.coronaBorealis.poolWeight;
+			case AQUILA -> CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.poolWeight;
+			case SCORPIUS -> CELESTIAL_ALIGNMENT_CONFIG.rare.scorpius.poolWeight;
+			case CETUS -> CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.poolWeight;
+			case RETICULUM -> CELESTIAL_ALIGNMENT_CONFIG.mythic.reticulum.poolWeight;
+			case LIBRA -> CELESTIAL_ALIGNMENT_CONFIG.mythic.libra.poolWeight;
+		};
+	}
+
+	private static int celestialAlignmentDurationTicks(CelestialAlignmentConstellation constellation) {
+		return switch (constellation) {
+			case CRATER -> CELESTIAL_ALIGNMENT_CONFIG.common.crater.durationTicks;
+			case ARA -> CELESTIAL_ALIGNMENT_CONFIG.common.ara.durationTicks;
+			case HOROLOGIUM -> CELESTIAL_ALIGNMENT_CONFIG.common.horologium.durationTicks;
+			case SAGITTA -> CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.durationTicks;
+			case GEMINI -> CELESTIAL_ALIGNMENT_CONFIG.common.gemini.durationTicks;
+			case PYXIS -> CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.durationTicks;
+			case BOOTES -> CELESTIAL_ALIGNMENT_CONFIG.rare.bootes.durationTicks;
+			case CORONA_BOREALIS -> CELESTIAL_ALIGNMENT_CONFIG.rare.coronaBorealis.durationTicks;
+			case AQUILA -> CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.durationTicks;
+			case SCORPIUS -> CELESTIAL_ALIGNMENT_CONFIG.rare.scorpius.durationTicks;
+			case CETUS -> CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.durationTicks;
+			case RETICULUM -> CELESTIAL_ALIGNMENT_CONFIG.mythic.reticulum.durationTicks;
+			case LIBRA -> CELESTIAL_ALIGNMENT_CONFIG.mythic.libra.durationTicks;
+		};
+	}
+
+	private static double celestialAlignmentRadius(CelestialAlignmentConstellation constellation) {
+		return switch (constellation) {
+			case CRATER -> CELESTIAL_ALIGNMENT_CONFIG.common.crater.radius;
+			case ARA -> CELESTIAL_ALIGNMENT_CONFIG.common.ara.radius;
+			case HOROLOGIUM -> CELESTIAL_ALIGNMENT_CONFIG.common.horologium.radius;
+			case SAGITTA -> CELESTIAL_ALIGNMENT_CONFIG.common.sagitta.radius;
+			case GEMINI -> CELESTIAL_ALIGNMENT_CONFIG.common.gemini.radius;
+			case PYXIS -> CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.radius;
+			case BOOTES -> CELESTIAL_ALIGNMENT_CONFIG.rare.bootes.radius;
+			case CORONA_BOREALIS -> CELESTIAL_ALIGNMENT_CONFIG.rare.coronaBorealis.radius;
+			case AQUILA -> CELESTIAL_ALIGNMENT_CONFIG.rare.aquila.radius;
+			case SCORPIUS -> CELESTIAL_ALIGNMENT_CONFIG.rare.scorpius.radius;
+			case CETUS -> CELESTIAL_ALIGNMENT_CONFIG.mythic.cetus.radius;
+			case RETICULUM -> CELESTIAL_ALIGNMENT_CONFIG.mythic.reticulum.radius;
+			case LIBRA -> CELESTIAL_ALIGNMENT_CONFIG.mythic.libra.radius;
+		};
+	}
+
+	private static CelestialPattern celestialPattern(CelestialAlignmentConstellation constellation) {
+		return switch (constellation) {
+			case CRATER -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.7, 0.0, -0.2),
+					new Vec3d(-0.35, 0.0, -0.52),
+					new Vec3d(0.0, 0.0, -0.62),
+					new Vec3d(0.35, 0.0, -0.52),
+					new Vec3d(0.7, 0.0, -0.2),
+					new Vec3d(-0.28, 0.0, 0.18),
+					new Vec3d(0.28, 0.0, 0.18),
+					new Vec3d(0.0, 0.0, 0.46),
+					new Vec3d(0.0, 0.0, 0.72)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 4), new CelestialPatternEdge(1, 5), new CelestialPatternEdge(3, 6), new CelestialPatternEdge(5, 6), new CelestialPatternEdge(5, 7), new CelestialPatternEdge(6, 7), new CelestialPatternEdge(7, 8))
+			);
+			case ARA -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.62, 0.0, 0.45),
+					new Vec3d(0.62, 0.0, 0.45),
+					new Vec3d(-0.42, 0.0, -0.1),
+					new Vec3d(0.42, 0.0, -0.1),
+					new Vec3d(-0.22, 0.0, -0.48),
+					new Vec3d(0.22, 0.0, -0.48)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(0, 2), new CelestialPatternEdge(1, 3), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(2, 4), new CelestialPatternEdge(3, 5), new CelestialPatternEdge(4, 5))
+			);
+			case HOROLOGIUM -> new CelestialPattern(
+				List.of(
+					new Vec3d(0.0, 0.0, -0.72),
+					new Vec3d(0.72, 0.0, 0.0),
+					new Vec3d(0.0, 0.0, 0.72),
+					new Vec3d(-0.72, 0.0, 0.0),
+					new Vec3d(0.0, 0.0, 0.0),
+					new Vec3d(0.36, 0.0, -0.36),
+					new Vec3d(-0.28, 0.0, 0.26)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 0), new CelestialPatternEdge(0, 4), new CelestialPatternEdge(2, 4), new CelestialPatternEdge(4, 5), new CelestialPatternEdge(4, 6))
+			);
+			case SAGITTA -> new CelestialPattern(
+				List.of(
+					new Vec3d(0.0, 0.0, -0.7),
+					new Vec3d(0.0, 0.0, -0.1),
+					new Vec3d(-0.24, 0.0, -0.38),
+					new Vec3d(0.24, 0.0, -0.38),
+					new Vec3d(0.0, 0.0, 0.58),
+					new Vec3d(-0.26, 0.0, 0.34),
+					new Vec3d(0.26, 0.0, 0.34)
+				),
+				List.of(new CelestialPatternEdge(0, 2), new CelestialPatternEdge(0, 3), new CelestialPatternEdge(2, 1), new CelestialPatternEdge(3, 1), new CelestialPatternEdge(1, 4), new CelestialPatternEdge(4, 5), new CelestialPatternEdge(4, 6))
+			);
+			case GEMINI -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.32, 0.0, -0.68),
+					new Vec3d(-0.28, 0.0, -0.18),
+					new Vec3d(-0.26, 0.0, 0.28),
+					new Vec3d(-0.22, 0.0, 0.7),
+					new Vec3d(0.32, 0.0, -0.68),
+					new Vec3d(0.28, 0.0, -0.18),
+					new Vec3d(0.26, 0.0, 0.28),
+					new Vec3d(0.22, 0.0, 0.7),
+					new Vec3d(0.0, 0.0, -0.4),
+					new Vec3d(0.0, 0.0, 0.08)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(4, 5), new CelestialPatternEdge(5, 6), new CelestialPatternEdge(6, 7), new CelestialPatternEdge(1, 8), new CelestialPatternEdge(5, 8), new CelestialPatternEdge(2, 9), new CelestialPatternEdge(6, 9))
+			);
+			case PYXIS -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.45, 0.0, -0.45),
+					new Vec3d(0.45, 0.0, -0.45),
+					new Vec3d(0.45, 0.0, 0.45),
+					new Vec3d(-0.45, 0.0, 0.45),
+					new Vec3d(0.0, 0.0, 0.0),
+					new Vec3d(0.0, 0.0, -0.68),
+					new Vec3d(0.0, 0.0, 0.68)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 0), new CelestialPatternEdge(5, 4), new CelestialPatternEdge(4, 6))
+			);
+			case BOOTES -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.1, 0.0, -0.78),
+					new Vec3d(0.42, 0.0, -0.24),
+					new Vec3d(0.14, 0.0, 0.12),
+					new Vec3d(-0.34, 0.0, -0.18),
+					new Vec3d(-0.02, 0.0, 0.62)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 0), new CelestialPatternEdge(2, 4))
+			);
+			case CORONA_BOREALIS -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.72, 0.0, 0.18),
+					new Vec3d(-0.42, 0.0, -0.18),
+					new Vec3d(-0.06, 0.0, -0.42),
+					new Vec3d(0.28, 0.0, -0.32),
+					new Vec3d(0.6, 0.0, -0.04),
+					new Vec3d(0.78, 0.0, 0.26)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 4), new CelestialPatternEdge(4, 5))
+			);
+			case AQUILA -> new CelestialPattern(
+				List.of(
+					new Vec3d(0.0, 0.0, -0.5),
+					new Vec3d(0.0, 0.0, 0.56),
+					new Vec3d(-0.74, 0.0, -0.12),
+					new Vec3d(-0.38, 0.0, 0.08),
+					new Vec3d(0.74, 0.0, -0.12),
+					new Vec3d(0.38, 0.0, 0.08)
+				),
+				List.of(new CelestialPatternEdge(0, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 1), new CelestialPatternEdge(0, 4), new CelestialPatternEdge(4, 5), new CelestialPatternEdge(5, 1))
+			);
+			case SCORPIUS -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.68, 0.0, -0.26),
+					new Vec3d(-0.38, 0.0, -0.42),
+					new Vec3d(0.0, 0.0, -0.2),
+					new Vec3d(0.28, 0.0, 0.08),
+					new Vec3d(0.14, 0.0, 0.42),
+					new Vec3d(0.46, 0.0, 0.72)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 4), new CelestialPatternEdge(4, 5))
+			);
+			case CETUS -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.72, 0.0, -0.12),
+					new Vec3d(-0.42, 0.0, -0.5),
+					new Vec3d(-0.12, 0.0, -0.18),
+					new Vec3d(0.18, 0.0, 0.12),
+					new Vec3d(0.48, 0.0, 0.32),
+					new Vec3d(0.72, 0.0, 0.66)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(2, 3), new CelestialPatternEdge(3, 4), new CelestialPatternEdge(4, 5))
+			);
+			case RETICULUM -> new CelestialPattern(
+				List.of(
+					new Vec3d(-0.68, 0.0, -0.58),
+					new Vec3d(0.0, 0.0, -0.7),
+					new Vec3d(0.68, 0.0, -0.58),
+					new Vec3d(-0.7, 0.0, 0.0),
+					new Vec3d(0.0, 0.0, 0.0),
+					new Vec3d(0.7, 0.0, 0.0),
+					new Vec3d(-0.68, 0.0, 0.58),
+					new Vec3d(0.0, 0.0, 0.7),
+					new Vec3d(0.68, 0.0, 0.58)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(3, 4), new CelestialPatternEdge(4, 5), new CelestialPatternEdge(6, 7), new CelestialPatternEdge(7, 8), new CelestialPatternEdge(0, 3), new CelestialPatternEdge(3, 6), new CelestialPatternEdge(1, 4), new CelestialPatternEdge(4, 7), new CelestialPatternEdge(2, 5), new CelestialPatternEdge(5, 8), new CelestialPatternEdge(0, 4), new CelestialPatternEdge(2, 4), new CelestialPatternEdge(6, 4), new CelestialPatternEdge(8, 4))
+			);
+			case LIBRA -> new CelestialPattern(
+				List.of(
+					new Vec3d(0.0, 0.0, -0.72),
+					new Vec3d(0.0, 0.0, -0.2),
+					new Vec3d(-0.62, 0.0, 0.08),
+					new Vec3d(0.62, 0.0, 0.08),
+					new Vec3d(-0.36, 0.0, 0.42),
+					new Vec3d(0.36, 0.0, 0.42)
+				),
+				List.of(new CelestialPatternEdge(0, 1), new CelestialPatternEdge(1, 2), new CelestialPatternEdge(1, 3), new CelestialPatternEdge(2, 4), new CelestialPatternEdge(3, 5))
+			);
+		};
 	}
 
 	private static void applyOrionsGambit(ServerPlayerEntity caster, int currentTick) {
@@ -14694,40 +15781,7 @@ public final class MagicAbilityManager {
 		}
 
 		world.spawnParticles(ParticleTypes.GLOW, target.getX(), target.getBodyY(0.55), target.getZ(), 10, 0.35, 0.45, 0.35, 0.01);
-		world.spawnParticles(SAGITTARIUS_BEAM_PARTICLE, target.getX(), target.getBodyY(0.55), target.getZ(), 8, 0.25, 0.35, 0.25, 0.0);
-	}
-
-	private static void spawnSagittariusChargeParticles(LivingEntity caster) {
-		if (!(caster.getEntityWorld() instanceof ServerWorld world)) {
-			return;
-		}
-
-		if (SAGITTARIUS_CHARGE_GLOW_PARTICLE_COUNT > 0) {
-			world.spawnParticles(
-				ParticleTypes.GLOW,
-				caster.getX(),
-				caster.getBodyY(0.7),
-				caster.getZ(),
-				SAGITTARIUS_CHARGE_GLOW_PARTICLE_COUNT,
-				0.18,
-				0.22,
-				0.18,
-				0.01
-			);
-		}
-		if (SAGITTARIUS_CHARGE_BEAM_PARTICLE_COUNT > 0) {
-			world.spawnParticles(
-				SAGITTARIUS_BEAM_PARTICLE,
-				caster.getX(),
-				caster.getBodyY(0.7),
-				caster.getZ(),
-				SAGITTARIUS_CHARGE_BEAM_PARTICLE_COUNT,
-				0.12,
-				0.18,
-				0.12,
-				0.0
-			);
-		}
+		world.spawnParticles(ParticleTypes.END_ROD, target.getX(), target.getBodyY(0.55), target.getZ(), 8, 0.25, 0.35, 0.25, 0.0);
 	}
 
 	private static void activateManipulation(ServerPlayerEntity caster, ServerPlayerEntity target) {
@@ -15002,6 +16056,10 @@ public final class MagicAbilityManager {
 
 		if (world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer)) {
 			return ActionResult.PASS;
+		}
+		if (isConstellationTeleportItemBlocked(serverPlayer, stack)) {
+			serverPlayer.sendMessage(Text.translatable("message.magic.constellation.celestial_alignment.teleport_blocked"), true);
+			return ActionResult.FAIL;
 		}
 		if (isEntityCapturedByDomain(serverPlayer)) {
 			if (stack.isOf(Items.CHORUS_FRUIT) || stack.isOf(Items.ENDER_PEARL)) {
@@ -16438,11 +17496,14 @@ public final class MagicAbilityManager {
 		}
 
 		if (ability == MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
-			if (isCooldownDeferredByOrionsGambit(playerId, ability) || SAGITTARIUS_COOLDOWN_TICKS <= 0) {
+			if (isCooldownDeferredByOrionsGambit(playerId, ability) || CELESTIAL_ALIGNMENT_CONFIG.cooldownTicks <= 0) {
 				SAGITTARIUS_COOLDOWN_END_TICK.remove(playerId);
 				return;
 			}
-			SAGITTARIUS_COOLDOWN_END_TICK.put(playerId, currentTick + adjustedCooldownTicks(playerId, ability, SAGITTARIUS_COOLDOWN_TICKS, currentTick));
+			SAGITTARIUS_COOLDOWN_END_TICK.put(
+				playerId,
+				currentTick + adjustedCooldownTicks(playerId, ability, CELESTIAL_ALIGNMENT_CONFIG.cooldownTicks, currentTick)
+			);
 			return;
 		}
 
@@ -17289,6 +18350,321 @@ public final class MagicAbilityManager {
 		);
 	}
 
+	public static boolean handleCelestialPlayerMovePacket(ServerPlayerEntity player, PlayerMoveC2SPacket packet) {
+		if (!isManipulationPacketServerThread(player)) {
+			return false;
+		}
+
+		if (!isCelestialDelayBypassActive()) {
+			int delayTicks = celestialReticulumDelayTicks(player);
+			if (delayTicks > 0) {
+				queueCelestialAction(player.getUuid(), new DelayedMoveAction(currentTick(player) + delayTicks, packet));
+				return true;
+			}
+		}
+
+		if (isCelestialTransformBypassActive()) {
+			return false;
+		}
+
+		PlayerMoveC2SPacket transformed = transformCelestialPyxisMovePacket(player, packet);
+		if (transformed == null) {
+			return false;
+		}
+
+		runWithCelestialDelayAndTransformBypass(() -> player.networkHandler.onPlayerMove(transformed));
+		return true;
+	}
+
+	public static boolean handleCelestialPlayerInputPacket(ServerPlayerEntity player, PlayerInputC2SPacket packet) {
+		if (!isManipulationPacketServerThread(player)) {
+			return false;
+		}
+
+		if (!isCelestialDelayBypassActive()) {
+			int delayTicks = celestialReticulumDelayTicks(player);
+			if (delayTicks > 0) {
+				queueCelestialAction(player.getUuid(), new DelayedInputAction(currentTick(player) + delayTicks, packet));
+				return true;
+			}
+		}
+
+		if (isCelestialTransformBypassActive()) {
+			return false;
+		}
+
+		PlayerInput transformed = transformCelestialPyxisInput(player, packet.input());
+		if (transformed.equals(packet.input())) {
+			return false;
+		}
+
+		runWithCelestialDelayAndTransformBypass(() -> player.networkHandler.onPlayerInput(new PlayerInputC2SPacket(transformed)));
+		return true;
+	}
+
+	public static boolean handleCelestialClientCommandPacket(ServerPlayerEntity player, ClientCommandC2SPacket packet) {
+		if (!isManipulationPacketServerThread(player) || isCelestialDelayBypassActive()) {
+			return false;
+		}
+		int delayTicks = celestialReticulumDelayTicks(player);
+		if (delayTicks <= 0) {
+			return false;
+		}
+		queueCelestialAction(player.getUuid(), new DelayedClientCommandAction(currentTick(player) + delayTicks, packet));
+		return true;
+	}
+
+	public static boolean handleCelestialPlayerActionPacket(ServerPlayerEntity player, PlayerActionC2SPacket packet) {
+		if (!isManipulationPacketServerThread(player) || isCelestialDelayBypassActive()) {
+			return false;
+		}
+		int delayTicks = celestialReticulumDelayTicks(player);
+		if (delayTicks <= 0) {
+			return false;
+		}
+		queueCelestialAction(player.getUuid(), new DelayedPlayerActionAction(currentTick(player) + delayTicks, packet));
+		return true;
+	}
+
+	public static boolean handleCelestialInteractBlockPacket(ServerPlayerEntity player, PlayerInteractBlockC2SPacket packet) {
+		if (!isManipulationPacketServerThread(player) || isCelestialDelayBypassActive()) {
+			return false;
+		}
+		int delayTicks = celestialReticulumDelayTicks(player);
+		if (delayTicks <= 0) {
+			return false;
+		}
+		queueCelestialAction(player.getUuid(), new DelayedInteractBlockAction(currentTick(player) + delayTicks, packet));
+		return true;
+	}
+
+	public static boolean handleCelestialInteractItemPacket(ServerPlayerEntity player, PlayerInteractItemC2SPacket packet) {
+		if (!isManipulationPacketServerThread(player) || isCelestialDelayBypassActive()) {
+			return false;
+		}
+		int delayTicks = celestialReticulumDelayTicks(player);
+		if (delayTicks <= 0) {
+			return false;
+		}
+		queueCelestialAction(player.getUuid(), new DelayedInteractItemAction(currentTick(player) + delayTicks, packet));
+		return true;
+	}
+
+	public static boolean handleCelestialInteractEntityPacket(ServerPlayerEntity player, PlayerInteractEntityC2SPacket packet) {
+		if (!isManipulationPacketServerThread(player) || isCelestialDelayBypassActive()) {
+			return false;
+		}
+		int delayTicks = celestialReticulumDelayTicks(player);
+		if (delayTicks <= 0) {
+			return false;
+		}
+		queueCelestialAction(player.getUuid(), new DelayedInteractEntityAction(currentTick(player) + delayTicks, packet));
+		return true;
+	}
+
+	public static boolean queueCelestialAbilityRequest(ServerPlayerEntity player, int abilitySlot) {
+		if (player == null || isCelestialDelayBypassActive()) {
+			return false;
+		}
+		int delayTicks = celestialReticulumDelayTicks(player);
+		if (delayTicks <= 0) {
+			return false;
+		}
+		queueCelestialAction(player.getUuid(), new DelayedAbilityRequestAction(currentTick(player) + delayTicks, abilitySlot));
+		return true;
+	}
+
+	private static void updateCelestialDelayedActions(MinecraftServer server, int currentTick) {
+		Iterator<Map.Entry<UUID, List<DelayedCelestialAction>>> iterator = CELESTIAL_DELAYED_ACTIONS.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<UUID, List<DelayedCelestialAction>> entry = iterator.next();
+			ServerPlayerEntity player = server.getPlayerManager().getPlayer(entry.getKey());
+			if (player == null || !player.isAlive()) {
+				iterator.remove();
+				continue;
+			}
+			if (celestialReticulumDelayTicks(player) <= 0) {
+				entry.getValue().clear();
+				iterator.remove();
+				continue;
+			}
+			Iterator<DelayedCelestialAction> actionIterator = entry.getValue().iterator();
+			while (actionIterator.hasNext()) {
+				DelayedCelestialAction action = actionIterator.next();
+				if (currentTick < action.executeTick()) {
+					continue;
+				}
+				runWithCelestialDelayBypass(() -> action.apply(player));
+				actionIterator.remove();
+			}
+			if (entry.getValue().isEmpty()) {
+				iterator.remove();
+			}
+		}
+	}
+
+	private static void queueCelestialAction(UUID playerId, DelayedCelestialAction action) {
+		CELESTIAL_DELAYED_ACTIONS.computeIfAbsent(playerId, ignored -> new ArrayList<>()).add(action);
+	}
+
+	private static void clearCelestialDelayQueue(UUID playerId) {
+		CELESTIAL_DELAYED_ACTIONS.remove(playerId);
+	}
+
+	private static void clearCelestialDelayQueueIfUnaffected(MinecraftServer server, UUID playerId, CelestialAlignmentState ignoredState) {
+		ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerId);
+		if (!(player instanceof ServerPlayerEntity serverPlayer) || celestialReticulumDelayTicks(serverPlayer, ignoredState) > 0) {
+			return;
+		}
+		clearCelestialDelayQueue(playerId);
+	}
+
+	private static int celestialReticulumDelayTicks(ServerPlayerEntity player) {
+		return celestialReticulumDelayTicks(player, null);
+	}
+
+	private static int celestialReticulumDelayTicks(ServerPlayerEntity player, CelestialAlignmentState ignoredState) {
+		if (player == null) {
+			return 0;
+		}
+		int delayTicks = 0;
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (state == ignoredState || state.constellation != CelestialAlignmentConstellation.RETICULUM || player.getUuid().equals(state.ownerId)) {
+				continue;
+			}
+			if (isInsideCelestialAlignmentArea(state, player)) {
+				delayTicks = Math.max(delayTicks, CELESTIAL_ALIGNMENT_CONFIG.mythic.reticulum.inputDelayTicks);
+			}
+		}
+		return delayTicks;
+	}
+
+	private static PlayerInput transformCelestialPyxisInput(ServerPlayerEntity player, PlayerInput input) {
+		boolean invertForward = false;
+		boolean invertStrafe = false;
+		boolean invertJumpSneak = false;
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (state.constellation != CelestialAlignmentConstellation.PYXIS || player.getUuid().equals(state.ownerId) || !isInsideCelestialAlignmentArea(state, player)) {
+				continue;
+			}
+			invertForward ^= CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.invertForwardBackward;
+			invertStrafe ^= CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.invertStrafe;
+			invertJumpSneak ^= CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.invertJumpSneak;
+		}
+		return new PlayerInput(
+			invertForward ? input.backward() : input.forward(),
+			invertForward ? input.forward() : input.backward(),
+			invertStrafe ? input.right() : input.left(),
+			invertStrafe ? input.left() : input.right(),
+			invertJumpSneak ? input.sneak() : input.jump(),
+			invertJumpSneak ? input.jump() : input.sneak(),
+			input.sprint()
+		);
+	}
+
+	private static PlayerMoveC2SPacket transformCelestialPyxisMovePacket(ServerPlayerEntity player, PlayerMoveC2SPacket packet) {
+		boolean invertForward = false;
+		boolean invertStrafe = false;
+		boolean invertJumpSneak = false;
+		for (CelestialAlignmentState state : SAGITTARIUS_STATES.values()) {
+			if (state.constellation != CelestialAlignmentConstellation.PYXIS || player.getUuid().equals(state.ownerId) || !isInsideCelestialAlignmentArea(state, player)) {
+				continue;
+			}
+			invertForward ^= CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.invertForwardBackward;
+			invertStrafe ^= CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.invertStrafe;
+			invertJumpSneak ^= CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.invertJumpSneak && CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.mirrorVerticalDelta;
+		}
+		if (!invertForward && !invertStrafe && !invertJumpSneak) {
+			return null;
+		}
+
+		double currentX = player.getX();
+		double currentY = player.getY();
+		double currentZ = player.getZ();
+		double nextX = packet.getX(currentX);
+		double nextY = packet.getY(currentY);
+		double nextZ = packet.getZ(currentZ);
+		Vec3d delta = new Vec3d(nextX - currentX, 0.0, nextZ - currentZ);
+		Vec3d forward = player.getRotationVec(1.0F);
+		Vec3d forwardHorizontal = new Vec3d(forward.x, 0.0, forward.z);
+		if (forwardHorizontal.lengthSquared() > 1.0E-6 && (invertForward || invertStrafe)) {
+			forwardHorizontal = forwardHorizontal.normalize();
+			Vec3d right = new Vec3d(-forwardHorizontal.z, 0.0, forwardHorizontal.x);
+			double forwardComponent = delta.dotProduct(forwardHorizontal);
+			double strafeComponent = delta.dotProduct(right);
+			if (invertForward) {
+				forwardComponent *= -1.0;
+			}
+			if (invertStrafe) {
+				strafeComponent *= -1.0;
+			}
+			Vec3d transformed = forwardHorizontal.multiply(forwardComponent).add(right.multiply(strafeComponent));
+			nextX = currentX + transformed.x;
+			nextZ = currentZ + transformed.z;
+		}
+
+		if (invertJumpSneak && packet.changesPosition()) {
+			PlayerInput latestInput = MANIPULATION_INPUT_BY_CASTER.getOrDefault(player.getUuid(), PlayerInput.DEFAULT);
+			double deltaY = nextY - currentY;
+			if (latestInput.jump() != latestInput.sneak()) {
+				if (Math.abs(deltaY) > 1.0E-6) {
+					nextY = currentY - deltaY;
+				} else if (latestInput.sneak() && player.isOnGround()) {
+					nextY = currentY + CELESTIAL_ALIGNMENT_CONFIG.rare.pyxis.groundedSneakJumpLift;
+				}
+			}
+		}
+
+		if (Math.abs(nextX - packet.getX(currentX)) <= 1.0E-6 && Math.abs(nextY - packet.getY(currentY)) <= 1.0E-6 && Math.abs(nextZ - packet.getZ(currentZ)) <= 1.0E-6) {
+			return null;
+		}
+
+		return new PlayerMoveC2SPacket.Full(nextX, nextY, nextZ, packet.getYaw(player.getYaw()), packet.getPitch(player.getPitch()), packet.isOnGround(), packet.horizontalCollision());
+	}
+
+	private static void runWithCelestialDelayBypass(Runnable action) {
+		int depth = CELESTIAL_DELAY_BYPASS_DEPTH.get();
+		CELESTIAL_DELAY_BYPASS_DEPTH.set(depth + 1);
+		try {
+			action.run();
+		} finally {
+			if (depth <= 0) {
+				CELESTIAL_DELAY_BYPASS_DEPTH.remove();
+			} else {
+				CELESTIAL_DELAY_BYPASS_DEPTH.set(depth);
+			}
+		}
+	}
+
+	private static void runWithCelestialDelayAndTransformBypass(Runnable action) {
+		int delayDepth = CELESTIAL_DELAY_BYPASS_DEPTH.get();
+		int transformDepth = CELESTIAL_TRANSFORM_BYPASS_DEPTH.get();
+		CELESTIAL_DELAY_BYPASS_DEPTH.set(delayDepth + 1);
+		CELESTIAL_TRANSFORM_BYPASS_DEPTH.set(transformDepth + 1);
+		try {
+			action.run();
+		} finally {
+			if (delayDepth <= 0) {
+				CELESTIAL_DELAY_BYPASS_DEPTH.remove();
+			} else {
+				CELESTIAL_DELAY_BYPASS_DEPTH.set(delayDepth);
+			}
+			if (transformDepth <= 0) {
+				CELESTIAL_TRANSFORM_BYPASS_DEPTH.remove();
+			} else {
+				CELESTIAL_TRANSFORM_BYPASS_DEPTH.set(transformDepth);
+			}
+		}
+	}
+
+	private static boolean isCelestialDelayBypassActive() {
+		return CELESTIAL_DELAY_BYPASS_DEPTH.get() > 0;
+	}
+
+	private static boolean isCelestialTransformBypassActive() {
+		return CELESTIAL_TRANSFORM_BYPASS_DEPTH.get() > 0;
+	}
+
 	private static boolean isLovePowerActiveThisSecond(ServerPlayerEntity player) {
 		return LOVE_POWER_ACTIVE_THIS_SECOND.getOrDefault(player.getUuid(), false);
 	}
@@ -17383,7 +18759,7 @@ public final class MagicAbilityManager {
 	}
 
 	public static boolean shouldBlockHealing(LivingEntity entity) {
-		return entity != null && isFrostHelpless(entity);
+		return entity != null && (isFrostHelpless(entity) || isCelestialHealingBlocked(entity));
 	}
 
 	public static boolean shouldBlockFrostTeleport(Entity entity) {
@@ -17938,6 +19314,7 @@ public final class MagicAbilityManager {
 		HERCULES_STATES.remove(playerId);
 		HERCULES_TARGETS.remove(playerId);
 		SAGITTARIUS_STATES.remove(playerId);
+		CELESTIAL_ALIGNMENT_FORCED_RARITIES.remove(playerId);
 		ORIONS_GAMBIT_STATES.remove(playerId);
 		ORIONS_GAMBIT_PENALTIES.remove(playerId);
 		ORIONS_GAMBIT_CASTER_BY_TARGET.remove(playerId);
@@ -18040,6 +19417,7 @@ public final class MagicAbilityManager {
 			return;
 		}
 
+		CELESTIAL_ALIGNMENT_FORCED_RARITIES.remove(player.getUuid());
 		clearFrostControlledTargetState(player.getUuid(), server);
 
 		if (PLUS_ULTRA_STATES.containsKey(player.getUuid()) || activeAbility(player) == MagicAbility.PLUS_ULTRA) {
@@ -18364,11 +19742,170 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private static final class SagittariusWindupState {
-		private final int fireTick;
+	private enum CelestialAlignmentRarity {
+		COMMON,
+		RARE,
+		MYTHIC
+	}
 
-		private SagittariusWindupState(int fireTick) {
-			this.fireTick = fireTick;
+	private enum CelestialAlignmentConstellation {
+		CRATER("magic.constellation.celestial_alignment.crater"),
+		ARA("magic.constellation.celestial_alignment.ara"),
+		HOROLOGIUM("magic.constellation.celestial_alignment.horologium"),
+		SAGITTA("magic.constellation.celestial_alignment.sagitta"),
+		GEMINI("magic.constellation.celestial_alignment.gemini"),
+		PYXIS("magic.constellation.celestial_alignment.pyxis"),
+		BOOTES("magic.constellation.celestial_alignment.bootes"),
+		CORONA_BOREALIS("magic.constellation.celestial_alignment.corona_borealis"),
+		AQUILA("magic.constellation.celestial_alignment.aquila"),
+		SCORPIUS("magic.constellation.celestial_alignment.scorpius"),
+		CETUS("magic.constellation.celestial_alignment.cetus"),
+		RETICULUM("magic.constellation.celestial_alignment.reticulum"),
+		LIBRA("magic.constellation.celestial_alignment.libra");
+
+		private final String translationKey;
+
+		CelestialAlignmentConstellation(String translationKey) {
+			this.translationKey = translationKey;
+		}
+	}
+
+	private record CelestialAlignmentRoll(
+		CelestialAlignmentRarity rarity,
+		CelestialAlignmentConstellation constellation,
+		int durationTicks,
+		double radius
+	) {
+	}
+
+	private record CelestialPattern(List<Vec3d> nodes, List<CelestialPatternEdge> edges) {
+	}
+
+	private record CelestialPatternEdge(int startIndex, int endIndex) {
+	}
+
+	private static final class CelestialAlignmentState {
+		private final UUID ownerId;
+		private final RegistryKey<World> dimension;
+		private final Vec3d center;
+		private final double radius;
+		private final double minY;
+		private final double maxY;
+		private final CelestialAlignmentRarity rarity;
+		private final CelestialAlignmentConstellation constellation;
+		private final int startTick;
+		private final int endTick;
+		private int nextVisualTick;
+		private int nextEffectTick;
+		private final Set<UUID> trackedLivingIds = new HashSet<>();
+		private final Map<UUID, List<Float>> geminiRecordedDamage = new HashMap<>();
+		private final List<AquilaStarState> aquilaStars = new ArrayList<>();
+		private final Set<UUID> suspendedProjectileIds = new HashSet<>();
+		private final Map<UUID, Map<RegistryEntry<StatusEffect>, ObservedStatusEffectState>> observedNegativeEffectsByEntity = new HashMap<>();
+
+		private CelestialAlignmentState(
+			UUID ownerId,
+			RegistryKey<World> dimension,
+			Vec3d center,
+			double radius,
+			double minY,
+			double maxY,
+			CelestialAlignmentRarity rarity,
+			CelestialAlignmentConstellation constellation,
+			int startTick,
+			int endTick
+		) {
+			this.ownerId = ownerId;
+			this.dimension = dimension;
+			this.center = center;
+			this.radius = radius;
+			this.minY = minY;
+			this.maxY = maxY;
+			this.rarity = rarity;
+			this.constellation = constellation;
+			this.startTick = startTick;
+			this.endTick = endTick;
+			this.nextVisualTick = startTick;
+			this.nextEffectTick = startTick;
+		}
+	}
+
+	private static final class AquilaStarState {
+		private Vec3d position;
+		private Vec3d velocity;
+		private final UUID targetId;
+		private final int expireTick;
+
+		private AquilaStarState(Vec3d position, Vec3d velocity, UUID targetId, int expireTick) {
+			this.position = position;
+			this.velocity = velocity;
+			this.targetId = targetId;
+			this.expireTick = expireTick;
+		}
+	}
+
+	private record ObservedStatusEffectState(int durationTicks, int amplifier) {
+	}
+
+	private interface DelayedCelestialAction {
+		int executeTick();
+
+		void apply(ServerPlayerEntity player);
+	}
+
+	private record DelayedMoveAction(int executeTick, PlayerMoveC2SPacket packet) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			player.networkHandler.onPlayerMove(packet);
+		}
+	}
+
+	private record DelayedInputAction(int executeTick, PlayerInputC2SPacket packet) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			player.networkHandler.onPlayerInput(packet);
+		}
+	}
+
+	private record DelayedClientCommandAction(int executeTick, ClientCommandC2SPacket packet) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			player.networkHandler.onClientCommand(packet);
+		}
+	}
+
+	private record DelayedPlayerActionAction(int executeTick, PlayerActionC2SPacket packet) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			player.networkHandler.onPlayerAction(packet);
+		}
+	}
+
+	private record DelayedInteractBlockAction(int executeTick, PlayerInteractBlockC2SPacket packet) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			player.networkHandler.onPlayerInteractBlock(packet);
+		}
+	}
+
+	private record DelayedInteractItemAction(int executeTick, PlayerInteractItemC2SPacket packet) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			player.networkHandler.onPlayerInteractItem(packet);
+		}
+	}
+
+	private record DelayedInteractEntityAction(int executeTick, PlayerInteractEntityC2SPacket packet) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			player.networkHandler.onPlayerInteractEntity(packet);
+		}
+	}
+
+	private record DelayedAbilityRequestAction(int executeTick, int abilitySlot) implements DelayedCelestialAction {
+		@Override
+		public void apply(ServerPlayerEntity player) {
+			onAbilityRequested(player, abilitySlot);
 		}
 	}
 
