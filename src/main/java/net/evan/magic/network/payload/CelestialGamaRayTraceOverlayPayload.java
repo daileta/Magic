@@ -13,6 +13,11 @@ public record CelestialGamaRayTraceOverlayPayload(
 	float scale,
 	int xOffset,
 	int yOffset,
+	float inputScale,
+	int lineThickness,
+	int nodeRadius,
+	int cursorRadius,
+	boolean lockCameraWhileTracing,
 	int pathColorRgb,
 	int progressColorRgb,
 	int activeSegmentColorRgb,
@@ -36,6 +41,11 @@ public record CelestialGamaRayTraceOverlayPayload(
 			buf.writeFloat(value.scale());
 			buf.writeInt(value.xOffset());
 			buf.writeInt(value.yOffset());
+			buf.writeFloat(value.inputScale());
+			buf.writeInt(value.lineThickness());
+			buf.writeInt(value.nodeRadius());
+			buf.writeInt(value.cursorRadius());
+			buf.writeBoolean(value.lockCameraWhileTracing());
 			buf.writeInt(value.pathColorRgb());
 			buf.writeInt(value.progressColorRgb());
 			buf.writeInt(value.activeSegmentColorRgb());
@@ -54,6 +64,11 @@ public record CelestialGamaRayTraceOverlayPayload(
 			buf.readFloat(),
 			buf.readInt(),
 			buf.readInt(),
+			buf.readFloat(),
+			buf.readInt(),
+			buf.readInt(),
+			buf.readInt(),
+			buf.readBoolean(),
 			buf.readInt(),
 			buf.readInt(),
 			buf.readInt(),

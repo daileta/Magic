@@ -2236,7 +2236,7 @@ public final class MagicConfig {
 	public static final class ConstellationCelestialAlignmentConfig {
 		public double activationCostPercent = 15.0;
 		public int normalCooldownTicks = 2 * 60 * 20;
-		public int gamaRayCooldownTicks = 5 * 60 * 20;
+		public int gamaRayCooldownTicks = 7 * 60 * 20;
 		public double targetPlacementRange = 15.0;
 		public double columnHeight = 10.0;
 		public int maxActiveConstellations = 3;
@@ -2556,13 +2556,15 @@ public final class MagicConfig {
 	}
 
 	public static final class GamaRayConfig {
-		public double activationCostPercent = 25.0;
+		public double minimumStartManaPercent = 80.0;
+		public double beamFireManaCostPercent = 100.0;
 		public TracingConfig tracing = new TracingConfig();
 		public ChargeConfig charge = new ChargeConfig();
 		public BeamConfig beam = new BeamConfig();
 
 		private void normalize() {
-			activationCostPercent = MathHelper.clamp(activationCostPercent, 0.0, 100.0);
+			minimumStartManaPercent = MathHelper.clamp(minimumStartManaPercent, 0.0, 100.0);
+			beamFireManaCostPercent = MathHelper.clamp(beamFireManaCostPercent, 0.0, 100.0);
 			if (tracing == null) {
 				tracing = new TracingConfig();
 			}
@@ -2579,12 +2581,19 @@ public final class MagicConfig {
 	}
 
 	public static final class TracingConfig {
-		public double toleranceRadius = 18.0;
-		public double segmentCompletionRadius = 20.0;
+		public double toleranceRadius = 34.0;
+		public double segmentCompletionRadius = 30.0;
+		public double inputScale = 1.0;
 		public int resetTimeoutTicks = 8 * 20;
-		public float overlayScale = 1.0F;
+		public int cancelCooldownTicks = 30 * 20;
+		public float overlayScale = 1.45F;
 		public int overlayXOffset = 0;
 		public int overlayYOffset = -12;
+		public int lineThickness = 5;
+		public int nodeRadius = 4;
+		public int cursorRadius = 4;
+		public boolean lockCameraWhileTracing = true;
+		public String promptColorHex = "#7FD4FF";
 		public String pathColorHex = "#86B6FF";
 		public String progressColorHex = "#FFF1B0";
 		public String activeSegmentColorHex = "#FFFFFF";
@@ -2596,8 +2605,14 @@ public final class MagicConfig {
 		private void normalize() {
 			toleranceRadius = Math.max(1.0, toleranceRadius);
 			segmentCompletionRadius = Math.max(1.0, segmentCompletionRadius);
+			inputScale = Math.max(0.1, inputScale);
 			resetTimeoutTicks = Math.max(1, resetTimeoutTicks);
+			cancelCooldownTicks = Math.max(0, cancelCooldownTicks);
 			overlayScale = Math.max(0.25F, overlayScale);
+			lineThickness = Math.max(1, lineThickness);
+			nodeRadius = Math.max(1, nodeRadius);
+			cursorRadius = Math.max(1, cursorRadius);
+			promptColorHex = normalizeColorHex(promptColorHex, "#7FD4FF");
 			pathColorHex = normalizeColorHex(pathColorHex, "#86B6FF");
 			progressColorHex = normalizeColorHex(progressColorHex, "#FFF1B0");
 			activeSegmentColorHex = normalizeColorHex(activeSegmentColorHex, "#FFFFFF");

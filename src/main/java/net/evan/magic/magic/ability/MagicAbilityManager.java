@@ -4557,6 +4557,10 @@ public final class MagicAbilityManager {
 		CelestialAlignmentSessionState session = SAGITTARIUS_STATES.get(playerId);
 		CelestialGamaRayState gamaRayState = CELESTIAL_GAMA_RAY_STATES.get(playerId);
 		if (gamaRayState != null) {
+			if (gamaRayState.phase == CelestialGamaRayPhase.TRACING) {
+				cancelCelestialGamaRayTrace(player, true);
+				return;
+			}
 			player.sendMessage(Text.translatable("message.magic.constellation.still_charging", celestialGamaRayDisplayName()), true);
 			return;
 		}
@@ -4576,13 +4580,11 @@ public final class MagicAbilityManager {
 				return;
 			}
 
-			int manaCost = (int) Math.ceil(manaFromPercentExact(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.activationCostPercent));
-			if (!canSpendAbilityCost(player, manaCost)) {
+			if (!hasRequiredManaPercent(player, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.minimumStartManaPercent)) {
 				player.sendMessage(Text.translatable("message.magic.ability.no_mana"), true);
 				return;
 			}
 
-			spendAbilityCost(player, manaCost);
 			startCelestialGamaRayTracing(player, currentTick);
 			recordOrionsGambitAbilityUse(player, MagicAbility.SAGITTARIUS_ASTRAL_ARROW);
 			return;
@@ -13224,6 +13226,14 @@ public final class MagicAbilityManager {
 			|| MagicPlayerData.getMana(player) >= MagicPlayerData.MAX_MANA;
 	}
 
+	private static boolean hasRequiredManaPercent(ServerPlayerEntity player, double percent) {
+		if (isTestingMode(player) || isOrionsGambitManaCostSuppressed(player)) {
+			return true;
+		}
+		double threshold = manaFromPercentExact(MathHelper.clamp(percent, 0.0, 100.0));
+		return MagicPlayerData.getMana(player) >= Math.ceil(threshold);
+	}
+
 	private static void spendAbilityCost(ServerPlayerEntity player, int manaCost) {
 		int adjustedManaCost = adjustCelestialAlignmentManaCost(player, GreedDomainRuntime.adjustManaCost(player, manaCost));
 		if (isTestingMode(player)) {
@@ -14044,6 +14054,27 @@ public final class MagicAbilityManager {
 		);
 	}
 
+	private static void sendCelestialGamaRayTraceBanner(ServerPlayerEntity caster) {
+		if (caster == null || !CELESTIAL_ALIGNMENT_CONFIG.banner.enabled) {
+			return;
+		}
+
+		MagicConfig.BannerConfig banner = CELESTIAL_ALIGNMENT_CONFIG.banner;
+		ServerPlayNetworking.send(
+			caster,
+			new ConstellationWarningOverlayPayload(
+				Text.translatable("message.magic.constellation.celestial_gama_ray.trace_prompt_short").getString(),
+				parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.promptColorHex, 0x7FD4FF),
+				banner.scale,
+				banner.fadeInTicks,
+				20 * 60 * 20,
+				banner.fadeOutTicks,
+				banner.screenXOffset,
+				banner.screenYOffset
+			)
+		);
+	}
+
 	private static CelestialAlignmentConstellation rollCelestialAlignment(ServerPlayerEntity caster) {
 		List<CelestialAlignmentConstellation> constellations = List.of(
 			CelestialAlignmentConstellation.CRATER,
@@ -14108,28 +14139,46 @@ public final class MagicAbilityManager {
 		setActiveAbility(caster, MagicAbility.SAGITTARIUS_ASTRAL_ARROW);
 		MagicPlayerData.setDepletedRecoveryMode(caster, false);
 		sendCelestialGamaRayTraceOverlay(caster, true, constellation);
-		caster.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.trace_prompt", Text.translatable(constellation.translationKey)), true);
+		sendCelestialGamaRayTraceBanner(caster);
 	}
 
 	private static void clearCelestialGamaRayState(ServerPlayerEntity caster, boolean sendFeedback, boolean startCooldown) {
+		clearCelestialGamaRayState(caster, sendFeedback, startCooldown, CELESTIAL_ALIGNMENT_CONFIG.gamaRayCooldownTicks);
+	}
+
+	private static void clearCelestialGamaRayState(ServerPlayerEntity caster, boolean sendFeedback, boolean startCooldown, int cooldownTicks) {
 		if (caster == null) {
 			return;
 		}
 		CelestialGamaRayState state = CELESTIAL_GAMA_RAY_STATES.remove(caster.getUuid());
 		MinecraftServer server = caster.getEntityWorld().getServer();
-		if (state != null && startCooldown && server != null && CELESTIAL_ALIGNMENT_CONFIG.gamaRayCooldownTicks > 0) {
-			int currentTick = server.getTicks();
-			SAGITTARIUS_COOLDOWN_END_TICK.put(
-				caster.getUuid(),
-				currentTick + adjustedCooldownTicks(caster.getUuid(), MagicAbility.SAGITTARIUS_ASTRAL_ARROW, CELESTIAL_ALIGNMENT_CONFIG.gamaRayCooldownTicks, currentTick)
-			);
+		if (state != null && startCooldown && server != null && cooldownTicks > 0) {
+			startCelestialGamaRayCooldown(caster, server.getTicks(), cooldownTicks);
 		}
 		if (!SAGITTARIUS_STATES.containsKey(caster.getUuid()) && activeAbility(caster) == MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
 			setActiveAbility(caster, MagicAbility.NONE);
 		}
 		sendCelestialGamaRayTraceOverlay(caster, false, state == null ? null : state.constellation);
+		clearCelestialAlignmentBanner(caster);
 		if (sendFeedback) {
 			caster.sendMessage(Text.translatable("message.magic.ability.deactivated", celestialGamaRayDisplayName()), true);
+		}
+	}
+
+	private static void startCelestialGamaRayCooldown(ServerPlayerEntity caster, int currentTick, int cooldownTicks) {
+		if (caster == null || cooldownTicks <= 0) {
+			return;
+		}
+		SAGITTARIUS_COOLDOWN_END_TICK.put(
+			caster.getUuid(),
+			currentTick + adjustedCooldownTicks(caster.getUuid(), MagicAbility.SAGITTARIUS_ASTRAL_ARROW, cooldownTicks, currentTick)
+		);
+	}
+
+	private static void cancelCelestialGamaRayTrace(ServerPlayerEntity caster, boolean sendFeedback) {
+		clearCelestialGamaRayState(caster, false, true, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.cancelCooldownTicks);
+		if (caster != null && sendFeedback) {
+			caster.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.trace_cancelled"), true);
 		}
 	}
 
@@ -14147,6 +14196,7 @@ public final class MagicAbilityManager {
 			state.phase = CelestialGamaRayPhase.CHARGING;
 			state.chargeCompleteTick = currentTick + Math.max(0, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.charge.readyDelayTicks);
 			sendCelestialGamaRayTraceOverlay(player, false, state.constellation);
+			clearCelestialAlignmentBanner(player);
 			player.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.charging"), true);
 			return;
 		}
@@ -14168,6 +14218,11 @@ public final class MagicAbilityManager {
 				CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.overlayScale,
 				CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.overlayXOffset,
 				CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.overlayYOffset,
+				(float) CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.inputScale,
+				CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.lineThickness,
+				CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.nodeRadius,
+				CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.cursorRadius,
+				CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.lockCameraWhileTracing,
 				parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.pathColorHex, 0x86B6FF),
 				parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.progressColorHex, 0xFFF1B0),
 				parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.activeSegmentColorHex, 0xFFFFFF),
@@ -14177,7 +14232,7 @@ public final class MagicAbilityManager {
 				parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.failColorHex, 0xFF8080),
 				(float) CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.toleranceRadius,
 				(float) CELESTIAL_ALIGNMENT_CONFIG.gamaRay.tracing.segmentCompletionRadius,
-				Text.translatable("message.magic.constellation.celestial_gama_ray.trace_prompt_short").getString(),
+				"",
 				Text.translatable("message.magic.constellation.celestial_gama_ray.charging").getString()
 			)
 		);
@@ -14195,6 +14250,8 @@ public final class MagicAbilityManager {
 			}
 			if (state.phase == CelestialGamaRayPhase.TRACING && currentTick >= state.traceExpireTick) {
 				iterator.remove();
+				sendCelestialGamaRayTraceOverlay(caster, false, state.constellation);
+				clearCelestialAlignmentBanner(caster);
 				caster.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.trace_failed"), true);
 				if (!SAGITTARIUS_STATES.containsKey(caster.getUuid())) {
 					setActiveAbility(caster, MagicAbility.NONE);
@@ -14207,8 +14264,9 @@ public final class MagicAbilityManager {
 			if (state.phase == CelestialGamaRayPhase.FIRING) {
 				updateCelestialGamaRayBeam(caster, state, currentTick);
 				if (currentTick >= state.endTick) {
+					startCelestialGamaRayCooldown(caster, currentTick, CELESTIAL_ALIGNMENT_CONFIG.gamaRayCooldownTicks);
 					iterator.remove();
-					clearCelestialGamaRayState(caster, true, true);
+					clearCelestialGamaRayState(caster, true, false);
 				}
 			}
 		}
@@ -14238,6 +14296,12 @@ public final class MagicAbilityManager {
 		Vec3d direction = caster.getRotationVector();
 		if (direction.lengthSquared() <= 1.0E-6) {
 			direction = new Vec3d(0.0, 0.0, 1.0);
+		}
+		if (CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beamFireManaCostPercent >= 100.0) {
+			consumeFullManaBar(caster);
+		} else {
+			int manaCost = (int) Math.ceil(manaFromPercentExact(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beamFireManaCostPercent));
+			spendAbilityCost(caster, manaCost);
 		}
 		state.phase = CelestialGamaRayPhase.FIRING;
 		state.beamOrigin = caster.getEyePos();

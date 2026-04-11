@@ -16,12 +16,16 @@ import net.minecraft.util.math.MathHelper;
 
 public final class CelestialGamaRayTraceHudOverlay {
 	private static final Identifier HUD_LAYER = Identifier.of(Magic.MOD_ID, "celestial_gama_ray_trace");
-	private static final float INPUT_SCALE = 7.5F;
 	private static boolean active;
 	private static String constellationId = "";
 	private static float overlayScale = 1.0F;
 	private static int overlayXOffset;
 	private static int overlayYOffset;
+	private static float inputScale = 1.0F;
+	private static int lineThickness = 5;
+	private static int nodeRadius = 4;
+	private static int cursorRadius = 4;
+	private static boolean lockCameraWhileTracing = true;
 	private static int pathColor = 0xFF86B6FF;
 	private static int progressColor = 0xFFFFF1B0;
 	private static int activeSegmentColor = 0xFFFFFFFF;
@@ -56,6 +60,11 @@ public final class CelestialGamaRayTraceHudOverlay {
 		float scale,
 		int xOffset,
 		int yOffset,
+		float inputScale,
+		int lineThickness,
+		int nodeRadius,
+		int cursorRadius,
+		boolean lockCameraWhileTracing,
 		int pathColorRgb,
 		int progressColorRgb,
 		int activeSegmentColorRgb,
@@ -73,6 +82,11 @@ public final class CelestialGamaRayTraceHudOverlay {
 		CelestialGamaRayTraceHudOverlay.overlayScale = Math.max(0.25F, scale);
 		CelestialGamaRayTraceHudOverlay.overlayXOffset = xOffset;
 		CelestialGamaRayTraceHudOverlay.overlayYOffset = yOffset;
+		CelestialGamaRayTraceHudOverlay.inputScale = Math.max(0.1F, inputScale);
+		CelestialGamaRayTraceHudOverlay.lineThickness = Math.max(1, lineThickness);
+		CelestialGamaRayTraceHudOverlay.nodeRadius = Math.max(1, nodeRadius);
+		CelestialGamaRayTraceHudOverlay.cursorRadius = Math.max(1, cursorRadius);
+		CelestialGamaRayTraceHudOverlay.lockCameraWhileTracing = lockCameraWhileTracing;
 		CelestialGamaRayTraceHudOverlay.pathColor = 0xFF000000 | (pathColorRgb & 0x00FFFFFF);
 		CelestialGamaRayTraceHudOverlay.progressColor = 0xFF000000 | (progressColorRgb & 0x00FFFFFF);
 		CelestialGamaRayTraceHudOverlay.activeSegmentColor = 0xFF000000 | (activeSegmentColorRgb & 0x00FFFFFF);
@@ -115,18 +129,38 @@ public final class CelestialGamaRayTraceHudOverlay {
 		if (path.size() < 2) {
 			return;
 		}
+		if (segmentIndex >= path.size() - 1) {
+			if (flashTicks > 0) {
+				flashTicks--;
+			}
+			if (lockCameraWhileTracing) {
+				lockCamera(client);
+			}
+			return;
+		}
 		if (Float.isNaN(lastYaw)) {
 			lastYaw = client.player.getYaw();
 			lastPitch = client.player.getPitch();
 			return;
 		}
 
-		float yawDelta = MathHelper.wrapDegrees(client.player.getYaw() - lastYaw);
-		float pitchDelta = client.player.getPitch() - lastPitch;
-		lastYaw = client.player.getYaw();
-		lastPitch = client.player.getPitch();
-		cursorX += yawDelta * INPUT_SCALE;
-		cursorY += pitchDelta * INPUT_SCALE;
+		float anchoredYaw = lastYaw;
+		float anchoredPitch = lastPitch;
+		float yawDelta = MathHelper.wrapDegrees(client.player.getYaw() - anchoredYaw);
+		float pitchDelta = client.player.getPitch() - anchoredPitch;
+		cursorX += yawDelta * inputScale;
+		cursorY += pitchDelta * inputScale;
+		if (lockCameraWhileTracing) {
+			client.player.setYaw(anchoredYaw);
+			client.player.setPitch(anchoredPitch);
+			client.player.setHeadYaw(anchoredYaw);
+			client.player.setBodyYaw(anchoredYaw);
+			lastYaw = anchoredYaw;
+			lastPitch = anchoredPitch;
+		} else {
+			lastYaw = client.player.getYaw();
+			lastPitch = client.player.getPitch();
+		}
 
 		TracePoint start = path.get(segmentIndex);
 		TracePoint end = path.get(segmentIndex + 1);
@@ -190,6 +224,7 @@ public final class CelestialGamaRayTraceHudOverlay {
 				centerY + Math.round(start.y * scale),
 				centerX + Math.round(end.x * scale),
 				centerY + Math.round(end.y * scale),
+				lineThickness,
 				color
 			);
 		}
@@ -197,23 +232,17 @@ public final class CelestialGamaRayTraceHudOverlay {
 		for (int index = 0; index < path.size(); index++) {
 			TracePoint point = path.get(index);
 			int color = index == 0 ? startNodeColor : (index == path.size() - 1 ? endNodeColor : pathColor);
-			drawNode(context, centerX + Math.round(point.x * scale), centerY + Math.round(point.y * scale), 2, color);
+			drawNode(context, centerX + Math.round(point.x * scale), centerY + Math.round(point.y * scale), nodeRadius, color);
 		}
 
 		if (flashTicks > 0) {
-			drawNode(context, centerX + Math.round(cursorX * scale), centerY + Math.round(cursorY * scale), 3, flashColor);
+			drawNode(context, centerX + Math.round(cursorX * scale), centerY + Math.round(cursorY * scale), cursorRadius + 1, flashColor);
 		} else {
-			drawNode(context, centerX + Math.round(cursorX * scale), centerY + Math.round(cursorY * scale), 2, progressColor);
-		}
-
-		Text line = completionSent ? chargingText : promptText;
-		if (!line.getString().isEmpty()) {
-			int width = client.textRenderer.getWidth(line);
-			context.drawTextWithShadow(client.textRenderer, line, centerX - width / 2, centerY + Math.round(82 * scale), 0xFFFFFFFF);
+			drawNode(context, centerX + Math.round(cursorX * scale), centerY + Math.round(cursorY * scale), cursorRadius, progressColor);
 		}
 	}
 
-	private static void drawLine(DrawContext context, int x0, int y0, int x1, int y1, int color) {
+	private static void drawLine(DrawContext context, int x0, int y0, int x1, int y1, int thickness, int color) {
 		int dx = Math.abs(x1 - x0);
 		int dy = Math.abs(y1 - y0);
 		int sx = x0 < x1 ? 1 : -1;
@@ -221,8 +250,9 @@ public final class CelestialGamaRayTraceHudOverlay {
 		int err = dx - dy;
 		int x = x0;
 		int y = y0;
+		int radius = Math.max(0, (thickness - 1) / 2);
 		while (true) {
-			context.fill(x, y, x + 2, y + 2, color);
+			context.fill(x - radius, y - radius, x + radius + 1, y + radius + 1, color);
 			if (x == x1 && y == y1) {
 				break;
 			}
@@ -236,6 +266,16 @@ public final class CelestialGamaRayTraceHudOverlay {
 				y += sy;
 			}
 		}
+	}
+
+	private static void lockCamera(MinecraftClient client) {
+		if (client.player == null || Float.isNaN(lastYaw)) {
+			return;
+		}
+		client.player.setYaw(lastYaw);
+		client.player.setPitch(lastPitch);
+		client.player.setHeadYaw(lastYaw);
+		client.player.setBodyYaw(lastYaw);
 	}
 
 	private static void drawNode(DrawContext context, int x, int y, int radius, int color) {
