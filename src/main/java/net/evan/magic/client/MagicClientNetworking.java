@@ -3,6 +3,7 @@ package net.evan.magic.client;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import net.evan.magic.network.payload.CelestialGamaRayTraceOverlayPayload;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
 import net.evan.magic.network.payload.GreedDomainWarningOverlayPayload;
 import net.evan.magic.network.payload.JesterJokeOverlayPayload;
@@ -42,6 +43,32 @@ public final class MagicClientNetworking {
 					payload.yOffset()
 				)
 			)
+		);
+		ClientPlayNetworking.registerGlobalReceiver(CelestialGamaRayTraceOverlayPayload.ID, (payload, context) ->
+			context.client().execute(() -> {
+				if (!payload.active()) {
+					CelestialGamaRayTraceHudOverlay.clear();
+					return;
+				}
+				CelestialGamaRayTraceHudOverlay.show(
+					payload.active(),
+					payload.constellationId(),
+					payload.scale(),
+					payload.xOffset(),
+					payload.yOffset(),
+					payload.pathColorRgb(),
+					payload.progressColorRgb(),
+					payload.activeSegmentColorRgb(),
+					payload.startNodeColorRgb(),
+					payload.endNodeColorRgb(),
+					payload.successColorRgb(),
+					payload.failColorRgb(),
+					payload.toleranceRadius(),
+					payload.segmentCompletionRadius(),
+					payload.promptText(),
+					payload.chargingText()
+				);
+			})
 		);
 		ClientPlayNetworking.registerGlobalReceiver(GreedDomainWarningOverlayPayload.ID, (payload, context) ->
 			context.client().execute(() ->

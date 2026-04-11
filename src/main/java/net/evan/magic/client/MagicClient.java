@@ -6,10 +6,12 @@ import net.fabricmc.api.ClientModInitializer;
 public final class MagicClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+		ClientLibraryValidation.initialize();
 		BurningPassionAfterimageRenderer.initialize();
 		MagicClientParticles.initialize();
 		MagicKeybindings.initialize();
 		MagicClientNetworking.initialize();
+		CelestialGamaRayTraceHudOverlay.register();
 		ManaHudOverlay.register();
 	}
 }

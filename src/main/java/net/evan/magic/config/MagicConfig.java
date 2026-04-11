@@ -2234,159 +2234,43 @@ public final class MagicConfig {
 	}
 
 	public static final class ConstellationCelestialAlignmentConfig {
-		public double activationCostPercent = 45.0;
-		public int cooldownTicks = 20 * 20;
+		public double activationCostPercent = 15.0;
+		public int normalCooldownTicks = 2 * 60 * 20;
+		public int gamaRayCooldownTicks = 5 * 60 * 20;
 		public double targetPlacementRange = 15.0;
 		public double columnHeight = 10.0;
-		public VisualConfig visuals = new VisualConfig();
+		public int maxActiveConstellations = 3;
+		public double manaDrainPercentPerSecondPerActiveConstellation = 1.0;
+		public boolean disableManaRegenWhileConstellationsActive = true;
+		public boolean overlapAllowed = true;
+		public boolean shiftCancelEnabled = true;
+		public boolean autoEndOnManaDepletion = true;
 		public BannerConfig banner = new BannerConfig();
-		public RarityWeightsConfig rarityWeights = new RarityWeightsConfig();
-		public CommonPoolConfig common = new CommonPoolConfig();
-		public RarePoolConfig rare = new RarePoolConfig();
-		public MythicPoolConfig mythic = new MythicPoolConfig();
+		public VisualConfig visuals = new VisualConfig();
+		public CraterConfig crater = new CraterConfig();
+		public SagittaConfig sagitta = new SagittaConfig();
+		public GeminiConfig gemini = new GeminiConfig();
+		public AquilaConfig aquila = new AquilaConfig();
+		public ScorpiusConfig scorpius = new ScorpiusConfig();
+		public LibraConfig libra = new LibraConfig();
+		public GamaRayConfig gamaRay = new GamaRayConfig();
 
 		private void normalize() {
 			activationCostPercent = MathHelper.clamp(activationCostPercent, 0.0, 100.0);
-			cooldownTicks = Math.max(0, cooldownTicks);
+			normalCooldownTicks = Math.max(0, normalCooldownTicks);
+			gamaRayCooldownTicks = Math.max(0, gamaRayCooldownTicks);
 			targetPlacementRange = Math.max(1.0, targetPlacementRange);
 			columnHeight = Math.max(1.0, columnHeight);
-			if (visuals == null) {
-				visuals = new VisualConfig();
-			}
+			maxActiveConstellations = MathHelper.clamp(maxActiveConstellations, 1, 3);
+			manaDrainPercentPerSecondPerActiveConstellation = MathHelper.clamp(manaDrainPercentPerSecondPerActiveConstellation, 0.0, 100.0);
 			if (banner == null) {
 				banner = new BannerConfig();
 			}
-			if (rarityWeights == null) {
-				rarityWeights = new RarityWeightsConfig();
+			if (visuals == null) {
+				visuals = new VisualConfig();
 			}
-			if (common == null) {
-				common = new CommonPoolConfig();
-			}
-			if (rare == null) {
-				rare = new RarePoolConfig();
-			}
-			if (mythic == null) {
-				mythic = new MythicPoolConfig();
-			}
-			visuals.normalize();
-			banner.normalize();
-			rarityWeights.normalize();
-			common.normalize();
-			rare.normalize();
-			mythic.normalize();
-		}
-	}
-
-	public static class ConstellationCelestialAlignmentEntryConfig {
-		public double poolWeight = 1.0;
-		public int durationTicks = 20;
-		public double radius = 5.0;
-
-		protected void normalizeBase() {
-			poolWeight = Math.max(0.0, poolWeight);
-			durationTicks = Math.max(1, durationTicks);
-			radius = Math.max(0.5, radius);
-		}
-	}
-
-	public static final class VisualConfig {
-		public boolean renderGroundRing = true;
-		public boolean renderTopRing = true;
-		public boolean renderConstellationShape = true;
-		public boolean renderVerticalLinks = true;
-		public int particleIntervalTicks = 4;
-		public int groundRingParticleCount = 40;
-		public int topRingParticleCount = 40;
-		public int starNodeParticleCount = 4;
-		public int connectionLineParticleCount = 10;
-		public int verticalLinkParticleCount = 8;
-		public String groundRingPrimaryColorHex = "#74FF9A";
-		public String groundRingSecondaryColorHex = "#FFFFFF";
-		public String topRingPrimaryColorHex = "#74FF9A";
-		public String topRingSecondaryColorHex = "#FFFFFF";
-		public String starNodeColorHex = "#FFFFFF";
-		public String connectionLineColorHex = "#DFFFE8";
-		public String verticalLinkColorHex = "#C4FFD8";
-		public float ringParticleScale = 1.2F;
-		public float starNodeParticleScale = 1.05F;
-		public float connectionParticleScale = 0.85F;
-		public float verticalLinkParticleScale = 0.65F;
-
-		private void normalize() {
-			particleIntervalTicks = Math.max(1, particleIntervalTicks);
-			groundRingParticleCount = Math.max(0, groundRingParticleCount);
-			topRingParticleCount = Math.max(0, topRingParticleCount);
-			starNodeParticleCount = Math.max(0, starNodeParticleCount);
-			connectionLineParticleCount = Math.max(0, connectionLineParticleCount);
-			verticalLinkParticleCount = Math.max(0, verticalLinkParticleCount);
-			groundRingPrimaryColorHex = normalizeColorHex(groundRingPrimaryColorHex, "#74FF9A");
-			groundRingSecondaryColorHex = normalizeColorHex(groundRingSecondaryColorHex, "#FFFFFF");
-			topRingPrimaryColorHex = normalizeColorHex(topRingPrimaryColorHex, "#74FF9A");
-			topRingSecondaryColorHex = normalizeColorHex(topRingSecondaryColorHex, "#FFFFFF");
-			starNodeColorHex = normalizeColorHex(starNodeColorHex, "#FFFFFF");
-			connectionLineColorHex = normalizeColorHex(connectionLineColorHex, "#DFFFE8");
-			verticalLinkColorHex = normalizeColorHex(verticalLinkColorHex, "#C4FFD8");
-			ringParticleScale = Math.max(0.1F, ringParticleScale);
-			starNodeParticleScale = Math.max(0.1F, starNodeParticleScale);
-			connectionParticleScale = Math.max(0.1F, connectionParticleScale);
-			verticalLinkParticleScale = Math.max(0.1F, verticalLinkParticleScale);
-		}
-	}
-
-	public static final class BannerConfig {
-		public boolean enabled = true;
-		public float scale = 1.2F;
-		public int fadeInTicks = 4;
-		public int fadeOutTicks = 8;
-		public int screenXOffset = 0;
-		public int screenYOffset = 0;
-		public String commonColorHex = "#FFFFFF";
-		public String rareColorHex = "#4AA3FF";
-		public String mythicColorHex = "#FF4A4A";
-
-		private void normalize() {
-			scale = Math.max(0.5F, scale);
-			fadeInTicks = Math.max(0, fadeInTicks);
-			fadeOutTicks = Math.max(0, fadeOutTicks);
-			commonColorHex = normalizeColorHex(commonColorHex, "#FFFFFF");
-			rareColorHex = normalizeColorHex(rareColorHex, "#4AA3FF");
-			mythicColorHex = normalizeColorHex(mythicColorHex, "#FF4A4A");
-		}
-	}
-
-	public static final class RarityWeightsConfig {
-		public double common = 60.0;
-		public double rare = 35.0;
-		public double mythic = 5.0;
-
-		private void normalize() {
-			common = Math.max(0.0, common);
-			rare = Math.max(0.0, rare);
-			mythic = Math.max(0.0, mythic);
-			if (common + rare + mythic <= 1.0E-6) {
-				common = 60.0;
-				rare = 35.0;
-				mythic = 5.0;
-			}
-		}
-	}
-
-	public static final class CommonPoolConfig {
-		public CraterConfig crater = new CraterConfig();
-		public AraConfig ara = new AraConfig();
-		public HorologiumConfig horologium = new HorologiumConfig();
-		public SagittaConfig sagitta = new SagittaConfig();
-		public GeminiConfig gemini = new GeminiConfig();
-
-		private void normalize() {
 			if (crater == null) {
 				crater = new CraterConfig();
-			}
-			if (ara == null) {
-				ara = new AraConfig();
-			}
-			if (horologium == null) {
-				horologium = new HorologiumConfig();
 			}
 			if (sagitta == null) {
 				sagitta = new SagittaConfig();
@@ -2394,63 +2278,129 @@ public final class MagicConfig {
 			if (gemini == null) {
 				gemini = new GeminiConfig();
 			}
-			crater.normalize();
-			ara.normalize();
-			horologium.normalize();
-			sagitta.normalize();
-			gemini.normalize();
-		}
-	}
-
-	public static final class RarePoolConfig {
-		public PyxisConfig pyxis = new PyxisConfig();
-		public BootesConfig bootes = new BootesConfig();
-		public CoronaBorealisConfig coronaBorealis = new CoronaBorealisConfig();
-		public AquilaConfig aquila = new AquilaConfig();
-		public ScorpiusConfig scorpius = new ScorpiusConfig();
-
-		private void normalize() {
-			if (pyxis == null) {
-				pyxis = new PyxisConfig();
-			}
-			if (bootes == null) {
-				bootes = new BootesConfig();
-			}
-			if (coronaBorealis == null) {
-				coronaBorealis = new CoronaBorealisConfig();
-			}
 			if (aquila == null) {
 				aquila = new AquilaConfig();
 			}
 			if (scorpius == null) {
 				scorpius = new ScorpiusConfig();
 			}
-			pyxis.normalize();
-			bootes.normalize();
-			coronaBorealis.normalize();
-			aquila.normalize();
-			scorpius.normalize();
-		}
-	}
-
-	public static final class MythicPoolConfig {
-		public CetusConfig cetus = new CetusConfig();
-		public ReticulumConfig reticulum = new ReticulumConfig();
-		public LibraConfig libra = new LibraConfig();
-
-		private void normalize() {
-			if (cetus == null) {
-				cetus = new CetusConfig();
-			}
-			if (reticulum == null) {
-				reticulum = new ReticulumConfig();
-			}
 			if (libra == null) {
 				libra = new LibraConfig();
 			}
-			cetus.normalize();
-			reticulum.normalize();
+			if (gamaRay == null) {
+				gamaRay = new GamaRayConfig();
+			}
+			banner.normalize();
+			visuals.normalize();
+			crater.normalize();
+			sagitta.normalize();
+			gemini.normalize();
+			aquila.normalize();
+			scorpius.normalize();
 			libra.normalize();
+			gamaRay.normalize();
+		}
+	}
+
+	public static class ConstellationCelestialAlignmentEntryConfig {
+		public double radius = 15.0;
+		public String colorHex = "#FFFFFF";
+
+		protected void normalizeBase() {
+			radius = Math.max(0.5, radius);
+			colorHex = normalizeColorHex(colorHex, "#FFFFFF");
+		}
+	}
+
+	public static final class VisualConfig {
+		public boolean usePlayerAnimations = true;
+		public boolean useGeckoLibAquilaProjectile = false;
+		public boolean useGeckoLibGamaRayChargeOrb = false;
+		public boolean reducedFirstPersonEffects = false;
+		public boolean reducedBeamDensity = false;
+		public boolean reducedConstellationAmbientParticles = false;
+		public double maxVisibleConstellationEffectsDistance = 64.0;
+		public double maxVisibleBeamEffectsDistance = 96.0;
+		public boolean allowCameraShake = true;
+		public boolean allowFovPulse = true;
+		public boolean lowFxFallbackMode = false;
+		public int placementBuildInTicks = 18;
+		public int nodePulseIntervalTicks = 14;
+		public float nodePulseScale = 1.15F;
+		public String lineDrawMode = "segment";
+		public double lineTravelSpeed = 0.12;
+		public int ambientParticleIntervalTicks = 6;
+		public int ambientParticleCount = 4;
+		public int verticalThreadCount = 10;
+		public float verticalThreadOpacity = 0.42F;
+		public boolean ringShimmerEnabled = true;
+		public int ringShimmerIntervalTicks = 10;
+		public boolean summonFlourishEnabled = true;
+		public int summonFlourishDurationTicks = 10;
+		public int groundRingParticleCount = 56;
+		public int topRingParticleCount = 40;
+		public int starNodeParticleCount = 5;
+		public int connectionLineParticleCount = 12;
+		public float ringParticleScale = 1.15F;
+		public float starNodeParticleScale = 1.0F;
+		public float connectionParticleScale = 0.82F;
+		public float verticalThreadParticleScale = 0.5F;
+		public String groundRingPrimaryColorHex = "#CFE7FF";
+		public String groundRingSecondaryColorHex = "#FFFFFF";
+		public String topRingPrimaryColorHex = "#D9F2FF";
+		public String topRingSecondaryColorHex = "#9FD4FF";
+		public String verticalThreadColorHex = "#D3ECFF";
+		public String shimmerColorHex = "#FFFFFF";
+
+		private void normalize() {
+			maxVisibleConstellationEffectsDistance = Math.max(8.0, maxVisibleConstellationEffectsDistance);
+			maxVisibleBeamEffectsDistance = Math.max(8.0, maxVisibleBeamEffectsDistance);
+			placementBuildInTicks = Math.max(1, placementBuildInTicks);
+			nodePulseIntervalTicks = Math.max(1, nodePulseIntervalTicks);
+			nodePulseScale = Math.max(0.1F, nodePulseScale);
+			if (lineDrawMode == null || lineDrawMode.isBlank()) {
+				lineDrawMode = "segment";
+			} else {
+				lineDrawMode = lineDrawMode.trim().toLowerCase(java.util.Locale.ROOT);
+			}
+			lineTravelSpeed = Math.max(0.01, lineTravelSpeed);
+			ambientParticleIntervalTicks = Math.max(1, ambientParticleIntervalTicks);
+			ambientParticleCount = Math.max(0, ambientParticleCount);
+			verticalThreadCount = Math.max(0, verticalThreadCount);
+			verticalThreadOpacity = MathHelper.clamp(verticalThreadOpacity, 0.0F, 1.0F);
+			ringShimmerIntervalTicks = Math.max(1, ringShimmerIntervalTicks);
+			summonFlourishDurationTicks = Math.max(1, summonFlourishDurationTicks);
+			groundRingParticleCount = Math.max(0, groundRingParticleCount);
+			topRingParticleCount = Math.max(0, topRingParticleCount);
+			starNodeParticleCount = Math.max(0, starNodeParticleCount);
+			connectionLineParticleCount = Math.max(0, connectionLineParticleCount);
+			ringParticleScale = Math.max(0.1F, ringParticleScale);
+			starNodeParticleScale = Math.max(0.1F, starNodeParticleScale);
+			connectionParticleScale = Math.max(0.1F, connectionParticleScale);
+			verticalThreadParticleScale = Math.max(0.1F, verticalThreadParticleScale);
+			groundRingPrimaryColorHex = normalizeColorHex(groundRingPrimaryColorHex, "#CFE7FF");
+			groundRingSecondaryColorHex = normalizeColorHex(groundRingSecondaryColorHex, "#FFFFFF");
+			topRingPrimaryColorHex = normalizeColorHex(topRingPrimaryColorHex, "#D9F2FF");
+			topRingSecondaryColorHex = normalizeColorHex(topRingSecondaryColorHex, "#9FD4FF");
+			verticalThreadColorHex = normalizeColorHex(verticalThreadColorHex, "#D3ECFF");
+			shimmerColorHex = normalizeColorHex(shimmerColorHex, "#FFFFFF");
+		}
+	}
+
+	public static final class BannerConfig {
+		public boolean enabled = true;
+		public float scale = 1.2F;
+		public int fadeInTicks = 4;
+		public int stayTicks = 60;
+		public int fadeOutTicks = 8;
+		public int screenXOffset = 0;
+		public int screenYOffset = 0;
+
+		private void normalize() {
+			scale = Math.max(0.5F, scale);
+			fadeInTicks = Math.max(0, fadeInTicks);
+			stayTicks = Math.max(0, stayTicks);
+			fadeOutTicks = Math.max(0, fadeOutTicks);
 		}
 	}
 
@@ -2459,63 +2409,38 @@ public final class MagicConfig {
 		public boolean blockPotionHealing = true;
 		public boolean blockEffectHealing = true;
 		public boolean blockMagicHealing = true;
+		public int siphonRippleIntervalTicks = 14;
+		public int siphonParticleCount = 8;
 
 		public CraterConfig() {
-			poolWeight = 16.0;
-			durationTicks = 10 * 20;
-			radius = 6.0;
+			radius = 15.0;
+			colorHex = "#6F8AA5";
 		}
 
 		private void normalize() {
 			normalizeBase();
-		}
-	}
-
-	public static final class AraConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public double manaCostMultiplier = 1.5;
-		public double greedCoinMultiplier = 1.5;
-
-		public AraConfig() {
-			poolWeight = 14.0;
-			durationTicks = 12 * 20;
-			radius = 7.0;
-		}
-
-		private void normalize() {
-			normalizeBase();
-			manaCostMultiplier = Math.max(1.0, manaCostMultiplier);
-			greedCoinMultiplier = Math.max(1.0, greedCoinMultiplier);
-		}
-	}
-
-	public static final class HorologiumConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public double enemyPositiveEffectDrainMultiplier = 2.0;
-		public double casterPositiveEffectExtensionMultiplier = 2.0;
-
-		public HorologiumConfig() {
-			poolWeight = 12.0;
-			durationTicks = 12 * 20;
-			radius = 7.0;
-		}
-
-		private void normalize() {
-			normalizeBase();
-			enemyPositiveEffectDrainMultiplier = Math.max(1.0, enemyPositiveEffectDrainMultiplier);
-			casterPositiveEffectExtensionMultiplier = Math.max(1.0, casterPositiveEffectExtensionMultiplier);
+			siphonRippleIntervalTicks = Math.max(1, siphonRippleIntervalTicks);
+			siphonParticleCount = Math.max(0, siphonParticleCount);
 		}
 	}
 
 	public static final class SagittaConfig extends ConstellationCelestialAlignmentEntryConfig {
 		public int beamStartDelayTicks = 20;
-		public int beamIntervalTicks = 4;
-		public int beamsPerInterval = 2;
-		public float beamDamage = 2.0F;
-		public double beamHitRadius = 0.85;
+		public int beamIntervalTicks = 10;
+		public int beamsPerInterval = 1;
+		public int telegraphTicks = 10;
+		public double telegraphRingSize = 1.5;
+		public float previewShaftOpacity = 0.45F;
+		public int impactBurstDensity = 12;
+		public float strikeDamage = 2.0F;
+		public double strikeHitRadius = 1.0;
+		public float strikeSoundVolume = 1.0F;
+		public float strikeSoundPitch = 1.15F;
+		public boolean layeredStrikeSound = true;
 
 		public SagittaConfig() {
-			poolWeight = 10.0;
-			durationTicks = 7 * 20;
-			radius = 7.0;
+			radius = 18.0;
+			colorHex = "#63C8FF";
 		}
 
 		private void normalize() {
@@ -2523,176 +2448,231 @@ public final class MagicConfig {
 			beamStartDelayTicks = Math.max(0, beamStartDelayTicks);
 			beamIntervalTicks = Math.max(1, beamIntervalTicks);
 			beamsPerInterval = Math.max(0, beamsPerInterval);
-			beamDamage = Math.max(0.0F, beamDamage);
-			beamHitRadius = Math.max(0.1, beamHitRadius);
+			telegraphTicks = Math.max(0, telegraphTicks);
+			telegraphRingSize = Math.max(0.1, telegraphRingSize);
+			previewShaftOpacity = MathHelper.clamp(previewShaftOpacity, 0.0F, 1.0F);
+			impactBurstDensity = Math.max(0, impactBurstDensity);
+			strikeDamage = Math.max(0.0F, strikeDamage);
+			strikeHitRadius = Math.max(0.1, strikeHitRadius);
+			strikeSoundVolume = Math.max(0.0F, strikeSoundVolume);
+			strikeSoundPitch = Math.max(0.0F, strikeSoundPitch);
 		}
 	}
 
 	public static final class GeminiConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public int recordedHitCount = 3;
+		public int echoMarkerDurationTicks = 18;
+		public int maxVisibleMarkers = 5;
+		public int replayBurstSpacingTicks = 1;
+		public float replayFlashIntensity = 0.8F;
 
 		public GeminiConfig() {
-			poolWeight = 8.0;
-			durationTicks = 10 * 20;
-			radius = 6.0;
+			radius = 20.0;
+			colorHex = "#F6D6FF";
 		}
 
 		private void normalize() {
 			normalizeBase();
-			recordedHitCount = Math.max(1, recordedHitCount);
-		}
-	}
-
-	public static final class PyxisConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public boolean invertForwardBackward = true;
-		public boolean invertStrafe = true;
-		public boolean invertJumpSneak = true;
-		public boolean mirrorVerticalDelta = true;
-		public double groundedSneakJumpLift = 0.42;
-
-		public PyxisConfig() {
-			poolWeight = 9.0;
-			durationTicks = 5 * 20;
-			radius = 5.0;
-		}
-
-		private void normalize() {
-			normalizeBase();
-			groundedSneakJumpLift = Math.max(0.0, groundedSneakJumpLift);
-		}
-	}
-
-	public static final class BootesConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public double casterCooldownRateMultiplier = 2.0;
-		public double othersMovementSpeedMultiplier = 0.5;
-		public boolean disableSprint = true;
-
-		public BootesConfig() {
-			poolWeight = 8.0;
-			durationTicks = 8 * 20;
-			radius = 6.0;
-		}
-
-		private void normalize() {
-			normalizeBase();
-			casterCooldownRateMultiplier = Math.max(1.0, casterCooldownRateMultiplier);
-			othersMovementSpeedMultiplier = MathHelper.clamp(othersMovementSpeedMultiplier, 0.0, 1.0);
-		}
-	}
-
-	public static final class CoronaBorealisConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public boolean casterImmuneToNegativeEffects = true;
-		public boolean curseExistingCasterEffects = true;
-		public double targetNegativeDurationMultiplier = 1.5;
-		public int targetNegativeAmplifierBonus = 1;
-
-		public CoronaBorealisConfig() {
-			poolWeight = 7.0;
-			durationTicks = 8 * 20;
-			radius = 6.0;
-		}
-
-		private void normalize() {
-			normalizeBase();
-			targetNegativeDurationMultiplier = Math.max(1.0, targetNegativeDurationMultiplier);
-			targetNegativeAmplifierBonus = Math.max(0, targetNegativeAmplifierBonus);
+			echoMarkerDurationTicks = Math.max(1, echoMarkerDurationTicks);
+			maxVisibleMarkers = Math.max(1, maxVisibleMarkers);
+			replayBurstSpacingTicks = Math.max(0, replayBurstSpacingTicks);
+			replayFlashIntensity = Math.max(0.0F, replayFlashIntensity);
 		}
 	}
 
 	public static final class AquilaConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public int starSpawnIntervalTicks = 4;
-		public int starsPerInterval = 1;
-		public float starDamage = 5.0F;
-		public double starSpeed = 1.1;
-		public double homingStrength = 0.3;
-		public double hitRadius = 0.85;
-		public int maxLifetimeTicks = 40;
+		public boolean useGeckoLibProjectile = false;
+		public int projectileSpawnIntervalTicks = 8;
+		public int projectilesPerInterval = 1;
+		public float projectileDamage = 4.0F;
+		public double projectileSpeed = 1.25;
+		public double projectileScale = 0.75;
+		public int trailParticleCount = 3;
+		public int trailLength = 6;
+		public int impactSparkCount = 12;
+		public double homingTurnRate = 0.32;
+		public double projectileGlowPulseSpeed = 0.18;
+		public double projectileSpinSpeed = 0.24;
+		public double hitRadius = 0.9;
+		public int maxLifetimeTicks = 60;
 
 		public AquilaConfig() {
-			poolWeight = 6.0;
-			durationTicks = 8 * 20;
-			radius = 7.0;
+			radius = 15.0;
+			colorHex = "#FFE58E";
 		}
 
 		private void normalize() {
 			normalizeBase();
-			starSpawnIntervalTicks = Math.max(1, starSpawnIntervalTicks);
-			starsPerInterval = Math.max(0, starsPerInterval);
-			starDamage = Math.max(0.0F, starDamage);
-			starSpeed = Math.max(0.0, starSpeed);
-			homingStrength = Math.max(0.0, homingStrength);
+			projectileSpawnIntervalTicks = Math.max(1, projectileSpawnIntervalTicks);
+			projectilesPerInterval = Math.max(0, projectilesPerInterval);
+			projectileDamage = Math.max(0.0F, projectileDamage);
+			projectileSpeed = Math.max(0.0, projectileSpeed);
+			projectileScale = Math.max(0.1, projectileScale);
+			trailParticleCount = Math.max(0, trailParticleCount);
+			trailLength = Math.max(0, trailLength);
+			impactSparkCount = Math.max(0, impactSparkCount);
+			homingTurnRate = Math.max(0.0, homingTurnRate);
+			projectileGlowPulseSpeed = Math.max(0.0, projectileGlowPulseSpeed);
+			projectileSpinSpeed = Math.max(0.0, projectileSpinSpeed);
 			hitRadius = Math.max(0.1, hitRadius);
 			maxLifetimeTicks = Math.max(1, maxLifetimeTicks);
 		}
 	}
 
 	public static final class ScorpiusConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public double incomingDamageMultiplier = 1.5;
+		public double incomingDamageMultiplier = 2.0;
+		public int stingAccentParticleCount = 4;
 
 		public ScorpiusConfig() {
-			poolWeight = 5.0;
-			durationTicks = 5 * 20;
-			radius = 5.0;
+			radius = 18.0;
+			colorHex = "#FF7C8A";
 		}
 
 		private void normalize() {
 			normalizeBase();
 			incomingDamageMultiplier = Math.max(1.0, incomingDamageMultiplier);
-		}
-	}
-
-	public static final class CetusConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public double pullStrength = 0.35;
-		public boolean suspendProjectilesAtCenter = true;
-		public double centerHoldRadius = 1.2;
-		public float projectileContactDamage = 4.0F;
-		public boolean affectNonLivingEntities = true;
-
-		public CetusConfig() {
-			poolWeight = 2.0;
-			durationTicks = 5 * 20;
-			radius = 6.0;
-		}
-
-		private void normalize() {
-			normalizeBase();
-			pullStrength = Math.max(0.0, pullStrength);
-			centerHoldRadius = Math.max(0.1, centerHoldRadius);
-			projectileContactDamage = Math.max(0.0F, projectileContactDamage);
-		}
-	}
-
-	public static final class ReticulumConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public int inputDelayTicks = 2 * 20;
-
-		public ReticulumConfig() {
-			poolWeight = 1.5;
-			durationTicks = 6 * 20;
-			radius = 8.0;
-		}
-
-		private void normalize() {
-			normalizeBase();
-			inputDelayTicks = Math.max(1, inputDelayTicks);
+			stingAccentParticleCount = Math.max(0, stingAccentParticleCount);
 		}
 	}
 
 	public static final class LibraConfig extends ConstellationCelestialAlignmentEntryConfig {
-		public boolean redistributeOutgoingDamage = true;
 		public boolean includeOriginalTarget = true;
 		public int minimumEligibleTargets = 1;
 		public double casterIncomingDamageMultiplier = 0.5;
+		public int tetherParticleCount = 6;
+		public int centerPulseParticleCount = 8;
 
 		public LibraConfig() {
-			poolWeight = 1.5;
-			durationTicks = 6 * 20;
-			radius = 5.5;
+			radius = 20.0;
+			colorHex = "#CBE6A4";
 		}
 
 		private void normalize() {
 			normalizeBase();
 			minimumEligibleTargets = Math.max(1, minimumEligibleTargets);
 			casterIncomingDamageMultiplier = MathHelper.clamp(casterIncomingDamageMultiplier, 0.0, 1.0);
+			tetherParticleCount = Math.max(0, tetherParticleCount);
+			centerPulseParticleCount = Math.max(0, centerPulseParticleCount);
+		}
+	}
+
+	public static final class GamaRayConfig {
+		public double activationCostPercent = 25.0;
+		public TracingConfig tracing = new TracingConfig();
+		public ChargeConfig charge = new ChargeConfig();
+		public BeamConfig beam = new BeamConfig();
+
+		private void normalize() {
+			activationCostPercent = MathHelper.clamp(activationCostPercent, 0.0, 100.0);
+			if (tracing == null) {
+				tracing = new TracingConfig();
+			}
+			if (charge == null) {
+				charge = new ChargeConfig();
+			}
+			if (beam == null) {
+				beam = new BeamConfig();
+			}
+			tracing.normalize();
+			charge.normalize();
+			beam.normalize();
+		}
+	}
+
+	public static final class TracingConfig {
+		public double toleranceRadius = 18.0;
+		public double segmentCompletionRadius = 20.0;
+		public int resetTimeoutTicks = 8 * 20;
+		public float overlayScale = 1.0F;
+		public int overlayXOffset = 0;
+		public int overlayYOffset = -12;
+		public String pathColorHex = "#86B6FF";
+		public String progressColorHex = "#FFF1B0";
+		public String activeSegmentColorHex = "#FFFFFF";
+		public String startNodeColorHex = "#9CFFDE";
+		public String endNodeColorHex = "#FFA0B4";
+		public String successColorHex = "#9CFFDE";
+		public String failColorHex = "#FF8080";
+
+		private void normalize() {
+			toleranceRadius = Math.max(1.0, toleranceRadius);
+			segmentCompletionRadius = Math.max(1.0, segmentCompletionRadius);
+			resetTimeoutTicks = Math.max(1, resetTimeoutTicks);
+			overlayScale = Math.max(0.25F, overlayScale);
+			pathColorHex = normalizeColorHex(pathColorHex, "#86B6FF");
+			progressColorHex = normalizeColorHex(progressColorHex, "#FFF1B0");
+			activeSegmentColorHex = normalizeColorHex(activeSegmentColorHex, "#FFFFFF");
+			startNodeColorHex = normalizeColorHex(startNodeColorHex, "#9CFFDE");
+			endNodeColorHex = normalizeColorHex(endNodeColorHex, "#FFA0B4");
+			successColorHex = normalizeColorHex(successColorHex, "#9CFFDE");
+			failColorHex = normalizeColorHex(failColorHex, "#FF8080");
+		}
+	}
+
+	public static final class ChargeConfig {
+		public int readyDelayTicks = 3 * 20;
+		public boolean useGeckoLibChargeOrb = false;
+		public double chargeOrbScale = 1.4;
+		public int chargeParticleCount = 12;
+		public int chargeParticleIntervalTicks = 2;
+		public int chargeSoundIntervalTicks = 10;
+		public float chargeSoundVolume = 1.0F;
+		public float chargeSoundPitch = 0.85F;
+
+		private void normalize() {
+			readyDelayTicks = Math.max(0, readyDelayTicks);
+			chargeOrbScale = Math.max(0.1, chargeOrbScale);
+			chargeParticleCount = Math.max(0, chargeParticleCount);
+			chargeParticleIntervalTicks = Math.max(1, chargeParticleIntervalTicks);
+			chargeSoundIntervalTicks = Math.max(1, chargeSoundIntervalTicks);
+			chargeSoundVolume = Math.max(0.0F, chargeSoundVolume);
+			chargeSoundPitch = Math.max(0.0F, chargeSoundPitch);
+		}
+	}
+
+	public static final class BeamConfig {
+		public double range = 70.0;
+		public double radius = 5.0;
+		public int durationTicks = 20 * 20;
+		public int damageIntervalTicks = 20;
+		public float damagePerInterval = 4.0F;
+		public boolean immobilizeTargets = true;
+		public boolean immobilizeCaster = true;
+		public boolean aimLockDuringBeam = true;
+		public int particleIntervalTicks = 2;
+		public double sliceSpacing = 1.5;
+		public int coreParticleCount = 3;
+		public int outerParticleCount = 8;
+		public int orbitingAccentCount = 6;
+		public int travelingFleckCount = 8;
+		public int muzzleBurstParticleCount = 32;
+		public int impactPressureParticleCount = 6;
+		public int soundIntervalTicks = 20;
+		public float soundVolume = 1.15F;
+		public float soundPitch = 0.7F;
+		public String coreColorHex = "#FFF1C7";
+		public String outerColorHex = "#7FD6FF";
+		public String accentColorHex = "#AFA1FF";
+
+		private void normalize() {
+			range = Math.max(1.0, range);
+			radius = Math.max(0.5, radius);
+			durationTicks = Math.max(1, durationTicks);
+			damageIntervalTicks = Math.max(1, damageIntervalTicks);
+			damagePerInterval = Math.max(0.0F, damagePerInterval);
+			particleIntervalTicks = Math.max(1, particleIntervalTicks);
+			sliceSpacing = Math.max(0.25, sliceSpacing);
+			coreParticleCount = Math.max(0, coreParticleCount);
+			outerParticleCount = Math.max(0, outerParticleCount);
+			orbitingAccentCount = Math.max(0, orbitingAccentCount);
+			travelingFleckCount = Math.max(0, travelingFleckCount);
+			muzzleBurstParticleCount = Math.max(0, muzzleBurstParticleCount);
+			impactPressureParticleCount = Math.max(0, impactPressureParticleCount);
+			soundIntervalTicks = Math.max(1, soundIntervalTicks);
+			soundVolume = Math.max(0.0F, soundVolume);
+			soundPitch = Math.max(0.0F, soundPitch);
+			coreColorHex = normalizeColorHex(coreColorHex, "#FFF1C7");
+			outerColorHex = normalizeColorHex(outerColorHex, "#7FD6FF");
+			accentColorHex = normalizeColorHex(accentColorHex, "#AFA1FF");
 		}
 	}
 
