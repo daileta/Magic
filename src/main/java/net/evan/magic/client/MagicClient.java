@@ -8,6 +8,7 @@ public final class MagicClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ClientLibraryValidation.initialize();
 		BurningPassionAfterimageRenderer.initialize();
+		CelestialGamaRayPresentationManager.initialize();
 		MagicClientParticles.initialize();
 		MagicKeybindings.initialize();
 		MagicClientNetworking.initialize();

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.evan.magic.Magic;
+import net.evan.magic.magic.MagicSchool;
 import net.evan.magic.magic.ability.MagicAbility;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.util.math.MathHelper;
@@ -155,6 +156,36 @@ public final class MagicConfig {
 		}
 	}
 
+	public static synchronized boolean setPlayerStageProgressionLocked(Collection<UUID> playerIds, MagicSchool school, int stage, boolean locked) {
+		if (playerIds == null || playerIds.isEmpty() || !isStageProgressionStageSupported(school, stage)) {
+			return false;
+		}
+
+		try {
+			MagicConfigData updated = copyOf(data);
+			boolean changed = false;
+
+			for (UUID playerId : playerIds) {
+				if (playerId == null) {
+					continue;
+				}
+				changed |= updated.abilityAccess.setPlayerStageProgressionLocked(playerId, school, stage, locked);
+			}
+
+			if (!changed) {
+				return true;
+			}
+
+			updated.normalize();
+			write(updated);
+			data = updated;
+			return true;
+		} catch (Exception exception) {
+			Magic.LOGGER.error("Failed to persist {} stage {} progression locked={} overrides.", school.id(), stage, locked, exception);
+			return false;
+		}
+	}
+
 	public static synchronized boolean clearPlayerAbilityOverrides(Collection<UUID> playerIds) {
 		if (playerIds == null || playerIds.isEmpty()) {
 			return false;
@@ -180,7 +211,7 @@ public final class MagicConfig {
 			data = updated;
 			return true;
 		} catch (Exception exception) {
-			Magic.LOGGER.error("Failed to persist player ability override cleanup.", exception);
+			Magic.LOGGER.error("Failed to persist player access override cleanup.", exception);
 			return false;
 		}
 	}
@@ -292,6 +323,99 @@ public final class MagicConfig {
 				UUID playerId = UUID.fromString(uuidString.trim());
 				Set<MagicAbility> abilities = parseAbilityIds(entry.getValue(), context + "." + uuidString);
 				resolved.put(playerId, abilities);
+			} catch (IllegalArgumentException exception) {
+				Magic.LOGGER.warn("Ignoring invalid UUID '{}' in {}.", uuidString, context);
+			}
+		}
+
+		return resolved;
+	}
+
+	private static boolean supportsStageProgressionAccess(MagicSchool school) {
+		return school == MagicSchool.FROST || school == MagicSchool.BURNING_PASSION;
+	}
+
+	private static boolean isStageProgressionStageSupported(MagicSchool school, int stage) {
+		return supportsStageProgressionAccess(school) && stage >= 2 && stage <= 3;
+	}
+
+	private static String stageProgressionId(MagicSchool school, int stage) {
+		return school.id() + ":" + stage;
+	}
+
+	private static Set<StageProgressionLock> parseStageProgressionIds(List<String> ids, String context) {
+		Set<StageProgressionLock> locks = new java.util.HashSet<>();
+		if (ids == null) {
+			return locks;
+		}
+
+		for (String id : ids) {
+			if (id == null) {
+				continue;
+			}
+
+			String normalized = id.trim().toLowerCase();
+			if (normalized.isEmpty()) {
+				continue;
+			}
+
+			int separatorIndex = normalized.indexOf(':');
+			if (separatorIndex < 0) {
+				MagicSchool school = MagicSchool.fromId(normalized);
+				if (!supportsStageProgressionAccess(school)) {
+					Magic.LOGGER.warn("Ignoring unsupported stage progression id '{}' in {}.", id, context);
+					continue;
+				}
+
+				for (int stage = 2; stage <= 3; stage++) {
+					locks.add(new StageProgressionLock(school, stage));
+				}
+				continue;
+			}
+
+			String schoolId = normalized.substring(0, separatorIndex).trim();
+			String stageToken = normalized.substring(separatorIndex + 1).trim();
+			MagicSchool school = MagicSchool.fromId(schoolId);
+			if (!supportsStageProgressionAccess(school)) {
+				Magic.LOGGER.warn("Ignoring unsupported stage progression school id '{}' in {}.", id, context);
+				continue;
+			}
+
+			int stage;
+			try {
+				stage = Integer.parseInt(stageToken);
+			} catch (NumberFormatException exception) {
+				Magic.LOGGER.warn("Ignoring invalid stage progression id '{}' in {}.", id, context);
+				continue;
+			}
+
+			if (!isStageProgressionStageSupported(school, stage)) {
+				Magic.LOGGER.warn("Ignoring unsupported stage progression id '{}' in {}.", id, context);
+				continue;
+			}
+
+			locks.add(new StageProgressionLock(school, stage));
+		}
+
+		return locks;
+	}
+
+	private static Map<UUID, Set<StageProgressionLock>> parsePlayerStageProgressionIds(Map<String, List<String>> raw, String context) {
+		Map<UUID, Set<StageProgressionLock>> resolved = new HashMap<>();
+		if (raw == null) {
+			return resolved;
+		}
+
+		for (Map.Entry<String, List<String>> entry : raw.entrySet()) {
+			String uuidString = entry.getKey();
+			if (uuidString == null || uuidString.isBlank()) {
+				continue;
+			}
+
+			try {
+				UUID playerId = UUID.fromString(uuidString.trim());
+				Set<StageProgressionLock> locks = parseStageProgressionIds(entry.getValue(), context + "." + uuidString);
+				resolved.put(playerId, locks);
 			} catch (IllegalArgumentException exception) {
 				Magic.LOGGER.warn("Ignoring invalid UUID '{}' in {}.", uuidString, context);
 			}
@@ -797,6 +921,8 @@ public final class MagicConfig {
 		public double selfFireThresholdPercent = 50.0;
 		public double healthDemandThresholdPercent = 75.0;
 		public double overheatThresholdPercent = 100.0;
+		public boolean ignitionPersistsOnManaDepletion = true;
+		public double manaRecoveryUnlockThresholdPercent = 25.0;
 		public int selfFireDurationTicks = 40;
 		public int selfFireDamageIntervalTicks = 10;
 		public float selfFireDamagePerTick = 0.5F;
@@ -814,6 +940,7 @@ public final class MagicConfig {
 			selfFireThresholdPercent = MathHelper.clamp(selfFireThresholdPercent, 0.0, 100.0);
 			healthDemandThresholdPercent = MathHelper.clamp(healthDemandThresholdPercent, selfFireThresholdPercent, 100.0);
 			overheatThresholdPercent = MathHelper.clamp(overheatThresholdPercent, healthDemandThresholdPercent, 100.0);
+			manaRecoveryUnlockThresholdPercent = MathHelper.clamp(manaRecoveryUnlockThresholdPercent, 0.0, overheatThresholdPercent);
 			selfFireDurationTicks = Math.max(1, selfFireDurationTicks);
 			selfFireDamageIntervalTicks = Math.max(1, selfFireDamageIntervalTicks);
 			selfFireDamagePerTick = Math.max(0.0F, selfFireDamagePerTick);
@@ -2561,6 +2688,10 @@ public final class MagicConfig {
 		public TracingConfig tracing = new TracingConfig();
 		public ChargeConfig charge = new ChargeConfig();
 		public BeamConfig beam = new BeamConfig();
+		public PlayerAnimationConfig playerAnimation = new PlayerAnimationConfig();
+		public ChargeConstructConfig chargeConstruct = new ChargeConstructConfig();
+		public BeamVisualConfig beamVisual = new BeamVisualConfig();
+		public PresentationConfig presentation = new PresentationConfig();
 
 		private void normalize() {
 			minimumStartManaPercent = MathHelper.clamp(minimumStartManaPercent, 0.0, 100.0);
@@ -2574,9 +2705,25 @@ public final class MagicConfig {
 			if (beam == null) {
 				beam = new BeamConfig();
 			}
+			if (playerAnimation == null) {
+				playerAnimation = new PlayerAnimationConfig();
+			}
+			if (chargeConstruct == null) {
+				chargeConstruct = new ChargeConstructConfig();
+			}
+			if (beamVisual == null) {
+				beamVisual = new BeamVisualConfig();
+			}
+			if (presentation == null) {
+				presentation = new PresentationConfig();
+			}
 			tracing.normalize();
 			charge.normalize();
 			beam.normalize();
+			playerAnimation.normalize();
+			chargeConstruct.normalize();
+			beamVisual.normalize();
+			presentation.normalize();
 		}
 	}
 
@@ -2586,10 +2733,10 @@ public final class MagicConfig {
 		public double inputScale = 1.0;
 		public int resetTimeoutTicks = 8 * 20;
 		public int cancelCooldownTicks = 30 * 20;
-		public float overlayScale = 1.45F;
+		public float overlayScale = 1.6F;
 		public int overlayXOffset = 0;
 		public int overlayYOffset = -12;
-		public int lineThickness = 5;
+		public int lineThickness = 4;
 		public int nodeRadius = 4;
 		public int cursorRadius = 4;
 		public boolean lockCameraWhileTracing = true;
@@ -2601,6 +2748,13 @@ public final class MagicConfig {
 		public String endNodeColorHex = "#FFA0B4";
 		public String successColorHex = "#9CFFDE";
 		public String failColorHex = "#FF8080";
+		public float activeSegmentGlowAlpha = 0.12F;
+		public int activeSegmentGlowThickness = 5;
+		public float progressGlowAlpha = 0.08F;
+		public float backgroundGlowAlpha = 0.03F;
+		public int nodeConfirmationFlashTicks = 6;
+		public int successBurstTicks = 12;
+		public float successBurstScale = 1.85F;
 
 		private void normalize() {
 			toleranceRadius = Math.max(1.0, toleranceRadius);
@@ -2620,6 +2774,43 @@ public final class MagicConfig {
 			endNodeColorHex = normalizeColorHex(endNodeColorHex, "#FFA0B4");
 			successColorHex = normalizeColorHex(successColorHex, "#9CFFDE");
 			failColorHex = normalizeColorHex(failColorHex, "#FF8080");
+			activeSegmentGlowAlpha = MathHelper.clamp(activeSegmentGlowAlpha, 0.0F, 1.0F);
+			activeSegmentGlowThickness = Math.max(1, activeSegmentGlowThickness);
+			progressGlowAlpha = MathHelper.clamp(progressGlowAlpha, 0.0F, 1.0F);
+			backgroundGlowAlpha = MathHelper.clamp(backgroundGlowAlpha, 0.0F, 1.0F);
+			nodeConfirmationFlashTicks = Math.max(0, nodeConfirmationFlashTicks);
+			successBurstTicks = Math.max(0, successBurstTicks);
+			successBurstScale = Math.max(0.1F, successBurstScale);
+		}
+	}
+
+	public static final class PlayerAnimationConfig {
+		public boolean enablePlayerAnimationPose = true;
+		public boolean reduceFirstPersonPoseIntensity = true;
+		public boolean tracePoseEnabled = true;
+		public boolean windupPoseEnabled = true;
+		public boolean firingPoseEnabled = true;
+		public double sidewaysTurnDegrees = 28.0;
+		public double torsoLeanDegrees = 11.0;
+		public double firingArmExtensionAmount = 0.95;
+		public String offArmBraceMode = "chest";
+		public boolean recoilPulseEnabled = true;
+		public double recoilPulseAmplitude = 3.2;
+		public double recoilPulseSpeed = 0.42;
+		public int recoveryDurationTicks = 12;
+
+		private void normalize() {
+			sidewaysTurnDegrees = MathHelper.clamp(sidewaysTurnDegrees, -80.0, 80.0);
+			torsoLeanDegrees = MathHelper.clamp(torsoLeanDegrees, -45.0, 45.0);
+			firingArmExtensionAmount = MathHelper.clamp(firingArmExtensionAmount, 0.0, 1.5);
+			if (offArmBraceMode == null || offArmBraceMode.isBlank()) {
+				offArmBraceMode = "chest";
+			} else {
+				offArmBraceMode = offArmBraceMode.trim().toLowerCase(java.util.Locale.ROOT);
+			}
+			recoilPulseAmplitude = Math.max(0.0, recoilPulseAmplitude);
+			recoilPulseSpeed = Math.max(0.0, recoilPulseSpeed);
+			recoveryDurationTicks = Math.max(0, recoveryDurationTicks);
 		}
 	}
 
@@ -2644,12 +2835,42 @@ public final class MagicConfig {
 		}
 	}
 
+	public static final class ChargeConstructConfig {
+		public boolean useGeckoLibChargeConstruct = true;
+		public double constructScale = 1.45;
+		public double constructOffsetForward = 1.2;
+		public double constructOffsetUp = -0.18;
+		public double constructSpinSpeed = 2.2;
+		public int constructShardCount = 6;
+		public int constructRingCount = 3;
+		public float constructOpacity = 0.9F;
+		public double constructPulseSpeed = 0.2;
+		public double constructBrightnessIntensity = 1.15;
+		public boolean constructPersistDuringBeam = false;
+		public boolean constructCollapseOnFire = true;
+		public int constructCleanupFadeTicks = 10;
+
+		private void normalize() {
+			constructScale = Math.max(0.1, constructScale);
+			constructOffsetForward = MathHelper.clamp(constructOffsetForward, -4.0, 8.0);
+			constructOffsetUp = MathHelper.clamp(constructOffsetUp, -4.0, 8.0);
+			constructSpinSpeed = Math.max(0.0, constructSpinSpeed);
+			constructShardCount = Math.max(0, constructShardCount);
+			constructRingCount = Math.max(0, constructRingCount);
+			constructOpacity = MathHelper.clamp(constructOpacity, 0.0F, 1.0F);
+			constructPulseSpeed = Math.max(0.0, constructPulseSpeed);
+			constructBrightnessIntensity = Math.max(0.0, constructBrightnessIntensity);
+			constructCleanupFadeTicks = Math.max(0, constructCleanupFadeTicks);
+		}
+	}
+
 	public static final class BeamConfig {
 		public double range = 70.0;
 		public double radius = 5.0;
 		public int durationTicks = 20 * 20;
 		public int damageIntervalTicks = 20;
 		public float damagePerInterval = 4.0F;
+		public boolean blockTeleportForHitTargets = true;
 		public boolean immobilizeTargets = true;
 		public boolean immobilizeCaster = true;
 		public boolean aimLockDuringBeam = true;
@@ -2664,9 +2885,9 @@ public final class MagicConfig {
 		public int soundIntervalTicks = 20;
 		public float soundVolume = 1.15F;
 		public float soundPitch = 0.7F;
-		public String coreColorHex = "#FFF1C7";
-		public String outerColorHex = "#7FD6FF";
-		public String accentColorHex = "#AFA1FF";
+		public String coreColorHex = "#FFD36B";
+		public String outerColorHex = "#58C8FF";
+		public String accentColorHex = "#7BA7FF";
 
 		private void normalize() {
 			range = Math.max(1.0, range);
@@ -2688,6 +2909,100 @@ public final class MagicConfig {
 			coreColorHex = normalizeColorHex(coreColorHex, "#FFF1C7");
 			outerColorHex = normalizeColorHex(outerColorHex, "#7FD6FF");
 			accentColorHex = normalizeColorHex(accentColorHex, "#AFA1FF");
+		}
+	}
+
+	public static final class BeamVisualConfig {
+		public double beamStartBackOffsetBlocks = 1.0;
+		public boolean beamCoreEnabled = true;
+		public double beamCoreThickness = 4.8;
+		public double beamCoreBrightness = 1.95;
+		public boolean beamOuterShellEnabled = true;
+		public double beamOuterShellThickness = 9.8;
+		public float beamOuterShellOpacity = 0.84F;
+		public boolean beamRibbonEnabled = true;
+		public int beamRibbonCount = 7;
+		public double beamRibbonOrbitRadius = 4.2;
+		public double beamRibbonAngularSpeed = 0.18;
+		public double beamRibbonThickness = 0.8;
+		public boolean beamFlowEnabled = false;
+		public double beamFlowSpeed = 1.1;
+		public int beamFlowDensity = 0;
+		public boolean beamOriginBurstEnabled = false;
+		public double beamOriginBurstRadius = 6.0;
+		public int beamOriginBurstParticleCount = 24;
+		public boolean beamOriginBurstShockRingEnabled = true;
+		public boolean beamImpactPressureEffectsEnabled = true;
+		public boolean beamTargetBindVisualsEnabled = true;
+		public double beamMaxVisibleDistance = 128.0;
+		public double beamSliceStep = 0.35;
+		public int beamDecorativeDensity = 104;
+		public int beamReducedFxDensity = 30;
+		public int beamReducedFirstPersonDensity = 18;
+		public boolean beamInteriorParticlesEnabled = true;
+		public int beamInteriorParticleCount = 28;
+		public double beamInteriorParticleRadiusFactor = 0.72;
+		public double beamInteriorParticleSize = 0.18;
+		public float beamInteriorParticleOpacity = 0.24F;
+		public double beamInteriorParticleScrollSpeed = 1.05;
+		public boolean beamInteriorVanillaParticlesEnabled = true;
+		public int beamInteriorVanillaParticleIntervalTicks = 2;
+		public int beamInteriorVanillaParticleCount = 18;
+		public double beamInteriorVanillaParticleScale = 1.15;
+		public double beamInteriorVanillaParticleSpeed = 0.1;
+
+		private void normalize() {
+			beamStartBackOffsetBlocks = Math.max(0.0, beamStartBackOffsetBlocks);
+			beamCoreThickness = Math.max(0.1, beamCoreThickness);
+			beamCoreBrightness = Math.max(0.0, beamCoreBrightness);
+			beamOuterShellThickness = Math.max(0.1, beamOuterShellThickness);
+			beamOuterShellOpacity = MathHelper.clamp(beamOuterShellOpacity, 0.0F, 1.0F);
+			beamRibbonCount = Math.max(0, beamRibbonCount);
+			beamRibbonOrbitRadius = Math.max(0.0, beamRibbonOrbitRadius);
+			beamRibbonAngularSpeed = Math.max(0.0, beamRibbonAngularSpeed);
+			beamRibbonThickness = Math.max(0.05, beamRibbonThickness);
+			beamFlowSpeed = Math.max(0.0, beamFlowSpeed);
+			beamFlowDensity = Math.max(0, beamFlowDensity);
+			beamOriginBurstRadius = Math.max(0.0, beamOriginBurstRadius);
+			beamOriginBurstParticleCount = Math.max(0, beamOriginBurstParticleCount);
+			beamMaxVisibleDistance = Math.max(8.0, beamMaxVisibleDistance);
+			beamSliceStep = Math.max(0.25, beamSliceStep);
+			beamDecorativeDensity = Math.max(0, beamDecorativeDensity);
+			beamReducedFxDensity = Math.max(0, beamReducedFxDensity);
+			beamReducedFirstPersonDensity = Math.max(0, beamReducedFirstPersonDensity);
+			beamInteriorParticleCount = Math.max(0, beamInteriorParticleCount);
+			beamInteriorParticleRadiusFactor = Math.max(0.0, beamInteriorParticleRadiusFactor);
+			beamInteriorParticleSize = Math.max(0.01, beamInteriorParticleSize);
+			beamInteriorParticleOpacity = MathHelper.clamp(beamInteriorParticleOpacity, 0.0F, 1.0F);
+			beamInteriorParticleScrollSpeed = Math.max(0.0, beamInteriorParticleScrollSpeed);
+			beamInteriorVanillaParticleIntervalTicks = Math.max(1, beamInteriorVanillaParticleIntervalTicks);
+			beamInteriorVanillaParticleCount = Math.max(0, beamInteriorVanillaParticleCount);
+			beamInteriorVanillaParticleScale = Math.max(0.1, beamInteriorVanillaParticleScale);
+			beamInteriorVanillaParticleSpeed = Math.max(0.0, beamInteriorVanillaParticleSpeed);
+		}
+	}
+
+	public static final class PresentationConfig {
+		public boolean allowScreenFlash = true;
+		public float screenFlashStrength = 0.42F;
+		public boolean allowCameraShake = true;
+		public float cameraShakeStartStrength = 0.75F;
+		public float cameraShakeSustainStrength = 0.18F;
+		public boolean allowFovPulse = true;
+		public float fovPulseAmount = 0.05F;
+		public boolean windupSigilsEnabled = true;
+		public int windupSigilCount = 3;
+		public double windupSigilRadius = 1.9;
+		public boolean chargeSoundLayeringEnabled = true;
+		public boolean firingSoundLayeringEnabled = true;
+
+		private void normalize() {
+			screenFlashStrength = MathHelper.clamp(screenFlashStrength, 0.0F, 1.0F);
+			cameraShakeStartStrength = Math.max(0.0F, cameraShakeStartStrength);
+			cameraShakeSustainStrength = Math.max(0.0F, cameraShakeSustainStrength);
+			fovPulseAmount = Math.max(0.0F, fovPulseAmount);
+			windupSigilCount = Math.max(0, windupSigilCount);
+			windupSigilRadius = Math.max(0.0, windupSigilRadius);
 		}
 	}
 
@@ -4666,10 +4981,14 @@ public final class MagicConfig {
 		public List<String> defaultLockedAbilities = new ArrayList<>();
 		public Map<String, List<String>> lockedAbilitiesByPlayer = new HashMap<>();
 		public Map<String, List<String>> unlockedAbilitiesByPlayer = new HashMap<>();
+		public Map<String, List<String>> lockedStageProgressionByPlayer = new HashMap<>();
+		public Map<String, List<String>> unlockedStageProgressionByPlayer = new HashMap<>();
 
 		private transient Set<MagicAbility> resolvedDefaultLockedAbilities = Set.of();
 		private transient Map<UUID, Set<MagicAbility>> resolvedLockedAbilitiesByPlayer = Map.of();
 		private transient Map<UUID, Set<MagicAbility>> resolvedUnlockedAbilitiesByPlayer = Map.of();
+		private transient Map<UUID, Set<StageProgressionLock>> resolvedLockedStageProgressionByPlayer = Map.of();
+		private transient Map<UUID, Set<StageProgressionLock>> resolvedUnlockedStageProgressionByPlayer = Map.of();
 
 		private void normalize() {
 			if (defaultLockedAbilities == null) {
@@ -4681,10 +5000,24 @@ public final class MagicConfig {
 			if (unlockedAbilitiesByPlayer == null) {
 				unlockedAbilitiesByPlayer = new HashMap<>();
 			}
+			if (lockedStageProgressionByPlayer == null) {
+				lockedStageProgressionByPlayer = new HashMap<>();
+			}
+			if (unlockedStageProgressionByPlayer == null) {
+				unlockedStageProgressionByPlayer = new HashMap<>();
+			}
 
 			resolvedDefaultLockedAbilities = parseAbilityIds(defaultLockedAbilities, "abilityAccess.defaultLockedAbilities");
 			resolvedLockedAbilitiesByPlayer = parsePlayerAbilityIds(lockedAbilitiesByPlayer, "abilityAccess.lockedAbilitiesByPlayer");
 			resolvedUnlockedAbilitiesByPlayer = parsePlayerAbilityIds(unlockedAbilitiesByPlayer, "abilityAccess.unlockedAbilitiesByPlayer");
+			resolvedLockedStageProgressionByPlayer = parsePlayerStageProgressionIds(
+				lockedStageProgressionByPlayer,
+				"abilityAccess.lockedStageProgressionByPlayer"
+			);
+			resolvedUnlockedStageProgressionByPlayer = parsePlayerStageProgressionIds(
+				unlockedStageProgressionByPlayer,
+				"abilityAccess.unlockedStageProgressionByPlayer"
+			);
 		}
 
 		private boolean setPlayerAbilityLocked(UUID playerId, MagicAbility ability, boolean locked) {
@@ -4704,6 +5037,26 @@ public final class MagicConfig {
 			String playerKey = playerId.toString();
 			boolean changed = lockedAbilitiesByPlayer.remove(playerKey) != null;
 			changed |= unlockedAbilitiesByPlayer.remove(playerKey) != null;
+			changed |= lockedStageProgressionByPlayer.remove(playerKey) != null;
+			changed |= unlockedStageProgressionByPlayer.remove(playerKey) != null;
+			return changed;
+		}
+
+		private boolean setPlayerStageProgressionLocked(UUID playerId, MagicSchool school, int stage, boolean locked) {
+			if (!isStageProgressionStageSupported(school, stage)) {
+				return false;
+			}
+
+			String playerKey = playerId.toString();
+			String stageId = stageProgressionId(school, stage);
+			if (locked) {
+				boolean changed = addAbilityOverride(lockedStageProgressionByPlayer, playerKey, stageId);
+				changed |= removeAbilityOverride(unlockedStageProgressionByPlayer, playerKey, stageId);
+				return changed;
+			}
+
+			boolean changed = addAbilityOverride(unlockedStageProgressionByPlayer, playerKey, stageId);
+			changed |= removeAbilityOverride(lockedStageProgressionByPlayer, playerKey, stageId);
 			return changed;
 		}
 
@@ -4738,6 +5091,26 @@ public final class MagicConfig {
 			return unlockedForSchool.contains(ability);
 		}
 
+		public boolean isStageProgressionUnlocked(UUID playerId, MagicSchool school, int stage) {
+			if (!enabled || !isStageProgressionStageSupported(school, stage)) {
+				return true;
+			}
+
+			StageProgressionLock requestedLock = new StageProgressionLock(school, stage);
+			boolean unlocked = true;
+			Set<StageProgressionLock> playerLocked = resolvedLockedStageProgressionByPlayer.get(playerId);
+			if (playerLocked != null && playerLocked.contains(requestedLock)) {
+				unlocked = false;
+			}
+
+			Set<StageProgressionLock> playerUnlocked = resolvedUnlockedStageProgressionByPlayer.get(playerId);
+			if (playerUnlocked != null && playerUnlocked.contains(requestedLock)) {
+				unlocked = true;
+			}
+
+			return unlocked;
+		}
+
 		private static boolean addAbilityOverride(Map<String, List<String>> overrides, String playerKey, String abilityId) {
 			List<String> abilities = overrides.computeIfAbsent(playerKey, ignored -> new ArrayList<>());
 			for (String existing : abilities) {
@@ -4762,5 +5135,8 @@ public final class MagicConfig {
 			}
 			return removed;
 		}
+	}
+
+	private record StageProgressionLock(MagicSchool school, int stage) {
 	}
 }

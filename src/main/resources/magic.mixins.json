@@ -16,9 +16,11 @@
 		"TntMinecartEntityMixin"
 	],
 	"client": [
+		"GameRendererMixin",
 		"LivingEntityRendererMixin",
 		"MinecraftClientMixin",
-		"PlayerEntityRendererMixin"
+		"PlayerEntityRendererMixin",
+		"WorldRenderStateAccessorMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

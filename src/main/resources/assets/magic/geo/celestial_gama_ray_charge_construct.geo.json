@@ -1,0 +1,222 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.magic.celestial_gama_ray_charge_construct",
+        "texture_width": 16,
+        "texture_height": 16,
+        "visible_bounds_width": 6,
+        "visible_bounds_height": 6,
+        "visible_bounds_offset": [
+          0,
+          1.5,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "root",
+          "pivot": [
+            0,
+            24,
+            0
+          ]
+        },
+        {
+          "name": "core",
+          "parent": "root",
+          "pivot": [
+            0,
+            24,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -1.5,
+                -1.5,
+                -1.5
+              ],
+              "size": [
+                3,
+                3,
+                3
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ring_outer",
+          "parent": "root",
+          "pivot": [
+            0,
+            24,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -4,
+                -0.3,
+                -0.3
+              ],
+              "size": [
+                8,
+                1,
+                1
+              ],
+              "uv": [
+                0,
+                4
+              ]
+            },
+            {
+              "origin": [
+                -0.3,
+                -4,
+                -0.3
+              ],
+              "size": [
+                1,
+                8,
+                1
+              ],
+              "uv": [
+                0,
+                6
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ring_inner",
+          "parent": "root",
+          "pivot": [
+            0,
+            24,
+            0
+          ],
+          "rotation": [
+            45,
+            0,
+            45
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -2.8,
+                -0.2,
+                -0.2
+              ],
+              "size": [
+                6,
+                1,
+                1
+              ],
+              "uv": [
+                0,
+                8
+              ]
+            },
+            {
+              "origin": [
+                -0.2,
+                -2.8,
+                -0.2
+              ],
+              "size": [
+                1,
+                6,
+                1
+              ],
+              "uv": [
+                0,
+                10
+              ]
+            }
+          ]
+        },
+        {
+          "name": "shards",
+          "parent": "root",
+          "pivot": [
+            0,
+            24,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                2.8,
+                -0.6,
+                -0.4
+              ],
+              "size": [
+                1,
+                2,
+                1
+              ],
+              "uv": [
+                0,
+                12
+              ]
+            },
+            {
+              "origin": [
+                -3.8,
+                -0.6,
+                -0.4
+              ],
+              "size": [
+                1,
+                2,
+                1
+              ],
+              "uv": [
+                0,
+                12
+              ]
+            },
+            {
+              "origin": [
+                -0.4,
+                -3.8,
+                -0.6
+              ],
+              "size": [
+                1,
+                1,
+                2
+              ],
+              "uv": [
+                4,
+                12
+              ]
+            },
+            {
+              "origin": [
+                -0.4,
+                2.8,
+                -0.6
+              ],
+              "size": [
+                1,
+                1,
+                2
+              ],
+              "uv": [
+                4,
+                12
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

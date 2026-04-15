@@ -92,22 +92,14 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			return;
 		}
 		MagicAbilityManager.onManipulationLookPacket(player, packet.getYaw(player.getYaw()), packet.getPitch(player.getPitch()));
-		if (MagicAbilityManager.isManipulationControlledTarget(player)) {
-			magic$packetDebug("{} packet onPlayerMove canceled: player is manipulation-controlled target", magic$debugName());
-			ci.cancel();
-			return;
-		}
 		if (magic$isGreedIntroFrozen()) {
 			ci.cancel();
 			return;
 		}
-
-		MagicAbilityManager.beginManipulationMovementProxy(player);
 	}
 
 	@Inject(method = "onPlayerMove", at = @At("RETURN"))
 	private void magic$onPlayerMoveReturn(PlayerMoveC2SPacket packet, CallbackInfo ci) {
-		MagicAbilityManager.endManipulationMovementProxy(player);
 	}
 
 	@Inject(method = "onPlayerInput", at = @At("HEAD"), cancellable = true)
@@ -117,11 +109,6 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			return;
 		}
 		MagicAbilityManager.onManipulationInputPacket(player, packet.input());
-		if (MagicAbilityManager.isManipulationControlledTarget(player)) {
-			magic$packetDebug("{} packet onPlayerInput canceled: player is manipulation-controlled target", magic$debugName());
-			ci.cancel();
-			return;
-		}
 		if (magic$isGreedIntroFrozen()) {
 			ci.cancel();
 			return;
@@ -161,17 +148,9 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			ci.cancel();
 			return;
 		}
-		if (MagicAbilityManager.isManipulationControlledTarget(player)) {
-			magic$packetDebug("{} packet onClientCommand canceled: player is manipulation-controlled target", magic$debugName());
-			ci.cancel();
-			return;
-		}
 		if (packet.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING) {
 			GreedRuntime.onStartSprinting(player);
 		}
-
-		MagicAbilityManager.beginManipulationMovementProxy(player);
-		magic$packetDebug("{} packet onClientCommand begin movement proxy", magic$debugName());
 	}
 
 	@Inject(method = "onClientCommand", at = @At("RETURN"))
@@ -183,8 +162,6 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			player.isSneaking(),
 			player.isSprinting()
 		);
-		MagicAbilityManager.endManipulationMovementProxy(player);
-		magic$packetDebug("{} packet onClientCommand end movement proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerAction", at = @At("HEAD"), cancellable = true)
@@ -216,15 +193,11 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			return;
 		}
 
-		MagicAbilityManager.beginManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerAction begin interaction proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerAction", at = @At("RETURN"))
 	private void magic$onPlayerActionReturn(PlayerActionC2SPacket packet, CallbackInfo ci) {
 		magic$packetDebug("{} packet onPlayerAction RETURN: action={}", magic$debugName(), packet.getAction());
-		MagicAbilityManager.endManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerAction end interaction proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerInteractBlock", at = @At("HEAD"), cancellable = true)
@@ -247,15 +220,11 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			packet.getHand(),
 			packet.getBlockHitResult().getPos()
 		);
-		MagicAbilityManager.beginManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerInteractBlock begin interaction proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerInteractBlock", at = @At("RETURN"))
 	private void magic$onPlayerInteractBlockReturn(PlayerInteractBlockC2SPacket packet, CallbackInfo ci) {
 		magic$packetDebug("{} packet onPlayerInteractBlock RETURN: hand={}", magic$debugName(), packet.getHand());
-		MagicAbilityManager.endManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerInteractBlock end interaction proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerInteractItem", at = @At("HEAD"), cancellable = true)
@@ -273,15 +242,11 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			return;
 		}
 		magic$packetDebug("{} packet onPlayerInteractItem HEAD: hand={}", magic$debugName(), packet.getHand());
-		MagicAbilityManager.beginManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerInteractItem begin interaction proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerInteractItem", at = @At("RETURN"))
 	private void magic$onPlayerInteractItemReturn(PlayerInteractItemC2SPacket packet, CallbackInfo ci) {
 		magic$packetDebug("{} packet onPlayerInteractItem RETURN: hand={}", magic$debugName(), packet.getHand());
-		MagicAbilityManager.endManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerInteractItem end interaction proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerInteractEntity", at = @At("HEAD"), cancellable = true)
@@ -309,15 +274,10 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			return;
 		}
 		MagicAbilityManager.recordBurningPassionMeleeImpact(player, packet);
-
-		MagicAbilityManager.beginManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerInteractEntity begin interaction proxy", magic$debugName());
 	}
 
 	@Inject(method = "onPlayerInteractEntity", at = @At("RETURN"))
 	private void magic$onPlayerInteractEntityReturn(PlayerInteractEntityC2SPacket packet, CallbackInfo ci) {
 		magic$packetDebug("{} packet onPlayerInteractEntity RETURN", magic$debugName());
-		MagicAbilityManager.endManipulationInteractionProxy(player);
-		magic$packetDebug("{} packet onPlayerInteractEntity end interaction proxy", magic$debugName());
 	}
 }

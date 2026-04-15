@@ -3,6 +3,7 @@ package net.evan.magic.network;
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.evan.magic.network.payload.CelestialGamaRayTraceOverlayPayload;
 import net.evan.magic.network.payload.CelestialGamaRayTraceProgressPayload;
+import net.evan.magic.network.payload.CelestialGamaRayVisualPayload;
 import net.evan.magic.network.payload.CooldownCheckPayload;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
@@ -31,6 +32,7 @@ public final class MagicNetworking {
 		PayloadTypeRegistry.playS2C().register(ConstellationOutlinePayload.ID, ConstellationOutlinePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ConstellationWarningOverlayPayload.ID, ConstellationWarningOverlayPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(CelestialGamaRayTraceOverlayPayload.ID, CelestialGamaRayTraceOverlayPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(CelestialGamaRayVisualPayload.ID, CelestialGamaRayVisualPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(GreedDomainWarningOverlayPayload.ID, GreedDomainWarningOverlayPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(JesterJokeOverlayPayload.ID, JesterJokeOverlayPayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(UseAbilityPayload.ID, (payload, context) ->

@@ -21,6 +21,7 @@ import net.evan.magic.mixin.DisplayEntityAccessorMixin;
 import net.evan.magic.network.payload.CelestialGamaRayTraceOverlayPayload;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
+import net.evan.magic.network.payload.CelestialGamaRayVisualPayload;
 import net.evan.magic.network.payload.JesterJokeOverlayPayload;
 import net.evan.magic.particle.AstralCataclysmBeamParticleEffect;
 import net.evan.magic.particle.AstralCataclysmDownflowParticleEffect;
@@ -1256,15 +1257,14 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		if (isMagicSuppressed(player)) {
-			player.sendMessage(Text.translatable("message.magic.empty_embrace.magic_blocked"), true);
-			return;
-		}
-
 		MagicSchool school = MagicPlayerData.getSchool(player);
 		MagicAbility requestedAbility = resolveRequestedAbility(player, school, abilitySlot);
 		if (requestedAbility == MagicAbility.NONE) {
 			player.sendMessage(Text.translatable("message.magic.ability.not_implemented", abilitySlot), true);
+			return;
+		}
+		if (isMagicSuppressed(player) && !isDomainExpansion(requestedAbility)) {
+			player.sendMessage(Text.translatable("message.magic.empty_embrace.magic_blocked"), true);
 			return;
 		}
 		if (queueCelestialAbilityRequest(player, abilitySlot)) {
@@ -1711,6 +1711,10 @@ public final class MagicAbilityManager {
 				);
 				return;
 			}
+			if (!MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.BURNING_PASSION, state.currentStage + 1)) {
+				state.stageStartTick = Math.max(state.stageStartTick, currentTick - stageDuration);
+				break;
+			}
 			state.stageStartTick += stageDuration;
 			state.currentStage++;
 		}
@@ -2024,6 +2028,49 @@ public final class MagicAbilityManager {
 		syncBurningPassionHudNotification(player, currentTick);
 	}
 
+	private static boolean shouldKeepIgnitionActiveOnManaDepletion() {
+		return BURNING_PASSION_CONFIG.heat.ignitionPersistsOnManaDepletion;
+	}
+
+	private static double burningPassionManaRecoveryUnlockThresholdPercent() {
+		return MathHelper.clamp(
+			BURNING_PASSION_CONFIG.heat.manaRecoveryUnlockThresholdPercent,
+			0.0,
+			BURNING_PASSION_CONFIG.heat.overheatThresholdPercent
+		);
+	}
+
+	private static void markBurningPassionManaDepleted(ServerPlayerEntity player, BurningPassionIgnitionState ignitionState) {
+		if (player == null || ignitionState == null) {
+			return;
+		}
+
+		ignitionState.manaRecoveryUnlocked = ignitionState.heatPercent <= burningPassionManaRecoveryUnlockThresholdPercent();
+		MagicPlayerData.setDepletedRecoveryMode(player, true);
+	}
+
+	private static boolean isBurningPassionManaRecoveryBlocked(ServerPlayerEntity player) {
+		if (player == null || !shouldKeepIgnitionActiveOnManaDepletion() || MagicPlayerData.getMana(player) > 0) {
+			return false;
+		}
+
+		BurningPassionIgnitionState ignitionState = burningPassionIgnitionState(player);
+		if (ignitionState == null) {
+			return false;
+		}
+
+		if (ignitionState.manaRecoveryUnlocked) {
+			return false;
+		}
+
+		if (ignitionState.heatPercent <= burningPassionManaRecoveryUnlockThresholdPercent()) {
+			ignitionState.manaRecoveryUnlocked = true;
+			return false;
+		}
+
+		return true;
+	}
+
 	private static double clampBurningPassionHeat(double heatPercent) {
 		return MathHelper.clamp(heatPercent, 0.0, BURNING_PASSION_CONFIG.heat.overheatThresholdPercent);
 	}
@@ -2075,7 +2122,7 @@ public final class MagicAbilityManager {
 				ignitionState.heatPercent + missingMana * overflowConfig.heatPercentPerMissingManaPercent
 			);
 		}
-		MagicPlayerData.setDepletedRecoveryMode(player, false);
+		markBurningPassionManaDepleted(player, ignitionState);
 		return true;
 	}
 
@@ -3394,6 +3441,7 @@ public final class MagicAbilityManager {
 			}
 
 			Vec3d dashStartPos = entityPosition(player);
+			Vec3d dashEndPos = dashStartPos.add(state.direction.multiply(BURNING_PASSION_CONFIG.searingDash.dashSpeedBlocksPerTick));
 			applyForcedVelocity(
 				player,
 				new Vec3d(
@@ -3405,7 +3453,7 @@ public final class MagicAbilityManager {
 			appendBurningPassionTrailPoints(player, state);
 			spawnBurningPassionSearingDashParticles(player);
 
-			LivingEntity impactedTarget = findBurningPassionSearingDashCollisionTarget(player, dashStartPos);
+			LivingEntity impactedTarget = findBurningPassionSearingDashCollisionTarget(player, dashStartPos, dashEndPos);
 			if (impactedTarget != null) {
 				triggerBurningPassionSearingDashImpact(player, impactedTarget);
 				iterator.remove();
@@ -3515,15 +3563,13 @@ public final class MagicAbilityManager {
 		}
 	}
 
-	private static LivingEntity findBurningPassionSearingDashCollisionTarget(ServerPlayerEntity player, Vec3d dashStartPos) {
+	private static LivingEntity findBurningPassionSearingDashCollisionTarget(ServerPlayerEntity player, Vec3d dashStartPos, Vec3d dashEndPos) {
 		if (!(player.getEntityWorld() instanceof ServerWorld world)) {
 			return null;
 		}
 
 		double radius = Math.max(0.1, BURNING_PASSION_CONFIG.searingDash.collisionRadius);
-		Vec3d dashEndPos = entityPosition(player);
-		Box previousBox = player.getBoundingBox().offset(dashStartPos.subtract(dashEndPos));
-		Box hitBox = previousBox.stretch(dashEndPos.subtract(dashStartPos)).expand(radius);
+		Box hitBox = player.getBoundingBox().stretch(dashEndPos.subtract(dashStartPos)).expand(radius);
 		LivingEntity closestTarget = null;
 		double closestDistanceSquared = Double.MAX_VALUE;
 		for (Entity other : world.getOtherEntities(player, hitBox)) {
@@ -4921,7 +4967,12 @@ public final class MagicAbilityManager {
 
 	private static boolean advanceFrostStage(ServerPlayerEntity player, int currentTick) {
 		FrostStageState state = FROST_STAGE_STATES.get(player.getUuid());
-		if (state == null || state.currentStage >= 3 || state.highestUnlockedStage <= state.currentStage) {
+		if (
+			state == null
+				|| state.currentStage >= 3
+				|| state.highestUnlockedStage <= state.currentStage
+				|| !MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.FROST, state.currentStage + 1)
+		) {
 			return false;
 		}
 		state.currentStage = Math.min(3, state.currentStage + 1);
@@ -5218,7 +5269,11 @@ public final class MagicAbilityManager {
 			return;
 		}
 		state.progressTicks = Math.min(requirement, state.progressTicks + 1);
-		if (state.progressTicks >= requirement && state.highestUnlockedStage == state.currentStage) {
+		if (
+			state.progressTicks >= requirement
+				&& state.highestUnlockedStage == state.currentStage
+				&& MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.FROST, state.currentStage + 1)
+		) {
 			state.highestUnlockedStage = Math.min(3, state.currentStage + 1);
 			player.sendMessage(Text.translatable("message.magic.frost.stage_unlocked", state.highestUnlockedStage), true);
 		}
@@ -5373,7 +5428,7 @@ public final class MagicAbilityManager {
 				damage
 			);
 		}
-		if (target.isAlive()) {
+		if (target.isAlive() || !(target instanceof ServerPlayerEntity)) {
 			return;
 		}
 		grantFrostKillProgress(caster, progressType);
@@ -6564,13 +6619,6 @@ public final class MagicAbilityManager {
 			return;
 		}
 
-		if (targetHasActiveDomain(target)) {
-			caster.sendMessage(Text.translatable("message.magic.empty_embrace.domain_overwhelmed", target.getDisplayName()), true);
-			deactivateManipulation(caster, true, "target domain overwhelmed empty embrace");
-			setActiveAbility(caster, MagicAbility.NONE);
-			return;
-		}
-
 		activateManipulation(caster, target, currentTick);
 	}
 
@@ -6590,10 +6638,7 @@ public final class MagicAbilityManager {
 		state.lockedCasterPos = new Vec3d(caster.getX(), caster.getY(), caster.getZ());
 		state.controlledPos = new Vec3d(target.getX(), target.getY(), target.getZ());
 		MANIPULATION_CASTER_BY_TARGET.put(target.getUuid(), casterId);
-		if (MANIPULATION_DEACTIVATE_TARGET_MAGIC) {
-			cancelMagicOnTarget(target, currentTick);
-		}
-		applyManipulationSuppressionTags(target);
+		clearManipulationSuppressionTags(target);
 		debugManipulation(
 			"{} empty embrace locked target {} ({}) at [{}, {}, {}]",
 			debugName(caster),
@@ -7216,6 +7261,9 @@ public final class MagicAbilityManager {
 				if (state.ability == MagicAbility.FROST_DOMAIN_EXPANSION && caster != null && caster.isAlive()) {
 					refreshFrostDomainCasterEffects(caster);
 				}
+				if (state.ability == MagicAbility.LOVE_DOMAIN_EXPANSION) {
+					clearLoveDomainWitherEffects(world, state, ownerId);
+				}
 				if (!(clashActive && DOMAIN_CLASH_DISABLE_DOMAIN_EFFECTS) && state.ability == MagicAbility.FROST_DOMAIN_EXPANSION) {
 					changed |= updateFrostDomain(world, ownerId, state, currentTick);
 				}
@@ -7274,6 +7322,12 @@ public final class MagicAbilityManager {
 
 		if (changed) {
 			persistDomainRuntimeState(server);
+		}
+	}
+
+	private static void clearLoveDomainWitherEffects(ServerWorld world, DomainExpansionState state, UUID ownerId) {
+		for (LivingEntity target : collectLivingEntitiesInsideDomain(world, state, ownerId)) {
+			target.removeStatusEffect(StatusEffects.WITHER);
 		}
 	}
 
@@ -8574,6 +8628,11 @@ public final class MagicAbilityManager {
 			return true;
 		}
 
+		if (isEntityCapturedByCelestialGamaRayBeam(player)) {
+			player.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.teleport_blocked"), true);
+			return true;
+		}
+
 		if (isEntityCapturedByDomain(player)) {
 			player.sendMessage(Text.translatable("message.magic.domain.teleport_blocked"), true);
 			return true;
@@ -8779,6 +8838,7 @@ public final class MagicAbilityManager {
 		}
 
 		deserializeDomainRuntimeState(server, persistentState.getDataCopy());
+		cleanupPersistedDomainsAfterRestart(server);
 	}
 
 	private static void persistDomainRuntimeState(MinecraftServer server) {
@@ -8788,6 +8848,20 @@ public final class MagicAbilityManager {
 		}
 
 		persistentState.setData(serializeDomainRuntimeState(server));
+	}
+
+	private static void cleanupPersistedDomainsAfterRestart(MinecraftServer server) {
+		if (DOMAIN_EXPANSIONS.isEmpty()) {
+			return;
+		}
+
+		for (DomainExpansionState state : new ArrayList<>(DOMAIN_EXPANSIONS.values())) {
+			restoreDomainExpansion(server, state);
+		}
+		DOMAIN_EXPANSIONS.clear();
+		DOMAIN_CLASHES_BY_OWNER.clear();
+		DOMAIN_CLASH_OWNER_BY_PARTICIPANT.clear();
+		persistDomainRuntimeState(server);
 	}
 
 	private static DomainRuntimePersistentState domainRuntimePersistentState(MinecraftServer server) {
@@ -9204,9 +9278,17 @@ public final class MagicAbilityManager {
 				updateManaOncePerSecond(player);
 			}
 		}
+		syncStageProgressionHuds(server);
 		GreedRuntime.onEndServerTick(server, currentTick);
 		GreedDomainRuntime.onEndServerTick(server, currentTick);
 		enforceOrionsGambitGreedTargetCoins(server);
+	}
+
+	private static void syncStageProgressionHuds(MinecraftServer server) {
+		for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+			syncFrostStageHud(player);
+			syncBurningPassionHud(player);
+		}
 	}
 
 	private static void updateComedicRewriteVisualCameos(MinecraftServer server, int currentTick) {
@@ -9642,6 +9724,16 @@ public final class MagicAbilityManager {
 				if (activeAbility == MagicAbility.BELOW_FREEZING) {
 					endFrostStagedMode(player, player.getEntityWorld().getServer().getTicks(), FrostStageEndReason.FORCED_THRESHOLD, true, false);
 				}
+				boolean keepIgnitionActive = false;
+				if (activeAbility == MagicAbility.IGNITION) {
+					BurningPassionIgnitionState ignitionState = burningPassionIgnitionState(player);
+					if (ignitionState != null && shouldKeepIgnitionActiveOnManaDepletion()) {
+						markBurningPassionManaDepleted(player, ignitionState);
+						keepIgnitionActive = true;
+					} else {
+						endIgnition(player, player.getEntityWorld().getServer().getTicks(), BurningPassionIgnitionEndReason.INVALID, true, false);
+					}
+				}
 				if (activeAbility == MagicAbility.ABSOLUTE_ZERO) {
 					deactivateAbsoluteZero(player);
 				}
@@ -9670,7 +9762,9 @@ public final class MagicAbilityManager {
 					deactivateMartyrsFlame(player, true);
 				}
 
-				setActiveAbility(player, MagicAbility.NONE);
+				if (!keepIgnitionActive) {
+					setActiveAbility(player, MagicAbility.NONE);
+				}
 				MagicPlayerData.setDepletedRecoveryMode(player, true);
 				Text depletedAbilityName = activeAbility != MagicAbility.NONE
 					? activeAbility.displayName()
@@ -9691,6 +9785,9 @@ public final class MagicAbilityManager {
 			return;
 		}
 		if (player.getEntityWorld().getServer() != null && frostManaRegenBlocked(player, player.getEntityWorld().getServer().getTicks())) {
+			return;
+		}
+		if (isBurningPassionManaRecoveryBlocked(player)) {
 			return;
 		}
 
@@ -13491,6 +13588,7 @@ public final class MagicAbilityManager {
 			case NONE -> false;
 			case BELOW_FREEZING -> false;
 			case IGNITION -> false;
+			case LOVE_DOMAIN_EXPANSION -> false;
 			case HERCULES_BURDEN_OF_THE_SKY -> HERCULES_DISABLE_MANA_REGEN_WHILE_ACTIVE;
 			case SAGITTARIUS_ASTRAL_ARROW -> true;
 			case ASTRAL_CATACLYSM -> ASTRAL_CATACLYSM_DISABLE_MANA_REGEN_WHILE_ACTIVE;
@@ -14140,6 +14238,7 @@ public final class MagicAbilityManager {
 		MagicPlayerData.setDepletedRecoveryMode(caster, false);
 		sendCelestialGamaRayTraceOverlay(caster, true, constellation);
 		sendCelestialGamaRayTraceBanner(caster);
+		broadcastCelestialGamaRayVisualState(caster, state, currentTick, state.traceExpireTick);
 	}
 
 	private static void clearCelestialGamaRayState(ServerPlayerEntity caster, boolean sendFeedback, boolean startCooldown) {
@@ -14159,6 +14258,7 @@ public final class MagicAbilityManager {
 			setActiveAbility(caster, MagicAbility.NONE);
 		}
 		sendCelestialGamaRayTraceOverlay(caster, false, state == null ? null : state.constellation);
+		clearCelestialGamaRayVisualState(caster);
 		clearCelestialAlignmentBanner(caster);
 		if (sendFeedback) {
 			caster.sendMessage(Text.translatable("message.magic.ability.deactivated", celestialGamaRayDisplayName()), true);
@@ -14197,6 +14297,10 @@ public final class MagicAbilityManager {
 			state.chargeCompleteTick = currentTick + Math.max(0, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.charge.readyDelayTicks);
 			sendCelestialGamaRayTraceOverlay(player, false, state.constellation);
 			clearCelestialAlignmentBanner(player);
+			broadcastCelestialGamaRayVisualState(player, state, currentTick, state.chargeCompleteTick);
+			if (CELESTIAL_ALIGNMENT_CONFIG.gamaRay.presentation.chargeSoundLayeringEnabled && player.getEntityWorld() instanceof ServerWorld world) {
+				world.playSound(null, player.getX(), player.getBodyY(0.6), player.getZ(), SoundEvents.BLOCK_RESPAWN_ANCHOR_CHARGE, SoundCategory.PLAYERS, 1.0F, 0.9F);
+			}
 			player.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.charging"), true);
 			return;
 		}
@@ -14238,6 +14342,60 @@ public final class MagicAbilityManager {
 		);
 	}
 
+	private static void broadcastCelestialGamaRayVisualState(ServerPlayerEntity caster, CelestialGamaRayState state, int phaseStartTick, int phaseEndTick) {
+		if (caster == null || !(caster.getEntityWorld() instanceof ServerWorld world) || state == null) {
+			return;
+		}
+
+		CelestialGamaRayVisualPayload payload = new CelestialGamaRayVisualPayload(
+			caster.getUuid(),
+			true,
+			switch (state.phase) {
+				case TRACING -> "tracing";
+				case CHARGING -> "charging";
+				case FIRING -> "firing";
+			},
+			phaseStartTick,
+			phaseEndTick,
+			state.beamOrigin.x,
+			state.beamOrigin.y,
+			state.beamOrigin.z,
+			state.beamDirection.x,
+			state.beamDirection.y,
+			state.beamDirection.z,
+			state.lockedYaw,
+			state.lockedPitch
+		);
+		for (ServerPlayerEntity watcher : world.getPlayers()) {
+			ServerPlayNetworking.send(watcher, payload);
+		}
+	}
+
+	private static void clearCelestialGamaRayVisualState(ServerPlayerEntity caster) {
+		if (caster == null || !(caster.getEntityWorld() instanceof ServerWorld world)) {
+			return;
+		}
+
+		CelestialGamaRayVisualPayload payload = new CelestialGamaRayVisualPayload(
+			caster.getUuid(),
+			false,
+			"inactive",
+			0,
+			0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0F,
+			0.0F
+		);
+		for (ServerPlayerEntity watcher : world.getPlayers()) {
+			ServerPlayNetworking.send(watcher, payload);
+		}
+	}
+
 	private static void updateCelestialGamaRayStates(MinecraftServer server, int currentTick) {
 		Iterator<Map.Entry<UUID, CelestialGamaRayState>> iterator = CELESTIAL_GAMA_RAY_STATES.entrySet().iterator();
 		while (iterator.hasNext()) {
@@ -14245,12 +14403,16 @@ public final class MagicAbilityManager {
 			ServerPlayerEntity caster = server.getPlayerManager().getPlayer(entry.getKey());
 			CelestialGamaRayState state = entry.getValue();
 			if (caster == null || !caster.isAlive() || activeAbility(caster) != MagicAbility.SAGITTARIUS_ASTRAL_ARROW) {
+				if (caster != null) {
+					clearCelestialGamaRayVisualState(caster);
+				}
 				iterator.remove();
 				continue;
 			}
 			if (state.phase == CelestialGamaRayPhase.TRACING && currentTick >= state.traceExpireTick) {
 				iterator.remove();
 				sendCelestialGamaRayTraceOverlay(caster, false, state.constellation);
+				clearCelestialGamaRayVisualState(caster);
 				clearCelestialAlignmentBanner(caster);
 				caster.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.trace_failed"), true);
 				if (!SAGITTARIUS_STATES.containsKey(caster.getUuid())) {
@@ -14310,17 +14472,28 @@ public final class MagicAbilityManager {
 		state.nextParticleTick = currentTick;
 		state.nextDamageTick = currentTick;
 		state.nextSoundTick = currentTick;
+		state.nextVisualSyncTick = currentTick;
 		state.lockedX = caster.getX();
 		state.lockedY = caster.getY();
 		state.lockedZ = caster.getZ();
 		state.lockedYaw = caster.getYaw();
 		state.lockedPitch = caster.getPitch();
+		broadcastCelestialGamaRayVisualState(caster, state, currentTick, state.endTick);
+		if (CELESTIAL_ALIGNMENT_CONFIG.gamaRay.presentation.firingSoundLayeringEnabled && caster.getEntityWorld() instanceof ServerWorld world) {
+			world.playSound(null, state.beamOrigin.x, state.beamOrigin.y, state.beamOrigin.z, SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE, SoundCategory.PLAYERS, 1.15F, 0.8F);
+			world.playSound(null, state.beamOrigin.x, state.beamOrigin.y, state.beamOrigin.z, SoundEvents.ENTITY_ENDER_DRAGON_SHOOT, SoundCategory.PLAYERS, 0.9F, 0.65F);
+		}
 		caster.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.firing"), true);
 	}
 
 	private static void updateCelestialGamaRayBeam(ServerPlayerEntity caster, CelestialGamaRayState state, int currentTick) {
 		if (!(caster.getEntityWorld() instanceof ServerWorld world)) {
 			return;
+		}
+
+		if (currentTick >= state.nextVisualSyncTick) {
+			broadcastCelestialGamaRayVisualState(caster, state, currentTick, state.endTick);
+			state.nextVisualSyncTick = currentTick + 10;
 		}
 
 		if (CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.immobilizeCaster) {
@@ -14361,7 +14534,12 @@ public final class MagicAbilityManager {
 
 		if (currentTick >= state.nextDamageTick) {
 			for (LivingEntity target : affected) {
-				dealTrackedMagicDamage(target, caster.getUuid(), world.getDamageSources().magic(), CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.damagePerInterval);
+				dealTrackedMagicDamage(
+					target,
+					caster.getUuid(),
+					createTrueMagicDamageSource(world, caster),
+					CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.damagePerInterval
+				);
 			}
 			state.nextDamageTick = currentTick + Math.max(1, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.damageIntervalTicks);
 		}
@@ -14390,7 +14568,11 @@ public final class MagicAbilityManager {
 	}
 
 	private static void spawnCelestialGamaRayBeamParticles(ServerWorld world, CelestialGamaRayState state, int currentTick) {
-		double range = CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.range;
+		if (!CELESTIAL_ALIGNMENT_CONFIG.visuals.lowFxFallbackMode) {
+			return;
+		}
+		Vec3d start = celestialGamaRayVisualStart(state);
+		double range = CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.range + celestialGamaRayVisualBackOffset();
 		double spacing = Math.max(0.25, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.sliceSpacing);
 		AstralCataclysmBeamParticleEffect coreEffect = new AstralCataclysmBeamParticleEffect(
 			parseHexColor(CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.coreColorHex, 0xFFF1C7),
@@ -14405,7 +14587,7 @@ public final class MagicAbilityManager {
 			10
 		);
 		for (double travelled = 0.0; travelled <= range + 1.0E-6; travelled += spacing) {
-			Vec3d center = state.beamOrigin.add(state.beamDirection.multiply(travelled));
+			Vec3d center = start.add(state.beamDirection.multiply(travelled));
 			world.spawnParticles(coreEffect, center.x, center.y, center.z, 1, 0.0, 0.0, 0.0, 0.0);
 			for (int index = 0; index < Math.max(1, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.outerParticleCount); index++) {
 				double angle = currentTick * 0.15 + (Math.PI * 2.0 * index / Math.max(1, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.outerParticleCount));
@@ -14414,6 +14596,14 @@ public final class MagicAbilityManager {
 				world.spawnParticles(outerEffect, point.x, point.y, point.z, 1, 0.0, 0.0, 0.0, 0.0);
 			}
 		}
+	}
+
+	private static double celestialGamaRayVisualBackOffset() {
+		return Math.max(0.0, CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beamVisual.beamStartBackOffsetBlocks);
+	}
+
+	private static Vec3d celestialGamaRayVisualStart(CelestialGamaRayState state) {
+		return state.beamOrigin.subtract(state.beamDirection.multiply(celestialGamaRayVisualBackOffset()));
 	}
 
 	private static Vec3d perpendicularBeamOffset(Vec3d direction, double angle, double radius) {
@@ -14960,6 +15150,10 @@ public final class MagicAbilityManager {
 			}
 		}
 		return false;
+	}
+
+	private static boolean isTeleportEscapeItem(ItemStack stack) {
+		return stack != null && (stack.isOf(Items.ENDER_PEARL) || stack.isOf(Items.CHORUS_FRUIT));
 	}
 
 	private static float celestialScaledIncomingDamage(LivingEntity entity, DamageSource source, float amount) {
@@ -16017,11 +16211,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static void applyManipulationSuppressionTags(ServerPlayerEntity target) {
-		target.addCommandTag(EMPTY_EMBRACE_TAG);
-		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_POWERS_TAG, MANIPULATION_DISABLE_ARTIFACT_POWERS);
-		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_SUMMONS_TAG, MANIPULATION_DISMISS_ARTIFACT_SUMMONS);
-		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_ARMOR_TAG, MANIPULATION_DISABLE_ARTIFACT_ARMOR_EFFECTS);
-		setManipulationSuppressionTag(target, EMPTY_EMBRACE_INFESTED_SILVERFISH_TAG, MANIPULATION_DISABLE_INFESTED_SILVERFISH_ENHANCEMENTS);
+		clearManipulationSuppressionTags(target);
 	}
 
 	private static void clearManipulationSuppressionTags(ServerPlayerEntity target) {
@@ -16208,8 +16398,12 @@ public final class MagicAbilityManager {
 			serverPlayer.sendMessage(Text.translatable("message.magic.constellation.celestial_alignment.teleport_blocked"), true);
 			return ActionResult.FAIL;
 		}
+		if (isEntityCapturedByCelestialGamaRayBeam(serverPlayer) && isTeleportEscapeItem(stack)) {
+			serverPlayer.sendMessage(Text.translatable("message.magic.constellation.celestial_gama_ray.teleport_blocked"), true);
+			return ActionResult.FAIL;
+		}
 		if (isEntityCapturedByDomain(serverPlayer)) {
-			if (stack.isOf(Items.CHORUS_FRUIT) || stack.isOf(Items.ENDER_PEARL)) {
+			if (isTeleportEscapeItem(stack)) {
 				serverPlayer.sendMessage(Text.translatable("message.magic.domain.teleport_blocked"), true);
 				return ActionResult.FAIL;
 			}
@@ -16333,7 +16527,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean shouldBlockArtifactUse(PlayerEntity player, Hand hand) {
-		if (!MANIPULATION_BLOCK_ARTIFACT_USE_CLICKS || !isMagicSuppressed(player)) {
+		if (!MANIPULATION_BLOCK_ARTIFACT_USE_CLICKS || !player.getCommandTags().contains(EMPTY_EMBRACE_ARTIFACT_POWERS_TAG)) {
 			return false;
 		}
 
@@ -16341,7 +16535,7 @@ public final class MagicAbilityManager {
 	}
 
 	private static boolean shouldBlockArtifactAttack(PlayerEntity player) {
-		if (!MANIPULATION_BLOCK_ARTIFACT_ATTACK_CLICKS || !isMagicSuppressed(player)) {
+		if (!MANIPULATION_BLOCK_ARTIFACT_ATTACK_CLICKS || !player.getCommandTags().contains(EMPTY_EMBRACE_ARTIFACT_POWERS_TAG)) {
 			return false;
 		}
 
@@ -17862,6 +18056,46 @@ public final class MagicAbilityManager {
 		return false;
 	}
 
+	public static boolean isEntityCapturedByCelestialGamaRayBeam(Entity entity) {
+		if (
+			entity == null
+			|| !CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.blockTeleportForHitTargets
+			|| CELESTIAL_GAMA_RAY_STATES.isEmpty()
+		) {
+			return false;
+		}
+
+		RegistryKey<World> dimension = entity.getEntityWorld().getRegistryKey();
+		UUID entityId = entity.getUuid();
+		for (CelestialGamaRayState state : CELESTIAL_GAMA_RAY_STATES.values()) {
+			if (
+				state.phase != CelestialGamaRayPhase.FIRING
+				|| !state.dimension.equals(dimension)
+				|| entityId.equals(state.casterId)
+				|| state.beamDirection.lengthSquared() <= 1.0E-6
+			) {
+				continue;
+			}
+			if (isInsideCelestialGamaRayBeam(entity, state)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean isInsideCelestialGamaRayBeam(Entity entity, CelestialGamaRayState state) {
+		Vec3d samplePoint = new Vec3d(entity.getX(), entity.getBodyY(0.5), entity.getZ());
+		Vec3d relative = samplePoint.subtract(state.beamOrigin);
+		double projection = relative.dotProduct(state.beamDirection);
+		if (projection < 0.0 || projection > CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.range) {
+			return false;
+		}
+		Vec3d nearest = state.beamOrigin.add(state.beamDirection.multiply(projection));
+		double radius = CELESTIAL_ALIGNMENT_CONFIG.gamaRay.beam.radius;
+		return samplePoint.squaredDistanceTo(nearest) <= radius * radius;
+	}
+
 	public static boolean isEntityCapturedByLoveDomain(Entity entity) {
 		if (domainClashStateForParticipant(entity.getUuid()) != null) {
 			return false;
@@ -19274,6 +19508,35 @@ public final class MagicAbilityManager {
 		}
 	}
 
+	public static void clearLockedStageProgressionState(ServerPlayerEntity player, MagicSchool school, int stage) {
+		if (player == null || school == null || player.getEntityWorld().getServer() == null) {
+			return;
+		}
+
+		if (school == MagicSchool.FROST) {
+			FrostStageState state = FROST_STAGE_STATES.get(player.getUuid());
+			if (state == null || state.currentStage >= stage) {
+				return;
+			}
+
+			state.highestUnlockedStage = Math.min(state.highestUnlockedStage, Math.max(state.currentStage, stage - 1));
+			syncFrostStageHud(player);
+			return;
+		}
+
+		if (school == MagicSchool.BURNING_PASSION) {
+			BurningPassionIgnitionState state = BURNING_PASSION_IGNITION_STATES.get(player.getUuid());
+			if (state == null || state.currentStage >= 3 || state.currentStage >= stage) {
+				return;
+			}
+
+			int currentTick = player.getEntityWorld().getServer().getTicks();
+			int stageDuration = burningPassionStageDurationTicks(state.currentStage);
+			state.stageStartTick = Math.max(state.stageStartTick, currentTick - stageDuration);
+			syncBurningPassionHud(player);
+		}
+	}
+
 	public static void clearAllRuntimeState(ServerPlayerEntity player) {
 		UUID playerId = player.getUuid();
 		MinecraftServer server = player.getEntityWorld().getServer();
@@ -19955,6 +20218,7 @@ public final class MagicAbilityManager {
 		private int nextParticleTick;
 		private int nextDamageTick;
 		private int nextSoundTick;
+		private int nextVisualSyncTick;
 		private Vec3d beamOrigin = Vec3d.ZERO;
 		private Vec3d beamDirection = Vec3d.ZERO;
 		private double lockedX;
@@ -20386,6 +20650,7 @@ public final class MagicAbilityManager {
 		private int currentStage;
 		private int stageStartTick;
 		private double heatPercent;
+		private boolean manaRecoveryUnlocked;
 		private final Map<UUID, Boolean> auraPlayersInside = new HashMap<>();
 		private final Map<UUID, Integer> boundaryCooldownEndTickByTarget = new HashMap<>();
 
@@ -20394,6 +20659,7 @@ public final class MagicAbilityManager {
 			this.currentStage = currentStage;
 			this.stageStartTick = stageStartTick;
 			this.heatPercent = Math.max(0.0, heatPercent);
+			this.manaRecoveryUnlocked = true;
 		}
 	}
 

@@ -2,6 +2,7 @@ package net.evan.magic.client;
 
 import java.util.List;
 import net.evan.magic.Magic;
+import net.evan.magic.config.MagicConfig;
 import net.evan.magic.network.payload.CelestialGamaRayTraceProgressPayload;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -172,7 +173,7 @@ public final class CelestialGamaRayTraceHudOverlay {
 
 		if (distance(cursorX, cursorY, end.x, end.y) <= segmentCompletionRadius) {
 			segmentIndex++;
-			flashTicks = 6;
+			flashTicks = tracingConfig().nodeConfirmationFlashTicks;
 			flashColor = successColor;
 			if (segmentIndex >= path.size() - 1 && !completionSent) {
 				completionSent = true;
@@ -192,7 +193,7 @@ public final class CelestialGamaRayTraceHudOverlay {
 		cursorY = first.y;
 		segmentIndex = 0;
 		completionSent = false;
-		flashTicks = 10;
+		flashTicks = Math.max(10, tracingConfig().nodeConfirmationFlashTicks + 2);
 		flashColor = failColor;
 		ClientPlayNetworking.send(new CelestialGamaRayTraceProgressPayload("reset"));
 	}
@@ -214,9 +215,50 @@ public final class CelestialGamaRayTraceHudOverlay {
 		int centerX = context.getScaledWindowWidth() / 2 + overlayXOffset;
 		int centerY = context.getScaledWindowHeight() / 2 + overlayYOffset;
 		float scale = overlayScale;
+		MagicConfig.TracingConfig tracing = tracingConfig();
+		int backgroundColor = withAlpha(pathColor, tracing.backgroundGlowAlpha);
+		int progressGlowColor = withAlpha(progressColor, tracing.progressGlowAlpha);
+		int activeGlowColor = withAlpha(activeSegmentColor, tracing.activeSegmentGlowAlpha);
+		if (tracing.backgroundGlowAlpha > 0.0F) {
+			for (int index = 0; index < path.size() - 1; index++) {
+				TracePoint start = path.get(index);
+				TracePoint end = path.get(index + 1);
+				drawLine(
+					context,
+					centerX + Math.round(start.x * scale),
+					centerY + Math.round(start.y * scale),
+					centerX + Math.round(end.x * scale),
+					centerY + Math.round(end.y * scale),
+					lineThickness + tracing.activeSegmentGlowThickness,
+					backgroundColor
+				);
+			}
+		}
 		for (int index = 0; index < path.size() - 1; index++) {
 			TracePoint start = path.get(index);
 			TracePoint end = path.get(index + 1);
+			if (index < segmentIndex && tracing.progressGlowAlpha > 0.0F) {
+				drawLine(
+					context,
+					centerX + Math.round(start.x * scale),
+					centerY + Math.round(start.y * scale),
+					centerX + Math.round(end.x * scale),
+					centerY + Math.round(end.y * scale),
+					lineThickness + Math.max(2, tracing.activeSegmentGlowThickness / 2),
+					progressGlowColor
+				);
+			}
+			if (index == segmentIndex && tracing.activeSegmentGlowAlpha > 0.0F) {
+				drawLine(
+					context,
+					centerX + Math.round(start.x * scale),
+					centerY + Math.round(start.y * scale),
+					centerX + Math.round(end.x * scale),
+					centerY + Math.round(end.y * scale),
+					lineThickness + tracing.activeSegmentGlowThickness,
+					activeGlowColor
+				);
+			}
 			int color = index < segmentIndex ? progressColor : (index == segmentIndex ? activeSegmentColor : pathColor);
 			drawLine(
 				context,
@@ -232,13 +274,33 @@ public final class CelestialGamaRayTraceHudOverlay {
 		for (int index = 0; index < path.size(); index++) {
 			TracePoint point = path.get(index);
 			int color = index == 0 ? startNodeColor : (index == path.size() - 1 ? endNodeColor : pathColor);
-			drawNode(context, centerX + Math.round(point.x * scale), centerY + Math.round(point.y * scale), nodeRadius, color);
+			int x = centerX + Math.round(point.x * scale);
+			int y = centerY + Math.round(point.y * scale);
+			if (index <= segmentIndex) {
+				drawNode(context, x, y, nodeRadius + 1, withAlpha(progressColor, 0.2F));
+			}
+			if (index == Math.min(segmentIndex + 1, path.size() - 1)) {
+				float pulse = 1.0F + (0.5F + 0.5F * MathHelper.sin((client.world == null ? 0.0F : client.world.getTime() + tickCounter.getTickProgress(false)) * 0.35F)) * 0.8F;
+				drawNode(context, x, y, nodeRadius + Math.round(pulse), withAlpha(activeSegmentColor, 0.18F));
+			}
+			drawNode(context, x, y, nodeRadius, color);
 		}
 
 		if (flashTicks > 0) {
 			drawNode(context, centerX + Math.round(cursorX * scale), centerY + Math.round(cursorY * scale), cursorRadius + 1, flashColor);
 		} else {
 			drawNode(context, centerX + Math.round(cursorX * scale), centerY + Math.round(cursorY * scale), cursorRadius, progressColor);
+		}
+		if (completionSent && tracing.successBurstTicks > 0) {
+			TracePoint end = path.get(path.size() - 1);
+			float burst = MathHelper.clamp(flashTicks / (float) Math.max(1, tracing.successBurstTicks), 0.0F, 1.0F);
+			drawNode(
+				context,
+				centerX + Math.round(end.x * scale),
+				centerY + Math.round(end.y * scale),
+				nodeRadius + Math.round(tracing.successBurstScale * (1.0F - burst)),
+				withAlpha(successColor, 0.22F)
+			);
 		}
 	}
 
@@ -280,6 +342,16 @@ public final class CelestialGamaRayTraceHudOverlay {
 
 	private static void drawNode(DrawContext context, int x, int y, int radius, int color) {
 		context.fill(x - radius, y - radius, x + radius + 1, y + radius + 1, color);
+	}
+
+	private static int withAlpha(int color, float alpha) {
+		int normalized = color & 0x00FFFFFF;
+		int alphaInt = Math.max(0, Math.min(255, Math.round(MathHelper.clamp(alpha, 0.0F, 1.0F) * 255.0F)));
+		return (alphaInt << 24) | normalized;
+	}
+
+	private static MagicConfig.TracingConfig tracingConfig() {
+		return MagicConfig.get().constellationCelestialAlignment.gamaRay.tracing;
 	}
 
 	private static SegmentProjection project(float px, float py, TracePoint start, TracePoint end) {

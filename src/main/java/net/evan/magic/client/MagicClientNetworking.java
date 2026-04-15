@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 import net.evan.magic.network.payload.CelestialGamaRayTraceOverlayPayload;
 import net.evan.magic.network.payload.ConstellationWarningOverlayPayload;
+import net.evan.magic.network.payload.CelestialGamaRayVisualPayload;
 import net.evan.magic.network.payload.GreedDomainWarningOverlayPayload;
 import net.evan.magic.network.payload.JesterJokeOverlayPayload;
 import net.evan.magic.network.payload.ConstellationOutlinePayload;
@@ -75,6 +76,9 @@ public final class MagicClientNetworking {
 				);
 			})
 		);
+		ClientPlayNetworking.registerGlobalReceiver(CelestialGamaRayVisualPayload.ID, (payload, context) ->
+			context.client().execute(() -> CelestialGamaRayPresentationManager.applyVisualState(payload))
+		);
 		ClientPlayNetworking.registerGlobalReceiver(GreedDomainWarningOverlayPayload.ID, (payload, context) ->
 			context.client().execute(() ->
 				ManaHudOverlay.showGreedDomainWarning(
@@ -98,7 +102,10 @@ public final class MagicClientNetworking {
 				)
 			)
 		);
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> CONSTELLATION_OUTLINED_ENTITIES.clear());
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			CONSTELLATION_OUTLINED_ENTITIES.clear();
+			CelestialGamaRayPresentationManager.clear();
+		});
 		initialized = true;
 	}
 

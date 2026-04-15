@@ -19,7 +19,11 @@ public abstract class EnderPearlEntityMixin {
 		if (!(owner instanceof LivingEntity livingOwner)) {
 			return;
 		}
-		if (!MagicAbilityManager.isEntityCapturedByDomain(livingOwner) && !MagicAbilityManager.shouldBlockFrostTeleport(livingOwner)) {
+		if (
+			!MagicAbilityManager.isEntityCapturedByDomain(livingOwner)
+			&& !MagicAbilityManager.shouldBlockFrostTeleport(livingOwner)
+			&& !MagicAbilityManager.isEntityCapturedByCelestialGamaRayBeam(livingOwner)
+		) {
 			return;
 		}
 

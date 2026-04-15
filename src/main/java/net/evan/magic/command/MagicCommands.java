@@ -152,7 +152,59 @@ public final class MagicCommands {
 														advanceFrostStage(
 															context.getSource(),
 															EntityArgumentType.getPlayers(context, "targets")
+															)
+													)
+											)
+									)
+									.then(
+										CommandManager.literal("lock")
+											.then(
+												CommandManager.argument("stage", IntegerArgumentType.integer(2, 3))
+													.executes(context ->
+														setStageProgressionAccessForSelf(
+															context.getSource(),
+															MagicSchool.FROST,
+															IntegerArgumentType.getInteger(context, "stage"),
+															true
 														)
+													)
+													.then(
+														CommandManager.argument("targets", EntityArgumentType.players())
+															.executes(context ->
+																setStageProgressionAccess(
+																	context.getSource(),
+																	EntityArgumentType.getPlayers(context, "targets"),
+																	MagicSchool.FROST,
+																	IntegerArgumentType.getInteger(context, "stage"),
+																	true
+																)
+															)
+													)
+											)
+									)
+									.then(
+										CommandManager.literal("unlock")
+											.then(
+												CommandManager.argument("stage", IntegerArgumentType.integer(2, 3))
+													.executes(context ->
+														setStageProgressionAccessForSelf(
+															context.getSource(),
+															MagicSchool.FROST,
+															IntegerArgumentType.getInteger(context, "stage"),
+															false
+														)
+													)
+													.then(
+														CommandManager.argument("targets", EntityArgumentType.players())
+															.executes(context ->
+																setStageProgressionAccess(
+																	context.getSource(),
+																	EntityArgumentType.getPlayers(context, "targets"),
+																	MagicSchool.FROST,
+																	IntegerArgumentType.getInteger(context, "stage"),
+																	false
+																)
+															)
 													)
 											)
 									)
@@ -246,6 +298,58 @@ public final class MagicCommands {
 																	context.getSource(),
 																	EntityArgumentType.getPlayers(context, "targets")
 																)
+															)
+													)
+											)
+											.then(
+												CommandManager.literal("lock")
+													.then(
+														CommandManager.argument("stage", IntegerArgumentType.integer(2, 3))
+															.executes(context ->
+																setStageProgressionAccessForSelf(
+																	context.getSource(),
+																	MagicSchool.BURNING_PASSION,
+																	IntegerArgumentType.getInteger(context, "stage"),
+																	true
+																)
+															)
+															.then(
+																CommandManager.argument("targets", EntityArgumentType.players())
+																	.executes(context ->
+																		setStageProgressionAccess(
+																			context.getSource(),
+																			EntityArgumentType.getPlayers(context, "targets"),
+																			MagicSchool.BURNING_PASSION,
+																			IntegerArgumentType.getInteger(context, "stage"),
+																			true
+																		)
+																	)
+															)
+													)
+											)
+											.then(
+												CommandManager.literal("unlock")
+													.then(
+														CommandManager.argument("stage", IntegerArgumentType.integer(2, 3))
+															.executes(context ->
+																setStageProgressionAccessForSelf(
+																	context.getSource(),
+																	MagicSchool.BURNING_PASSION,
+																	IntegerArgumentType.getInteger(context, "stage"),
+																	false
+																)
+															)
+															.then(
+																CommandManager.argument("targets", EntityArgumentType.players())
+																	.executes(context ->
+																		setStageProgressionAccess(
+																			context.getSource(),
+																			EntityArgumentType.getPlayers(context, "targets"),
+																			MagicSchool.BURNING_PASSION,
+																			IntegerArgumentType.getInteger(context, "stage"),
+																			false
+																		)
+																	)
 															)
 													)
 											)
@@ -478,6 +582,15 @@ public final class MagicCommands {
 		return setAbilityAccess(source, List.of(source.getPlayerOrThrow()), ability, locked);
 	}
 
+	private static int setStageProgressionAccessForSelf(
+		ServerCommandSource source,
+		MagicSchool school,
+		int stage,
+		boolean locked
+	) throws CommandSyntaxException {
+		return setStageProgressionAccess(source, List.of(source.getPlayerOrThrow()), school, stage, locked);
+	}
+
 	private static int setTestingModeForSelf(ServerCommandSource source, boolean enabled) throws CommandSyntaxException {
 		return setTestingMode(source, List.of(source.getPlayerOrThrow()), enabled);
 	}
@@ -589,6 +702,34 @@ public final class MagicCommands {
 		}
 
 		sendAbilityAccessFeedback(source, targets, ability, locked);
+		return targets.size();
+	}
+
+	private static int setStageProgressionAccess(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		MagicSchool school,
+		int stage,
+		boolean locked
+	) {
+		List<java.util.UUID> playerIds = new ArrayList<>(targets.size());
+		for (ServerPlayerEntity target : targets) {
+			playerIds.add(target.getUuid());
+		}
+
+		boolean persisted = MagicConfig.setPlayerStageProgressionLocked(playerIds, school, stage, locked);
+		if (!persisted) {
+			source.sendError(Text.translatable("command.magic.stage_progression.access.failure", MagicConfig.path().toString()));
+			return 0;
+		}
+
+		if (locked) {
+			for (ServerPlayerEntity target : targets) {
+				MagicAbilityManager.clearLockedStageProgressionState(target, school, stage);
+			}
+		}
+
+		sendStageProgressionAccessFeedback(source, targets, school, stage, locked);
 		return targets.size();
 	}
 
@@ -893,6 +1034,30 @@ public final class MagicCommands {
 
 		source.sendFeedback(
 			() -> Text.translatable(keyPrefix + ".multiple", ability.displayName(), targets.size()),
+			true
+		);
+	}
+
+	private static void sendStageProgressionAccessFeedback(
+		ServerCommandSource source,
+		Collection<ServerPlayerEntity> targets,
+		MagicSchool school,
+		int stage,
+		boolean locked
+	) {
+		String keyPrefix = locked ? "command.magic.stage_progression.lock" : "command.magic.stage_progression.unlock";
+
+		if (targets.size() == 1) {
+			ServerPlayerEntity target = targets.iterator().next();
+			source.sendFeedback(
+				() -> Text.translatable(keyPrefix + ".single", school.displayName(), stage, target.getDisplayName()),
+				true
+			);
+			return;
+		}
+
+		source.sendFeedback(
+			() -> Text.translatable(keyPrefix + ".multiple", school.displayName(), stage, targets.size()),
 			true
 		);
 	}
