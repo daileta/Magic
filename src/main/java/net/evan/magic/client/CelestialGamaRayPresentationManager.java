@@ -242,12 +242,15 @@ public final class CelestialGamaRayPresentationManager {
 			if (caster.squaredDistanceTo(cameraPos) > maxDistanceSq && player != client.player) {
 				continue;
 			}
+			boolean localCaster = caster == client.player;
 
 			if (state.phase == VisualPhase.CHARGING) {
-				renderWindupSigils(context, cameraPos, caster, state, tickDelta);
-				renderChargeConstruct(context, cameraState, cameraPos, caster, state, tickDelta, false);
+				if (localCaster) {
+					renderWindupSigils(context, cameraPos, caster, state, tickDelta);
+					renderChargeConstruct(context, cameraState, cameraPos, caster, state, tickDelta, false);
+				}
 			} else if (state.phase == VisualPhase.FIRING) {
-				if (config.gamaRay.chargeConstruct.constructPersistDuringBeam) {
+				if (localCaster && config.gamaRay.chargeConstruct.constructPersistDuringBeam) {
 					renderChargeConstruct(context, cameraState, cameraPos, caster, state, tickDelta, true);
 				}
 				renderBeam(context, cameraPos, world, caster, state, tickDelta);

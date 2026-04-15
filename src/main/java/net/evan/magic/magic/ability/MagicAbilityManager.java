@@ -1694,6 +1694,10 @@ public final class MagicAbilityManager {
 			endIgnition(player, currentTick, BurningPassionIgnitionEndReason.INVALID, false, false);
 			return;
 		}
+		if (isLockedBurningPassionStage(player, state.currentStage)) {
+			endIgnition(player, currentTick, BurningPassionIgnitionEndReason.LOCKED, false, false);
+			return;
+		}
 
 		int previousStage = state.currentStage;
 		while (true) {
@@ -1712,8 +1716,8 @@ public final class MagicAbilityManager {
 				return;
 			}
 			if (!MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.BURNING_PASSION, state.currentStage + 1)) {
-				state.stageStartTick = Math.max(state.stageStartTick, currentTick - stageDuration);
-				break;
+				endIgnition(player, currentTick, BurningPassionIgnitionEndReason.LOCKED, false, false);
+				return;
 			}
 			state.stageStartTick += stageDuration;
 			state.currentStage++;
@@ -2671,7 +2675,7 @@ public final class MagicAbilityManager {
 			BURNING_PASSION_CONFIG.engineHeart.tierThreeSpecialAttackDamage
 		);
 		ignitionState.heatPercent = clampBurningPassionHeat(
-			ignitionState.heatPercent + BURNING_PASSION_CONFIG.engineHeart.tierThreeSpecialHeatGainPercent
+			Math.max(ignitionState.heatPercent, BURNING_PASSION_CONFIG.engineHeart.tierThreeSpecialHeatGainPercent)
 		);
 		world.spawnParticles(
 			ParticleTypes.FLAME,
@@ -4900,6 +4904,10 @@ public final class MagicAbilityManager {
 			endFrostStagedMode(player, currentTick, FrostStageEndReason.INVALID, false, false);
 			return;
 		}
+		if (isLockedFrostStage(player, state.currentStage)) {
+			endFrostStagedMode(player, currentTick, FrostStageEndReason.LOCKED, false, false);
+			return;
+		}
 
 		if (isBelowFrostThreshold(player)) {
 			endFrostStagedMode(player, currentTick, FrostStageEndReason.FORCED_THRESHOLD, true, false);
@@ -5269,11 +5277,11 @@ public final class MagicAbilityManager {
 			return;
 		}
 		state.progressTicks = Math.min(requirement, state.progressTicks + 1);
-		if (
-			state.progressTicks >= requirement
-				&& state.highestUnlockedStage == state.currentStage
-				&& MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.FROST, state.currentStage + 1)
-		) {
+		if (state.progressTicks >= requirement && state.highestUnlockedStage == state.currentStage) {
+			if (!MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.FROST, state.currentStage + 1)) {
+				endFrostStagedMode(player, player.getEntityWorld().getServer().getTicks(), FrostStageEndReason.LOCKED, false, false);
+				return;
+			}
 			state.highestUnlockedStage = Math.min(3, state.currentStage + 1);
 			player.sendMessage(Text.translatable("message.magic.frost.stage_unlocked", state.highestUnlockedStage), true);
 		}
@@ -5456,6 +5464,10 @@ public final class MagicAbilityManager {
 		}
 		if (state.progressTicks >= requirement) {
 			state.progressTicks = requirement;
+			if (!MagicConfig.get().abilityAccess.isStageProgressionUnlocked(caster.getUuid(), MagicSchool.FROST, state.currentStage + 1)) {
+				endFrostStagedMode(caster, caster.getEntityWorld().getServer().getTicks(), FrostStageEndReason.LOCKED, false, false);
+				return;
+			}
 			state.highestUnlockedStage = Math.min(3, state.currentStage + 1);
 			caster.sendMessage(Text.translatable("message.magic.frost.stage_unlocked", state.highestUnlockedStage), true);
 		}
@@ -7329,6 +7341,31 @@ public final class MagicAbilityManager {
 		for (LivingEntity target : collectLivingEntitiesInsideDomain(world, state, ownerId)) {
 			target.removeStatusEffect(StatusEffects.WITHER);
 		}
+		clearLoveDomainClashParticipantWither(world, state, ownerId);
+		DomainClashState clash = domainClashStateForParticipant(ownerId);
+		if (clash != null) {
+			UUID otherId = clash.ownerId.equals(ownerId) ? clash.challengerId : clash.ownerId;
+			clearLoveDomainClashParticipantWither(world, state, otherId);
+		}
+	}
+
+	private static void clearLoveDomainClashParticipantWither(ServerWorld world, DomainExpansionState state, UUID playerId) {
+		if (playerId == null || world == null || state == null) {
+			return;
+		}
+
+		Entity entity = world.getEntity(playerId);
+		if (!(entity instanceof ServerPlayerEntity player) || !player.isAlive()) {
+			return;
+		}
+		if (domainClashStateForParticipant(playerId) == null || MagicPlayerData.getSchool(player) != MagicSchool.LOVE) {
+			return;
+		}
+		if (!isLivingEntityInsideDomainInterior(player, state)) {
+			return;
+		}
+
+		player.removeStatusEffect(StatusEffects.WITHER);
 	}
 
 	private static boolean updateFrostDomain(ServerWorld world, UUID ownerId, DomainExpansionState state, int currentTick) {
@@ -16211,7 +16248,11 @@ public final class MagicAbilityManager {
 	}
 
 	private static void applyManipulationSuppressionTags(ServerPlayerEntity target) {
-		clearManipulationSuppressionTags(target);
+		target.addCommandTag(EMPTY_EMBRACE_TAG);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_POWERS_TAG, MANIPULATION_DISABLE_ARTIFACT_POWERS);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_SUMMONS_TAG, MANIPULATION_DISMISS_ARTIFACT_SUMMONS);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_ARTIFACT_ARMOR_TAG, MANIPULATION_DISABLE_ARTIFACT_ARMOR_EFFECTS);
+		setManipulationSuppressionTag(target, EMPTY_EMBRACE_INFESTED_SILVERFISH_TAG, MANIPULATION_DISABLE_INFESTED_SILVERFISH_ENHANCEMENTS);
 	}
 
 	private static void clearManipulationSuppressionTags(ServerPlayerEntity target) {
@@ -19512,10 +19553,15 @@ public final class MagicAbilityManager {
 		if (player == null || school == null || player.getEntityWorld().getServer() == null) {
 			return;
 		}
+		int currentTick = player.getEntityWorld().getServer().getTicks();
 
 		if (school == MagicSchool.FROST) {
 			FrostStageState state = FROST_STAGE_STATES.get(player.getUuid());
-			if (state == null || state.currentStage >= stage) {
+			if (state == null) {
+				return;
+			}
+			if (state.currentStage >= stage) {
+				endFrostStagedMode(player, currentTick, FrostStageEndReason.LOCKED, false, false);
 				return;
 			}
 
@@ -19526,15 +19572,26 @@ public final class MagicAbilityManager {
 
 		if (school == MagicSchool.BURNING_PASSION) {
 			BurningPassionIgnitionState state = BURNING_PASSION_IGNITION_STATES.get(player.getUuid());
-			if (state == null || state.currentStage >= 3 || state.currentStage >= stage) {
+			if (state == null) {
+				return;
+			}
+			if (state.currentStage >= stage) {
+				endIgnition(player, currentTick, BurningPassionIgnitionEndReason.LOCKED, false, false);
 				return;
 			}
 
-			int currentTick = player.getEntityWorld().getServer().getTicks();
 			int stageDuration = burningPassionStageDurationTicks(state.currentStage);
 			state.stageStartTick = Math.max(state.stageStartTick, currentTick - stageDuration);
 			syncBurningPassionHud(player);
 		}
+	}
+
+	private static boolean isLockedFrostStage(ServerPlayerEntity player, int stage) {
+		return stage >= 2 && !MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.FROST, stage);
+	}
+
+	private static boolean isLockedBurningPassionStage(ServerPlayerEntity player, int stage) {
+		return stage >= 2 && !MagicConfig.get().abilityAccess.isStageProgressionUnlocked(player.getUuid(), MagicSchool.BURNING_PASSION, stage);
 	}
 
 	public static void clearAllRuntimeState(ServerPlayerEntity player) {

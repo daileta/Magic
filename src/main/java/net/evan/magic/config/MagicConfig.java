@@ -1135,7 +1135,7 @@ public final class MagicConfig {
 		public double momentumToleranceBlocksPerTick = 0.03;
 		public double tierOneHeatReductionPerSecond = 1.5;
 		public double tierTwoAttackBonus = 2.0;
-		public float tierThreeSpecialAttackDamage = 40.0F;
+		public float tierThreeSpecialAttackDamage = 85.0F;
 		public double tierThreeSpecialHeatGainPercent = 30.0;
 		public double specialKnockbackHorizontalVelocity = 1.6;
 		public double specialKnockbackVerticalVelocity = 0.5;
@@ -4761,12 +4761,12 @@ public final class MagicConfig {
 	public static final class FrostRangedAttackConfig {
 		public double width = 1.0;
 		public double range = 40.0;
-		public double speedBlocksPerSecond = 5;
+		public double speedBlocksPerSecond = 10;
 		public float baseDamage = 5.0F;
 		public double normalManaCostPercent = 25.0;
 		public double overcastChancePercent = 20.0;
 		public double overcastManaCostPercent = 75.0;
-		public double overcastSpeedBlocksPerSecond = 15;
+		public double overcastSpeedBlocksPerSecond = 20;
 		public boolean instantKillEnabled = true;
 		public double setbackChancePercent = 10.0;
 		public double particleSpacing = 0.35;
