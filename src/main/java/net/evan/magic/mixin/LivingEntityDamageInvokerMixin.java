@@ -13,3 +13,4 @@ public interface LivingEntityDamageInvokerMixin {
 	@Invoker("modifyAppliedDamage")
 	float magic$invokeModifyAppliedDamage(DamageSource source, float amount);
 }
+

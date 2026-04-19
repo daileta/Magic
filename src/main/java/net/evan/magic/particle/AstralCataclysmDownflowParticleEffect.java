@@ -47,3 +47,4 @@ public record AstralCataclysmDownflowParticleEffect(
 		return ModParticles.ASTRAL_CATACLYSM_DOWNFLOW;
 	}
 }
+

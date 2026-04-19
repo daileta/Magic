@@ -25,12 +25,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.evan.magic.Magic;
-import net.evan.magic.magic.MagicSchool;
-import net.evan.magic.magic.ability.MagicAbility;
+import net.evan.magic.magic.core.MagicSchool;
+import net.evan.magic.magic.core.ability.MagicAbility;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.util.math.MathHelper;
 
-public final class MagicConfig extends MagicConfigFrostAccessModels {
+public final class MagicConfig extends ConfigDataAndFrostModels {
 	private static final TypeAdapter<Integer> FLEXIBLE_INTEGER_ADAPTER = new TypeAdapter<>() {
 		@Override
 		public void write(JsonWriter out, Integer value) throws IOException {
@@ -255,4 +255,5 @@ public final class MagicConfig extends MagicConfigFrostAccessModels {
 		}
 	}
 }
+
 

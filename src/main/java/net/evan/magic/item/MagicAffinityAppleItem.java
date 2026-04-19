@@ -1,7 +1,7 @@
 package net.evan.magic.item;
 
-import net.evan.magic.magic.MagicPlayerData;
-import net.evan.magic.magic.MagicSchool;
+import net.evan.magic.magic.core.MagicPlayerData;
+import net.evan.magic.magic.core.MagicSchool;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
@@ -47,3 +47,4 @@ public final class MagicAffinityAppleItem extends Item {
 		player.sendMessage(Text.translatable("message.magic.already_attuned", currentSchool.displayName()), false);
 	}
 }
+

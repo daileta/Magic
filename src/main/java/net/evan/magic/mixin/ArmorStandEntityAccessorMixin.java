@@ -9,3 +9,4 @@ public interface ArmorStandEntityAccessorMixin {
 	@Invoker("setMarker")
 	void magic$setMarker(boolean marker);
 }
+

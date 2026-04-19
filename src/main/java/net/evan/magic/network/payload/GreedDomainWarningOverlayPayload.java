@@ -39,3 +39,4 @@ public record GreedDomainWarningOverlayPayload(
 		return ID;
 	}
 }
+

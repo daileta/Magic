@@ -1,6 +1,6 @@
 package net.evan.magic.mixin;
 
-import net.evan.magic.magic.ability.GreedRuntime;
+import net.evan.magic.magic.ability.GreedAbilityRuntime;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.vehicle.TntMinecartEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class TntMinecartEntityMixin {
 	@Inject(method = "prime", at = @At("HEAD"))
 	private void magic$recordGreedTntMinecartPrime(DamageSource source, CallbackInfo ci) {
-		GreedRuntime.onTntMinecartPrimed(source);
+		GreedAbilityRuntime.onTntMinecartPrimed(source);
 	}
 }
+

@@ -7,10 +7,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import net.evan.magic.config.MagicConfig;
-import net.evan.magic.magic.MagicPlayerData;
-import net.evan.magic.magic.MagicSchool;
-import net.evan.magic.magic.ability.GreedRuntime;
-import net.evan.magic.magic.ability.MagicAbility;
+import net.evan.magic.magic.core.MagicPlayerData;
+import net.evan.magic.magic.core.MagicSchool;
+import net.evan.magic.magic.ability.GreedAbilityRuntime;
+import net.evan.magic.magic.core.ability.MagicAbility;
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -220,7 +220,7 @@ final class MagicCommandActions {
 				skippedNonGreed++;
 				continue;
 			}
-			if (GreedRuntime.addCoins(target, amount) > 0) {
+			if (GreedAbilityRuntime.addCoins(target, amount) > 0) {
 				updatedTargets.add(target);
 			}
 		}
@@ -455,3 +455,4 @@ final class MagicCommandActions {
 		return playerIds;
 	}
 }
+

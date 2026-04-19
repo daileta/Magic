@@ -8,3 +8,4 @@ public final class ManaSicknessStatusEffect extends StatusEffect {
 		super(StatusEffectCategory.HARMFUL, 0x6C4F28);
 	}
 }
+

@@ -16,3 +16,4 @@ public final class Magic implements ModInitializer {
 		LOGGER.info("Initialized mod {}", MOD_ID);
 	}
 }
+

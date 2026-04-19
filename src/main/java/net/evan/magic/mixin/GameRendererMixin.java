@@ -1,6 +1,6 @@
 package net.evan.magic.mixin;
 
-import net.evan.magic.client.CelestialGamaRayPresentationManager;
+import net.evan.magic.client.render.CelestialGamaRayPresentationManager;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -30,3 +30,4 @@ public abstract class GameRendererMixin {
 		matrices.translate(Math.sin(tickProgress * 6.0F) * shake * 0.0015F, Math.cos(tickProgress * 4.0F) * shake * 0.0012F, 0.0F);
 	}
 }
+

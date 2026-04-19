@@ -1,6 +1,6 @@
 package net.evan.magic.mixin;
 
-import net.evan.magic.magic.ability.GreedRuntime;
+import net.evan.magic.magic.ability.GreedAbilityRuntime;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.decoration.EndCrystalEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -19,7 +19,8 @@ public abstract class EndCrystalEntityMixin {
 		CallbackInfoReturnable<Boolean> cir
 	) {
 		if (cir.getReturnValueZ()) {
-			GreedRuntime.onEndCrystalDestroyed(source);
+			GreedAbilityRuntime.onEndCrystalDestroyed(source);
 		}
 	}
 }
+

@@ -8,3 +8,4 @@ public final class GildedBurdenStatusEffect extends StatusEffect {
 		super(StatusEffectCategory.HARMFUL, 0xD8A624);
 	}
 }
+

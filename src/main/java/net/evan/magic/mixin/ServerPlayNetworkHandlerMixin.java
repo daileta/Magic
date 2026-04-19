@@ -1,7 +1,7 @@
 package net.evan.magic.mixin;
 
 import net.evan.magic.magic.ability.MagicAbilityManager;
-import net.evan.magic.magic.ability.GreedRuntime;
+import net.evan.magic.magic.ability.GreedAbilityRuntime;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
@@ -52,14 +52,14 @@ public abstract class ServerPlayNetworkHandlerMixin {
 	private boolean magic$shouldCancelGreedHandUse(Hand hand) {
 		if (
 			hand == Hand.OFF_HAND
-			&& GreedRuntime.isOffhandBlocked(player)
-			&& !GreedRuntime.canUseEnderPearlWhileRooted(player, player.getStackInHand(hand))
+			&& GreedAbilityRuntime.isOffhandBlocked(player)
+			&& !GreedAbilityRuntime.canUseEnderPearlWhileRooted(player, player.getStackInHand(hand))
 		) {
-			GreedRuntime.onBlockedShieldUse(player);
+			GreedAbilityRuntime.onBlockedShieldUse(player);
 			return true;
 		}
-		if (player.getStackInHand(hand).isOf(Items.SHIELD) && GreedRuntime.isShieldLocked(player)) {
-			GreedRuntime.onBlockedShieldUse(player);
+		if (player.getStackInHand(hand).isOf(Items.SHIELD) && GreedAbilityRuntime.isShieldLocked(player)) {
+			GreedAbilityRuntime.onBlockedShieldUse(player);
 			return true;
 		}
 		return false;
@@ -142,14 +142,14 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			ci.cancel();
 			return;
 		}
-		if (packet.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING && GreedRuntime.isSprintBlocked(player)) {
+		if (packet.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING && GreedAbilityRuntime.isSprintBlocked(player)) {
 			player.setSprinting(false);
-			GreedRuntime.onBlockedSprintAttempt(player);
+			GreedAbilityRuntime.onBlockedSprintAttempt(player);
 			ci.cancel();
 			return;
 		}
 		if (packet.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING) {
-			GreedRuntime.onStartSprinting(player);
+			GreedAbilityRuntime.onStartSprinting(player);
 		}
 	}
 
@@ -177,12 +177,12 @@ public abstract class ServerPlayNetworkHandlerMixin {
 			return;
 		}
 		if (action == PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND) {
-			if (GreedRuntime.isOffhandBlocked(player)) {
-				GreedRuntime.onBlockedShieldUse(player);
+			if (GreedAbilityRuntime.isOffhandBlocked(player)) {
+				GreedAbilityRuntime.onBlockedShieldUse(player);
 				ci.cancel();
 				return;
 			}
-			GreedRuntime.recordExternalAction(player, "attribute_swapping");
+			GreedAbilityRuntime.recordExternalAction(player, "attribute_swapping");
 		}
 		if (
 			(action == PlayerActionC2SPacket.Action.DROP_ITEM || action == PlayerActionC2SPacket.Action.DROP_ALL_ITEMS) &&
@@ -281,3 +281,4 @@ public abstract class ServerPlayNetworkHandlerMixin {
 		magic$packetDebug("{} packet onPlayerInteractEntity RETURN", magic$debugName());
 	}
 }
+

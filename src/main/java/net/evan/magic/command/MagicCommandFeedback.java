@@ -1,9 +1,9 @@
 package net.evan.magic.command;
 
 import java.util.Collection;
-import net.evan.magic.magic.MagicPlayerData;
-import net.evan.magic.magic.MagicSchool;
-import net.evan.magic.magic.ability.MagicAbility;
+import net.evan.magic.magic.core.MagicPlayerData;
+import net.evan.magic.magic.core.MagicSchool;
+import net.evan.magic.magic.core.ability.MagicAbility;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -349,3 +349,4 @@ final class MagicCommandFeedback {
 		return wholeCoins + "." + fractional;
 	}
 }
+

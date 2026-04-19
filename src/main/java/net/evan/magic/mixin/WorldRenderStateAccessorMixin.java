@@ -10,3 +10,4 @@ public interface WorldRenderStateAccessorMixin {
 	@Accessor("cameraRenderState")
 	CameraRenderState magic$getCameraRenderState();
 }
+

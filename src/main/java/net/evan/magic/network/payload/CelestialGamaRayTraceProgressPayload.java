@@ -23,3 +23,4 @@ public record CelestialGamaRayTraceProgressPayload(String action) implements Cus
 		return ID;
 	}
 }
+

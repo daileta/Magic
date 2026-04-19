@@ -36,3 +36,4 @@ public record JesterJokeOverlayPayload(
 		return ID;
 	}
 }
+

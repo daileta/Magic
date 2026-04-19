@@ -42,3 +42,4 @@ public final class ModStatusEffects {
 	public static void register() {
 	}
 }
+

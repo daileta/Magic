@@ -1,6 +1,6 @@
 package net.evan.magic.mixin;
 
-import net.evan.magic.client.BurningPassionAfterimageRenderer;
+import net.evan.magic.client.render.BurningPassionAfterimageRenderer;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.command.OrderedRenderCommandQueue;
@@ -67,3 +67,4 @@ public abstract class LivingEntityRendererMixin {
 		cir.setReturnValue(RenderLayers.entityTranslucent(texture));
 	}
 }
+

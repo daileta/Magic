@@ -79,3 +79,4 @@ public record AstralCataclysmSpiralParticleEffect(
 		return ModParticles.ASTRAL_CATACLYSM_SPIRAL;
 	}
 }
+

@@ -1,4 +1,7 @@
 package net.evan.magic.magic.ability;
+import net.evan.magic.magic.core.ability.MagicAbility;
+import net.evan.magic.magic.ability.GreedAbilityRuntime;
+import net.evan.magic.magic.ability.GreedDomainRuntime;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -13,8 +16,8 @@ import java.util.UUID;
 import java.util.function.Predicate;
 import net.evan.magic.Magic;
 import net.evan.magic.config.MagicConfig;
-import net.evan.magic.magic.MagicPlayerData;
-import net.evan.magic.magic.MagicSchool;
+import net.evan.magic.magic.core.MagicPlayerData;
+import net.evan.magic.magic.core.MagicSchool;
 import net.evan.magic.mixin.ArmorStandEntityAccessorMixin;
 import net.evan.magic.mixin.BlockDisplayEntityAccessorMixin;
 import net.evan.magic.mixin.DisplayEntityAccessorMixin;
@@ -142,7 +145,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 
-public final class MagicAbilityManager extends MagicAbilityManagerSupportResets {
+public final class MagicAbilityManager extends RuntimeResetService {
 	private MagicAbilityManager() {
 	}
 
@@ -638,12 +641,12 @@ public final class MagicAbilityManager extends MagicAbilityManagerSupportResets 
 			return;
 		}
 
-		if (GreedRuntime.isAbilityUseLocked(player, currentTick)) {
+		if (GreedAbilityRuntime.isAbilityUseLocked(player, currentTick)) {
 			player.sendMessage(Text.translatable("message.magic.greed.ability_locked"), true);
 			return;
 		}
 
-		if (GreedRuntime.handleAbilityRequest(player, requestedAbility)) {
+		if (GreedAbilityRuntime.handleAbilityRequest(player, requestedAbility)) {
 			recordOrionsGambitAbilityUse(player, requestedAbility);
 			return;
 		}
@@ -776,3 +779,4 @@ public final class MagicAbilityManager extends MagicAbilityManagerSupportResets 
 		return MagicAbility.fromSlotForSchool(abilitySlot, school);
 	}
 }
+

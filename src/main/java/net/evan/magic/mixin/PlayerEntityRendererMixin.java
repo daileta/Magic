@@ -1,6 +1,6 @@
 package net.evan.magic.mixin;
 
-import net.evan.magic.client.BurningPassionAfterimageRenderer;
+import net.evan.magic.client.render.BurningPassionAfterimageRenderer;
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.minecraft.client.render.command.OrderedRenderCommandQueue;
 import net.minecraft.client.render.entity.PlayerEntityRenderer;
@@ -63,3 +63,4 @@ public abstract class PlayerEntityRendererMixin {
 		}
 	}
 }
+

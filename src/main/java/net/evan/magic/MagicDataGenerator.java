@@ -9,3 +9,4 @@ public final class MagicDataGenerator implements DataGeneratorEntrypoint {
 		fabricDataGenerator.createPack();
 	}
 }
+

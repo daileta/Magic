@@ -39,3 +39,4 @@ public final class ModParticles {
 	public static void register() {
 	}
 }
+

@@ -50,3 +50,4 @@ public final class MagicNetworking {
 		initialized = true;
 	}
 }
+

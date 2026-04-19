@@ -79,3 +79,4 @@ public record TollkeepersClaimVortexParticleEffect(
 		return ModParticles.TOLLKEEPERS_CLAIM_VORTEX;
 	}
 }
+

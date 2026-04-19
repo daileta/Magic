@@ -4,8 +4,8 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import java.util.List;
-import net.evan.magic.magic.MagicSchool;
-import net.evan.magic.magic.ability.MagicAbility;
+import net.evan.magic.magic.core.MagicSchool;
+import net.evan.magic.magic.core.ability.MagicAbility;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
@@ -517,3 +517,4 @@ final class MagicCommandRegistrar {
 	private record SchoolLiteral(MagicSchool school, String literal) {
 	}
 }
+

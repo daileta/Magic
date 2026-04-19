@@ -25,3 +25,4 @@ public interface DisplayEntityAccessorMixin {
 	@Invoker("setTransformation")
 	void magic$setTransformation(AffineTransformation transformation);
 }
+

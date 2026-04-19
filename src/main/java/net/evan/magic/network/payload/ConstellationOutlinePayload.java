@@ -25,3 +25,4 @@ public record ConstellationOutlinePayload(List<UUID> entityUuids) implements Cus
 		return ID;
 	}
 }
+

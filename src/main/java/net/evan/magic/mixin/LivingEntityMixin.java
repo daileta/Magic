@@ -1,6 +1,6 @@
 package net.evan.magic.mixin;
 
-import net.evan.magic.magic.ability.GreedRuntime;
+import net.evan.magic.magic.ability.GreedAbilityRuntime;
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -17,9 +17,9 @@ public abstract class LivingEntityMixin {
 	private void magic$modifyGreedJumpVelocity(float strength, CallbackInfoReturnable<Float> cir) {
 		LivingEntity self = (LivingEntity) (Object) this;
 		if (self instanceof ServerPlayerEntity serverPlayer) {
-			GreedRuntime.onPlayerJump(serverPlayer);
+			GreedAbilityRuntime.onPlayerJump(serverPlayer);
 		}
-		cir.setReturnValue(GreedRuntime.modifyJumpVelocity(self, cir.getReturnValueF()));
+		cir.setReturnValue(GreedAbilityRuntime.modifyJumpVelocity(self, cir.getReturnValueF()));
 	}
 
 	@Inject(method = "heal(F)V", at = @At("HEAD"), cancellable = true)
@@ -38,7 +38,8 @@ public abstract class LivingEntityMixin {
 		}
 		MagicAbilityManager.onLivingEntityDeathProtectorTriggered(self);
 		if (self instanceof ServerPlayerEntity serverPlayer) {
-			GreedRuntime.onPlayerDeathProtectorTriggered(serverPlayer, source);
+			GreedAbilityRuntime.onPlayerDeathProtectorTriggered(serverPlayer, source);
 		}
 	}
 }
+

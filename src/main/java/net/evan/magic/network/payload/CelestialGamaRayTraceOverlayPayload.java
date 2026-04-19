@@ -88,3 +88,4 @@ public record CelestialGamaRayTraceOverlayPayload(
 		return ID;
 	}
 }
+

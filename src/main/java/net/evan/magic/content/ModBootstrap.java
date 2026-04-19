@@ -2,7 +2,7 @@ package net.evan.magic.content;
 
 import net.evan.magic.command.MagicCommands;
 import net.evan.magic.config.MagicConfig;
-import net.evan.magic.magic.MagicPlayerData;
+import net.evan.magic.magic.core.MagicPlayerData;
 import net.evan.magic.magic.ability.MagicAbilityManager;
 import net.evan.magic.network.MagicNetworking;
 import net.evan.magic.registry.ModBlocks;
@@ -33,3 +33,4 @@ public final class ModBootstrap {
 		initialized = true;
 	}
 }
+

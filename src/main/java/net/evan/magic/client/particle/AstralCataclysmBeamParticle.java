@@ -99,3 +99,4 @@ public final class AstralCataclysmBeamParticle extends BillboardParticle {
 		}
 	}
 }
+

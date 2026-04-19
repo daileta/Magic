@@ -1,0 +1,115 @@
+package net.evan.magic.magic.core.ability;
+
+import net.evan.magic.magic.core.MagicSchool;
+import net.minecraft.text.Text;
+
+public enum MagicAbility {
+	NONE(0, MagicSchool.NONE, "none"),
+	BELOW_FREEZING(1, MagicSchool.FROST, "below_freezing"),
+	FROST_ASCENT(2, MagicSchool.FROST, "frost_ascent"),
+	PLANCK_HEAT(3, MagicSchool.FROST, "planck_heat"),
+	ABSOLUTE_ZERO(4, MagicSchool.FROST, "absolute_zero"),
+	FROST_DOMAIN_EXPANSION(5, MagicSchool.FROST, "frost_domain_expansion"),
+	LOVE_AT_FIRST_SIGHT(1, MagicSchool.LOVE, "love_at_first_sight"),
+	TILL_DEATH_DO_US_PART(2, MagicSchool.LOVE, "till_death_do_us_part"),
+	MANIPULATION(3, MagicSchool.LOVE, "empty_embrace"),
+	LOVE_DOMAIN_EXPANSION(5, MagicSchool.LOVE, "love_domain_expansion"),
+	MARTYRS_FLAME(1, MagicSchool.BURNING_PASSION, "martyrs_flame"),
+	IGNITION(2, MagicSchool.BURNING_PASSION, "ignition"),
+	SEARING_DASH(3, MagicSchool.BURNING_PASSION, "searing_dash"),
+	CINDER_MARK(4, MagicSchool.BURNING_PASSION, "cinder_mark"),
+	ENGINE_HEART(4, MagicSchool.BURNING_PASSION, "engine_heart"),
+	OVERRIDE(5, MagicSchool.BURNING_PASSION, "override"),
+	SPOTLIGHT(1, MagicSchool.JESTER, "spotlight"),
+	WITTY_ONE_LINER(2, MagicSchool.JESTER, "witty_one_liner"),
+	COMEDIC_REWRITE(3, MagicSchool.JESTER, "comedic_rewrite"),
+	COMEDIC_ASSISTANT(4, MagicSchool.JESTER, "comedic_assistant"),
+	PLUS_ULTRA(5, MagicSchool.JESTER, "plus_ultra"),
+	CASSIOPEIA(1, MagicSchool.CONSTELLATION, "cassiopeia"),
+	HERCULES_BURDEN_OF_THE_SKY(2, MagicSchool.CONSTELLATION, "hercules_burden_of_the_sky"),
+	SAGITTARIUS_ASTRAL_ARROW(3, MagicSchool.CONSTELLATION, "celestial_alignment"),
+	ORIONS_GAMBIT(4, MagicSchool.CONSTELLATION, "orions_gambit"),
+	ASTRAL_CATACLYSM(5, MagicSchool.CONSTELLATION, "astral_cataclysm"),
+	APPRAISERS_MARK(1, MagicSchool.GREED, "appraisers_mark"),
+	TOLLKEEPERS_CLAIM(2, MagicSchool.GREED, "tollkeepers_claim"),
+	KINGS_DUES(3, MagicSchool.GREED, "kings_dues"),
+	BANKRUPTCY(4, MagicSchool.GREED, "bankruptcy"),
+	GREED_DOMAIN_EXPANSION(5, MagicSchool.GREED, "greed_domain_expansion");
+
+	private final int slot;
+	private final MagicSchool school;
+	private final String id;
+
+	MagicAbility(int slot, MagicSchool school, String id) {
+		this.slot = slot;
+		this.school = school;
+		this.id = id;
+	}
+
+	public int slot() {
+		return slot;
+	}
+
+	public MagicSchool school() {
+		return school;
+	}
+
+	public String id() {
+		return id;
+	}
+
+	public Text displayName() {
+		return Text.translatable("magic.ability." + id);
+	}
+
+	public static MagicAbility fromId(String id) {
+		if (id == null) {
+			return NONE;
+		}
+
+		if ("manipulation".equals(id)) {
+			return MANIPULATION;
+		}
+		if ("sagittarius_astral_arrow".equals(id)) {
+			return SAGITTARIUS_ASTRAL_ARROW;
+		}
+		if ("phoenixs_cage".equals(id)) {
+			return SEARING_DASH;
+		}
+		if ("pyrotechnics_law".equals(id)) {
+			return CINDER_MARK;
+		}
+		if ("im_the_fastest_there_is".equals(id)) {
+			return ENGINE_HEART;
+		}
+
+		for (MagicAbility ability : values()) {
+			if (ability.id.equals(id)) {
+				return ability;
+			}
+		}
+
+		return NONE;
+	}
+
+	public static MagicAbility fromSlot(int slot) {
+		for (MagicAbility ability : values()) {
+			if (ability.slot == slot) {
+				return ability;
+			}
+		}
+
+		return NONE;
+	}
+
+	public static MagicAbility fromSlotForSchool(int slot, MagicSchool school) {
+		for (MagicAbility ability : values()) {
+			if (ability.slot == slot && ability.school == school) {
+				return ability;
+			}
+		}
+
+		return NONE;
+	}
+}
+

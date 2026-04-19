@@ -1,6 +1,6 @@
 package net.evan.magic.mixin;
 
-import net.evan.magic.client.MagicClientNetworking;
+import net.evan.magic.client.networking.MagicClientNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,3 +17,4 @@ public abstract class MinecraftClientMixin {
 		}
 	}
 }
+

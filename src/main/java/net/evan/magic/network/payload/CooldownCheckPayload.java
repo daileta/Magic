@@ -19,3 +19,4 @@ public record CooldownCheckPayload(int ignored) implements CustomPayload {
 		return ID;
 	}
 }
+

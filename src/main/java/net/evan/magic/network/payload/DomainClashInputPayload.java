@@ -19,3 +19,4 @@ public record DomainClashInputPayload(int keyCode) implements CustomPayload {
 		return ID;
 	}
 }
+

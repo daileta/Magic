@@ -10,3 +10,4 @@ public interface BlockDisplayEntityAccessorMixin {
 	@Invoker("setBlockState")
 	void magic$setBlockState(BlockState blockState);
 }
+

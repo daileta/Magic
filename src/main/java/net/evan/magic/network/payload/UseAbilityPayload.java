@@ -17,3 +17,4 @@ public record UseAbilityPayload(int abilitySlot) implements CustomPayload {
 		return ID;
 	}
 }
+

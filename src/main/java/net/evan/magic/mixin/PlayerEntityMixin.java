@@ -1,7 +1,7 @@
 package net.evan.magic.mixin;
 
 import net.evan.magic.magic.ability.MagicAbilityManager;
-import net.evan.magic.magic.ability.GreedRuntime;
+import net.evan.magic.magic.ability.GreedAbilityRuntime;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
@@ -52,7 +52,7 @@ public abstract class PlayerEntityMixin {
 			return;
 		}
 
-		GreedRuntime.onShieldDisabled(serverPlayer, self instanceof net.minecraft.server.network.ServerPlayerEntity targetPlayer ? targetPlayer : null);
+		GreedAbilityRuntime.onShieldDisabled(serverPlayer, self instanceof net.minecraft.server.network.ServerPlayerEntity targetPlayer ? targetPlayer : null);
 	}
 
 	@Inject(method = "addAttackParticlesAndSounds", at = @At("HEAD"))
@@ -67,7 +67,7 @@ public abstract class PlayerEntityMixin {
 	) {
 		PlayerEntity self = (PlayerEntity) (Object) this;
 		if (criticalHit && self instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
-			GreedRuntime.recordExternalAction(serverPlayer, "critical_hit");
+			GreedAbilityRuntime.recordExternalAction(serverPlayer, "critical_hit");
 		}
 	}
 
@@ -100,3 +100,4 @@ public abstract class PlayerEntityMixin {
 		}
 	}
 }
+

@@ -2,7 +2,7 @@ package net.evan.magic.registry;
 
 import net.evan.magic.Magic;
 import net.evan.magic.item.MagicAffinityAppleItem;
-import net.evan.magic.magic.MagicSchool;
+import net.evan.magic.magic.core.MagicSchool;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.component.type.FoodComponents;
 import net.minecraft.item.Item;
@@ -72,3 +72,4 @@ public final class ModItems {
 		});
 	}
 }
+

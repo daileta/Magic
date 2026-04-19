@@ -8,3 +8,4 @@ public final class ModBlocks {
 		// TODO: Register custom blocks.
 	}
 }
+

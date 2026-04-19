@@ -33,3 +33,4 @@ public abstract class EnderPearlEntityMixin {
 		ci.cancel();
 	}
 }
+
