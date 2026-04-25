@@ -295,6 +295,10 @@ abstract class FrostAbilityRequests extends FrostEffectRuntime {
 		spawnFrostStageParticles(player, state.currentStage);
 		progressFrostStageUnlocks(player, state);
 		progressFrostMaximumUnlock(state);
+		if (hasFrostMaximumStageTimeoutElapsed(state)) {
+			endFrostStagedMode(player, currentTick, FrostStageEndReason.MAXIMUM, false, false);
+			return;
+		}
 		syncFrostStageHud(player);
 	}
 
@@ -849,6 +853,13 @@ abstract class FrostAbilityRequests extends FrostEffectRuntime {
 			FROST_CONFIG.progression.maximumUnlockTicks,
 			Math.max(0, state.stageThreeHoldTicks) + 1
 		);
+	}
+
+	static boolean hasFrostMaximumStageTimeoutElapsed(FrostStageState state) {
+		return state != null
+			&& FROST_CONFIG.maximum.enabled
+			&& state.currentStage == 3
+			&& Math.max(0, state.stageThreeHoldTicks) >= Math.max(1, FROST_CONFIG.progression.maximumUnlockTicks);
 	}
 
 	static void applyFrostFreeze(LivingEntity target, UUID casterId, int expiresTick) {

@@ -526,6 +526,10 @@ abstract class GreedAbilitySupport extends GreedAbilityState {
 	}
 
 	static ServerPlayerEntity attackingPlayerFrom(DamageSource source) {
+		if (source == null) {
+			return null;
+		}
+
 		Entity attacker = source.getAttacker();
 		if (attacker instanceof ServerPlayerEntity serverPlayer) {
 			return serverPlayer;

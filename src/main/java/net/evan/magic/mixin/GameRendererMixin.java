@@ -11,11 +11,16 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(GameRenderer.class)
+@Mixin(value = GameRenderer.class, priority = 900)
 public abstract class GameRendererMixin {
 	@Inject(method = "getFov(Lnet/minecraft/client/render/Camera;FZ)F", at = @At("RETURN"), cancellable = true)
 	private void magic$applyCelestialGamaRayFovPulse(Camera camera, float tickProgress, boolean changingFov, CallbackInfoReturnable<Float> cir) {
-		cir.setReturnValue(cir.getReturnValueF() * CelestialGamaRayPresentationManager.getLocalFovMultiplier(tickProgress));
+		float multiplier = CelestialGamaRayPresentationManager.getLocalFovMultiplier(tickProgress);
+		if (multiplier == 1.0F) {
+			return;
+		}
+
+		cir.setReturnValue(cir.getReturnValueF() * multiplier);
 	}
 
 	@Inject(method = "bobView(Lnet/minecraft/client/util/math/MatrixStack;F)V", at = @At("TAIL"))

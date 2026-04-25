@@ -166,6 +166,10 @@ abstract class GreedAbilityRequestHandler extends GreedAbilitySupport {
 	}
 
 	public static void onTntMinecartPrimed(DamageSource source) {
+		if (source == null) {
+			return;
+		}
+
 		ServerPlayerEntity attacker = attackingPlayerFrom(source);
 		if (attacker != null) {
 			recordActionFromPlayer(attacker, "ignite_tnt_minecart", null);

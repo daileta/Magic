@@ -146,6 +146,12 @@ import org.joml.Vector3f;
 
 
 abstract class DomainExpansionService extends LoveAbilityRequests {
+	static final Set<Identifier> UNIVERSAL_GRAVES_BLOCK_IDS = Set.of(
+		Identifier.of("universal_graves", "grave"),
+		Identifier.of("universal_graves", "visual_grave"),
+		Identifier.of("universal_graves", "container_grave")
+	);
+
 	static void handleDomainExpansionRequest(ServerPlayerEntity player, MagicAbility requestedAbility, int currentTick) {
 		MagicAbility activeAbility = activeAbility(player);
 		if (isDomainExpansion(activeAbility)) {
@@ -565,6 +571,10 @@ abstract class DomainExpansionService extends LoveAbilityRequests {
 				continue;
 			}
 
+			if (shouldPreserveUniversalGravesBlockOnDomainRestore(world, state, pos, saved)) {
+				continue;
+			}
+
 			if (!setDomainBlockState(world, pos, saved.blockState, DOMAIN_BLOCK_RESTORE_FLAGS)) {
 				continue;
 			}
@@ -584,6 +594,54 @@ abstract class DomainExpansionService extends LoveAbilityRequests {
 		}
 
 		restoreCapturedEntities(server, state);
+	}
+
+	static boolean shouldPreserveUniversalGravesBlockOnDomainRestore(
+		ServerWorld world,
+		DomainExpansionState state,
+		BlockPos pos,
+		DomainSavedBlockState saved
+	) {
+		BlockState currentState = world.getBlockState(pos);
+		if (currentState.equals(saved.blockState) || !isUniversalGravesBlock(currentState)) {
+			return false;
+		}
+
+		BlockState protectedState = state.protectedShellStates.get(pos);
+		if (protectedState != null) {
+			return !currentState.equals(protectedState);
+		}
+
+		int relativeY = pos.getY() - state.baseY;
+		if (relativeY < 0 || relativeY > state.height) {
+			return false;
+		}
+
+		int centerX = MathHelper.floor(state.centerX);
+		int centerZ = MathHelper.floor(state.centerZ);
+		int horizontalDistanceSq = horizontalDistanceSq(pos.getX(), centerX, pos.getZ(), centerZ);
+		if (relativeY > 0 && !isInsideDomainDome(horizontalDistanceSq, relativeY, state.radius, state.height)) {
+			return false;
+		}
+
+		boolean shell = relativeY == 0 || !isInsideDomainDome(horizontalDistanceSq, relativeY, state.innerRadius, state.innerHeight);
+		BlockState expectedDomainState = resolveDomainTargetState(
+			state.ability,
+			shell,
+			centerX,
+			centerZ,
+			state.baseY,
+			state.radius,
+			state.height,
+			state.innerRadius,
+			state.innerHeight,
+			pos
+		);
+		return !currentState.equals(expectedDomainState);
+	}
+
+	static boolean isUniversalGravesBlock(BlockState state) {
+		return UNIVERSAL_GRAVES_BLOCK_IDS.contains(Registries.BLOCK.getId(state.getBlock()));
 	}
 
 	static void updateDomainExpansions(MinecraftServer server, int currentTick) {
